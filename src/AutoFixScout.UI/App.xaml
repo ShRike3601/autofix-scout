@@ -1,0 +1,19 @@
+<Application x:Class="AutoFixScout.UI.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <!-- Base font and theme -->
+        <Style x:Key="BaseButtonStyle" TargetType="Button">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="Padding" Value="15,10"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <!-- Simple mode colors -->
+        <SolidColorBrush x:Key="SimpleModeBackground" Color="#F5F5F5"/>
+        <SolidColorBrush x:Key="SimpleModeForeground" Color="#333333"/>
+        <SolidColorBrush x:Key="SimpleModeAccent" Color="#0078D4"/>
+
+    </Application.Resources>
+</Application>

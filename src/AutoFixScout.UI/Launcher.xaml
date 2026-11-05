@@ -1,0 +1,44 @@
+<!-- Launcher executable (EXE) for v1 portable app -->
+<!-- Once .NET SDK is available, replace this launcher with a direct dotnet run or produce self-contained EXE -->
+<Application xmlns="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Application.Resources>
+        <!-- Default theme: high contrast, large buttons (section 4.2) -->
+        <SolidColorBrush x:Key="Background" Color="#F5F5F5"/>
+        <SolidColorBrush x:Key="Foreground" Color="#333333"/>
+        <SolidColorBrush x:Key="Accent" Color="#0078D4"/>
+
+        <!-- Button styles -->
+        <Style x:Key="LargeButtonStyle" TargetType="Button">
+            <Setter Property="FontSize" Value="24"/>
+            <Setter Property="Padding" Value="20,15"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <!-- Sound button (blue) -->
+        <Style x:Key="SoundButtonStyle" TargetType="Button" BasedOn="{StaticResource LargeButtonStyle}">
+            <Setter Property="BorderBrush" Value="#0078D4"/>
+        </Style>
+
+        <!-- Camera button (red) -->
+        <Style x:Key="CameraButtonStyle" TargetType="Button" BasedOn="{StaticResource LargeButtonStyle}">
+            <Setter Property="BorderBrush" Value="#D93F08"/>
+        </Style>
+
+        <!-- Network button (green) -->
+        <Style x:Key="NetworkButtonStyle" TargetType="Button" BasedOn="{StaticResource LargeButtonStyle}">
+            <Setter Property="BorderBrush" Value="#107C10"/>
+        </Style>
+    </Application.Resources>
+
+    <!-- Main window reference -->
+    <Window x:Name="MainWindow" x:Class="AutoFixScout.UI.MainWindow"
+            Title="AutoFix Scout" Height="720" Width="540" WindowStyle="SingleBorderWindow"
+            ResizeMode="NoResize" Background="{StaticResource Background}">
+
+        <!-- Content will be set in code-behind -->
+        <ContentPresenter x:Name="RootContent"/>
+    </Window>
+</Application>

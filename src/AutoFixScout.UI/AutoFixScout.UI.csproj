@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AutoFixScout.UI</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <!-- Packaging for portable installer -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AutoFixScout\AutoFixScout.csproj" />
+    <!-- Data binding and converters -->
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
+    <!-- Styling -->
+    <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.39" />
+  </ItemGroup>
+
+</Project>

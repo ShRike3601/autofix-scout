@@ -1,0 +1,22 @@
+<!-- SettingsView.xaml -->
+<Window x:Class="AutoFixScout.UI.SettingsView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings" Height="300" Width="400" WindowStyle="ToolWindow"
+        ResizeMode="NoResize" Background="#FFFFFF">
+
+    <StackPanel Margin="20">
+        <TextBlock Text="Telemetry (opt-in)" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/>
+        <CheckBox x:Name="TelemetryOptIn" Content="Send anonymous outcome data to improve fixes" Margin="0,0,0,20"/>
+
+        <TextBlock Text="LLM (optional cloud API)" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/>
+        <CheckBox x:Name="LLMEnabled" Content="Enable free-text symptom input and typed/voice routing" Margin="0,0,0,20"/>
+
+        <TextBlock Text="Risk Tier 2 Safety" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/>
+        <CheckBox x:Name="HelperApprovalForT2" Content="Require helper approval for driver changes (T2 actions)" IsChecked="True" Margin="0,0,0,30"/>
+
+        <!-- Footer -->
+        <Button Content="Save and close" Width="120" HorizontalAlignment="Right" Click="OnSaveClicked"/>
+    </StackPanel>
+
+</Window>
