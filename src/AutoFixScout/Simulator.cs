@@ -4,13 +4,13 @@ namespace AutoFixScout;
 
 public sealed class Simulator
 {
-    public static StepResult FakeExecute(StepAction action, int sessionId)
+    public static ActionStepResult FakeExecute(StepAction action, int sessionId)
     {
-        return new StepResult
+        return new ActionStepResult
         {
             ActionId = action.Id,
             Tier = action.Tier,
-            SessionId = sessionId,
+            SessionId = sessionId.ToString(),
             ProposedBy = "Test",
             Approved = true,
             ResultType = "Fake"

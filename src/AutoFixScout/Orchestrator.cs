@@ -3,7 +3,6 @@ namespace AutoFixScout;
 public sealed class Orchestrator : IDisposable
 {
     private readonly SessionManager _manager;
-    private readonly ActionCatalog _catalog;
     private int? _nextId;
     
     public string Id { get; } = Guid.NewGuid().ToString("N");
@@ -12,11 +11,9 @@ public sealed class Orchestrator : IDisposable
     public Orchestrator(IProbes probes = null)
     {
         _manager = new SessionManager();
-        ActionCatalog.Initialize();
-        _catalog = ActionCatalog.Instance;
     }
 
-    public StepResult ExecuteAction(StepAction action, int sessionId)
+    public ActionStepResult ExecuteAction(StepAction action, int sessionId)
     {
         var context = Simulator.FakeSession(sessionId);
         context.Log(action, null);

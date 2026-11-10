@@ -1,0 +1,21 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet test AutoFixScout.sln -c Release
+      - run: dotnet publish src/AutoFixScout.UI/AutoFixScout.UI.csproj -c Release -r win-x64 --self-contained false -o publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AutoFixScout-win-x64
+          path: publish/

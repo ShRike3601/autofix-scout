@@ -3,31 +3,29 @@ namespace AutoFixScout;
 public sealed class StepAction
 {
     public string Id { get; set; } = "";
-    public RiskTier Tier { get; set; }
+    public int Tier { get; set; }
     public bool AdminRequired { get; set; }
     public string? UndoInfo { get; set; }
 }
 
 public static class ActionCatalog
 {
-    public Dictionary<string, StepAction> ActionsByStepId => new()
+    private static readonly Dictionary<string, StepAction> _actionsByStepId = new()
     {
         ["Audio.Service.Restart"] = ActionContext.AudioServiceRestart,
         ["Camera.Driver.Update"] = ActionContext.CameraDriverUpdate,
         ["WiFi.Reconnect"] = ActionContext.WiFiReconnect
     };
 
-    public StepAction? Get(string stepId) => ActionsByStepId.GetValueOrDefault(stepId);
+    public static StepAction? Get(string stepId) => _actionsByStepId.GetValueOrDefault(stepId);
 }
 
 public static class RiskTier
 {
-    public static readonly int T0 = 0; // Safe
-    public static readonly int T1 = 1; // Moderate
-    public static readonly int T2 = 2; // Requires approval
-    public static readonly int T3 = 3; // Admin/Reboot
+    public const int T0 = 0; // Safe
+    public const int T1 = 1; // Moderate
+    public const int T2 = 2; // Requires approval
+    public const int T3 = 3; // Admin/Reboot
 
-    public static bool IsTier(Tier tier, int maxTier) => tier <= maxTier;
+    public static bool IsTier(int tier, int maxTier) => tier <= maxTier;
 }
-
-public enum Tier { T0, T1, T2, T3 }

@@ -1,15 +1,19 @@
+using Microsoft.Data.Sqlite;
+using System.Diagnostics.CodeAnalysis;
+
 namespace AutoFixScout;
 
 public sealed class SessionManager : IDisposable
 {
     private readonly Database _db = new();
+    private SqliteConnection? _connection;
     
     public bool HasDatabase => true;
     public string? LastError => null;
-    
-    public StepResult CreateSession(string symptomType, DateTime startedAt)
+
+    public ActionStepResult CreateSession(string symptomType, DateTime startedAt)
     {
-        return new StepResult
+        return new ActionStepResult
         {
             ActionId = "Session.Create",
             Tier = RiskTier.T0,
@@ -20,9 +24,9 @@ public sealed class SessionManager : IDisposable
         };
     }
 
-    public StepResult SaveSession(string sessionId, DateTime startedAt) => CreateSession(sessionId, startedAt);
+    public ActionStepResult SaveSession(string sessionId, DateTime startedAt) => CreateSession(sessionId, startedAt);
 
-    public void Dispose() => _db.Dispose();
+    public void Dispose() => _connection?.Dispose();
 }
 
 public sealed class Database : IDisposable
@@ -32,23 +36,8 @@ public sealed class Database : IDisposable
     public bool HasDatabase => false;
     public string? LastError => null;
 
-    private SqliteConnection Connection
-    {
-        get
-        {
-            if (_connection == null)
-            {
-                var connString = DataSource.GetFilename();
-                _connection = new SqliteConnection(connString);
-                _connection.Open();
-            }
-            return _connection;
-        }
-    }
-
     public int Insert(string tableName, object values)
     {
-        if (!HasDatabase) throw new InvalidOperationException("Database not initialized");
         return 0; // MVP stub
     }
 

@@ -1,5 +1,7 @@
 namespace AutoFixScout;
 
+using AutoFixScout.Probes; // For Tri enum and record types
+
 /// <summary>
 /// Read-only probe models (section 7.1).
 /// </summary>
@@ -24,15 +26,6 @@ public sealed class DriverInfo
     public string Provider { get; set; } = "";
     public string INF { get; set; } = "";
     public string HardwareID { get; set; } = "";
-}
-
-public sealed class AudioState
-{
-    public string DefaultOutputDevice { get; set; } = "";
-    public bool Muted { get; set; }
-    public int Volume { get; set; }  // 0-100
-    public string EndpointType { get; set; } = "";  // "Speakers", "Headphones", "HDMI", etc.
-    public List<string> ActiveEndpoints { get; set; } = new();
 }
 
 public sealed class CameraPrivacyState

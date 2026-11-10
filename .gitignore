@@ -1,0 +1,33 @@
+# Build artifacts - never commit these
+bin/
+obj/
+*.dll
+*.pdb
+*.exe
+*.pdb
+*.iwyu.pdb
+
+# WPF/BAML files (compiled XAML)
+*.baml
+App.g.i.cs
+GeneratedInternalTypeHelper.*
+
+# VS cache and user settings
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# NuGet temp
+*.nuget.props
+*.nuget.targets
+
+# Build log (tracked for debugging, but in .gitignore to be safe)
+build.txt
+
+# IDE specific
+*.vsix-cache/
+.idea/
+*.sln.code-workspace
+*.userprefs
