@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AutoFixScout\AutoFixScout.csproj" />
+    <ProjectReference Include="..\AutoFixScout.Executor\AutoFixScout.Executor.csproj" />
   </ItemGroup>
 
 </Project>
