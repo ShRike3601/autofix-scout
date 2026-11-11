@@ -90,7 +90,7 @@ sealed record Env(string? SoundId, string? WifiId, string? WifiAlias, string? Wi
     static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s;
 
     public override string ToString() =>
-        $"sound={SoundId}\nwifi={WifiId} alias={WifiAlias} profile={WifiProfile} dns={string.Join(",", WifiDns)}\ncamera={CameraId}\n" +
+        $"sound={SoundId}\nwifi={WifiId} alias={WifiAlias} profile={(WifiProfile is null ? "(unknown)" : "(known, not written: public repo)")} dns={string.Join(",", WifiDns)}\ncamera={CameraId}\n" +
         string.Join("\n", Privacy.Select(p => $"privacy {p.Key} = {p.Value ?? "(not set)"}"));
 }
 
@@ -450,7 +450,10 @@ static class Failsafe
                                     : $"New-Item -Path '{path}' -Force | Out-Null; Set-ItemProperty -Path '{path}' -Name Value -Value '{v}'");
         }
         ps.AppendLine($"schtasks /delete /tn {Task} /f");
-        var file = Path.Combine(dir, "failsafe-restore.ps1");
+        // Kept outside the repo: it names the Wi-Fi network, and the repo is public.
+        var safeDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "AFS-TestBench");
+        Directory.CreateDirectory(safeDir);
+        var file = Path.Combine(safeDir, "failsafe-restore.ps1");
         File.WriteAllText(file, ps.ToString());
         var at = DateTime.Now.AddMinutes(30);
         var (code, output) = Bench.Run("schtasks.exe",

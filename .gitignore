@@ -31,3 +31,7 @@ build.txt
 .idea/
 *.sln.code-workspace
 *.userprefs
+
+# TestBench: keep the Markdown reports, not raw logs (they can name local networks)
+docs/testbench-results/*.log
+docs/testbench-results/*.ps1
