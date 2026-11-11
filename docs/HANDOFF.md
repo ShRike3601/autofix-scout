@@ -30,7 +30,7 @@ from it that the code follows:
 | Session log (SQLite, spec schema) | `src/AutoFixScout/SessionLog.cs` -> `%LOCALAPPDATA%\AutoFixScout\session.db` |
 | Helper report | `src/AutoFixScout/HelperReport.cs` -> `%LOCALAPPDATA%\AutoFixScout\reports\` |
 | UI (screens + flow) | `src/AutoFixScout.UI/MainWindow.xaml(.cs)` |
-| Tests (85, all pass in CI) | `src/AutoFixScout.Tests/` |
+| Tests (89, all pass in CI) | `src/AutoFixScout.Tests/` |
 
 Unused leftovers from the first skeleton (safe to delete, not yet removed): `Orchestrator.cs`, `SessionManager.cs`,
 `Simulator.cs`, `ActionCatalog.cs`, `ActionContext.cs` (both projects), `IProbe.cs`, `IExecutor.cs`, `Probes.cs`,
@@ -63,9 +63,9 @@ Ethernet, Cloudflare WARP on (Wi-Fi DNS = 127.0.2.2/.3), Location services off, 
 | Step | Status | Notes |
 |---|---|---|
 | 1. Healthy machine | **Passed after fix** (2026-11-11) | See below. Probes ran fine; no device/service/DNS/privacy/default-output change; WARP DNS not blamed. |
-| 2. Sound faults | **Passed after fixes** (2026-11-11) | Muted -> unmute (no UAC). AudioSrv stopped -> restart_services (UAC). Realtek disabled (code 22) -> restart (no) then toggle_device (yes). Default = Bluetooth JBL Go 3 -> wrong_output after fix (see below). |
+| 2. Sound faults | **Passed after fixes** (2026-11-11) | Muted -> unmute (no UAC). AudioSrv stopped -> restart_services (UAC). Realtek disabled (code 22) -> restart (no) then toggle_device (yes). Default = Bluetooth JBL Go 3 -> wrong_output after fix (see below). 2e Realtek uninstalled (driver kept) -> restart_services (no) then new rescan (yes). |
 | 3. Network faults | **Passed after fixes** (2026-11-11, TestBench) | Wi-Fi disabled -> enable_adapter. Wi-Fi disconnected -> pick_wifi (internet back 7 s after reconnect). Bogus DNS (WARP paused) -> flush_dns (no) then new reset_dns (yes). Airplane mode (owner, by hand, no UAC) -> found (SystemRadioState=1), airplane rung opened Settings, switched off -> fixed; session + report correct. |
-| 4. Camera faults | **Passed / changed** (2026-11-11, TestBench) | Each privacy switch off -> privacy rung, named correctly. Camera disabled -> enable_camera. "Camera app holding it" can't be detected on this Windows build (see below); ladder changed. Human check of the real Camera-app test still to do with the new UI. |
+| 4. Camera faults | **Passed / changed** (2026-11-11, TestBench) | Each privacy switch off -> privacy rung, named correctly. Camera disabled -> enable_camera. 4f camera uninstalled (driver kept) -> new rescan first, fixed. "Camera app holding it" can't be detected on this Windows build (see below); ladder changed. Human check of the real Camera-app test still to do with the new UI. |
 | 5. Rollback | **Passed after fix** (2026-11-11, TestBench + manual) | Intel Display Audio 10.27.0.8 -> 10.27.0.9 staged as "the recent update". 5a "works" -> 10.27.0.8 stays, marker cleared. 5b "doesn't" -> 10.27.0.9 restored from the save point. 5c app closed right after the change, reopened -> offered "Put it back", restored (owner, by hand). 5d non-admin can read but not write the save point folder. |
 | 6. Windows Update driver | **Partly** (2026-11-11, TestBench) | Only "nothing offered": WU has no driver for the Realtek device here, so no change and no save point. A real WU install + undo is still untested on hardware. |
 | 7. session.db + report | **Passed after fixes** (2026-11-11) | 10 UI sessions (steps 1, 2, BT check) with the right outcomes and steps; reports match and name no network. Cut-off flows weren't logged and `started_at` was wrong (see below). Bench runs don't write session.db (by design). |
@@ -100,6 +100,13 @@ Step 3 findings:
   state / helper report (`StaticDnsServers`).
 - Cloudflare WARP hides DNS faults (it answers DNS itself); the bench pauses it with `--pause-warp` and
   reconnects it, retrying (one `warp-cli connect` once reported Success but stayed disconnected).
+
+Uninstalled devices (added before friend testing, 2026-11-11, TestBench 2e/4f):
+- **Added:** a device uninstalled in Device Manager (driver kept) or dropped off after an update used to end as
+  "can't find it" / probably hardware. New T1 rung `rescan` (executor `device.rescan <audio|camera|network>`):
+  `CM_Reenumerate_DevNode` on the PnP root + `CMP_WaitNoPendingInstallEvents`, i.e. "Scan for hardware changes".
+  Offered for NoCamera (first), NoNetworkAdapter, and sound with no active output (after restart_services).
+  Network (Wi-Fi adapter uninstalled) not run on hardware: it would cut this session's connection; same code path.
 
 Step 4 findings:
 - **Changed:** Windows 26300 no longer writes live camera use to the consent-store registry a non-admin app can
