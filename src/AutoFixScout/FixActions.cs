@@ -146,7 +146,8 @@ public static class FixActions
     public static async Task<bool> SettleSavePointAsync(string id, bool keep)
     {
         var marker = Path.Combine(PendingDir, id);
-        if (!keep && await Task.Run(() => RunElevated("driver.restore", id)) != 0) return false;
+        // 0 = put back (the executor then deletes the save point), 3 = nothing had changed. Anything else keeps the marker.
+        if (!keep && await Task.Run(() => RunElevated("driver.restore", id)) is not (0 or 3)) return false;
         File.Delete(marker);
         return true;
     }

@@ -30,7 +30,7 @@ from it that the code follows:
 | Session log (SQLite, spec schema) | `src/AutoFixScout/SessionLog.cs` -> `%LOCALAPPDATA%\AutoFixScout\session.db` |
 | Helper report | `src/AutoFixScout/HelperReport.cs` -> `%LOCALAPPDATA%\AutoFixScout\reports\` |
 | UI (screens + flow) | `src/AutoFixScout.UI/MainWindow.xaml(.cs)` |
-| Tests (85, all pass in CI) | `src/AutoFixScout.Tests/` |
+| Tests (102, all pass in CI) | `src/AutoFixScout.Tests/` |
 
 Unused leftovers from the first skeleton (safe to delete, not yet removed): `Orchestrator.cs`, `SessionManager.cs`,
 `Simulator.cs`, `ActionCatalog.cs`, `ActionContext.cs` (both projects), `IProbe.cs`, `IExecutor.cs`, `Probes.cs`,
@@ -52,8 +52,8 @@ Unused leftovers from the first skeleton (safe to delete, not yet removed): `Orc
     Any failure -> automatic restore. A "No" on the real test -> restore.
   - The app writes a marker per open save point in `%LOCALAPPDATA%\AutoFixScout\pending-savepoints`; it's removed
     when the person confirms the fix. A marker found at startup = unfinished change -> app offers to restore.
-  - Executor exit codes: 0 ok, 1 failed (nothing changed), 2 rejected input, 3 nothing to do, 4 changed but undone,
-    6 restore failed (save point kept).
+  - Executor exit codes: 0 ok, 1 failed (nothing changed), 2 rejected input, 3 nothing to do (restore: nothing to put
+    back), 4 changed but undone, 6 restore failed (save point kept). Retention: see "Steps 5-6 findings".
 
 ## Real-hardware test results (AFS-TESTBENCH)
 
@@ -116,9 +116,26 @@ Steps 5-6 findings:
   `Control\Class\<key>` `InfPath`/`DriverVersion` (live, no admin needed); WMI is only a fallback.
 - **Weak heuristic:** "driver changed in the last 30 days" = oem*.inf creation date. On a freshly set up PC every
   oem*.inf is recent, so every driver counts as "just updated".
-- **Wrong device can be offered:** the sound flow offers rollback for any MEDIA device with an older package in the
-  store, e.g. the HDMI audio driver when the problem is the laptop speakers. Should prefer the default output device.
-- Save point folders are kept after a successful restore (3 so far); nothing cleans them up yet.
+- **Fixed (needs a hardware retest): wrong device offered.** The sound flow offered rollback for any MEDIA device with
+  an older package in the store, e.g. the HDMI audio driver when the problem was the laptop speakers. Now
+  `AudioLadder.RollbackTargets`: devices reporting an error first, then the device behind the default output; other
+  devices only when that device is unknown; a display-audio device (Intel/NVIDIA/AMD function on HDAUDIO/INTELAUDIO,
+  or "HDMI"/"Display Audio"/"DisplayPort" in the name) only when the default output is on it (or is HDMI with its
+  device unknown, or there is no default output). The probe ties each output to its device
+  (`AudioEndpointInfo.DeviceInstanceId`): endpoint `PKEY_Device_InstanceId` -> parent device nodes (cfgmgr32
+  `CM_Get_Parent`, up to 4 levels) -> first one in the MEDIA list. Not yet seen on real hardware (the dev PC has no
+  audio endpoints): on the TestBench check that "Speakers (Realtek)" maps to the Realtek device and that rollback is
+  no longer offered for Intel Display Audio while the speakers are the default. Camera and network already target
+  the device they diagnose (network: the broken or connected adapter; camera: Camera-class devices first).
+- **Fixed: save points piled up** (3 on the TestBench, and the old "keep the newest 10" prune could delete an open
+  one). Now: a successful restore (`driver.restore`, or the automatic undo, exit 4) deletes that save point's folder;
+  a failed restore writes a `restore-failed` flag into it and it is never pruned (exit 6). When a new save point is
+  made, folders older than 30 days are pruned unless flagged or still held open by an app marker (the executor checks
+  `pending-savepoints\<id>` in every profile's `%LOCALAPPDATA%`, MSIX-redirected copies included; can't tell = keep).
+  Only 32-hex folders directly inside `savepoints`, never links. `driver.restore` of a save point without a manifest
+  (the manifest is written before any change, or the folder is already gone) now returns 3 "nothing to put back" and
+  the app clears its marker. A save point the person **kept** ("it works") stays until pruned after 30 days: deleting
+  it at once needs another UAC prompt right after "Yes, it works" (owner's call; it is also a helper's way back).
 - Staging a newer driver needs `UpdateDriverForPlugAndPlayDevices` with INSTALLFLAG_FORCE: `pnputil /add-driver
   /install` keeps the installed driver when it matches the device more specifically.
 - **Bench bug, laptop changed:** the first `--only unstage` used a regex over the whole pnputil output that ran from
