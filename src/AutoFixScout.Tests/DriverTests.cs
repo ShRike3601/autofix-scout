@@ -240,3 +240,32 @@ public class DriverLadderTests
         Assert.Equal(2, ExecutorProgram.Main(new[] { "driver.install_from_windows_update", @"HDAUDIO\X", "not-a-guid" }));
     }
 }
+
+public class InstalledDriverReadTests
+{
+    /// <summary>
+    /// Test step 5 found Win32_PnPSignedDriver lagging a real install, so DriverStore.Read now reads the device's class
+    /// key. On a device whose driver isn't changing, both must agree (runs on any Windows machine, CI included).
+    /// </summary>
+    [Fact]
+    public void RegistryRead_MatchesWmi_OnStableDevices()
+    {
+        using var q = new System.Management.ManagementObjectSearcher(
+            "SELECT DeviceID, InfName, DriverVersion FROM Win32_PnPSignedDriver WHERE InfName IS NOT NULL AND DriverVersion IS NOT NULL");
+        var checkedCount = 0;
+        foreach (var d in q.Get().Cast<System.Management.ManagementBaseObject>().Take(20))
+        {
+            if (d["DeviceID"] is not string id) continue;
+            var (inf, ver) = DriverStore.ReadInstalledDriver(id);
+            if (inf is null) continue; // no class key for this one (some software devices)
+            Assert.Equal((string)d["InfName"], inf, ignoreCase: true);
+            Assert.Equal((string)d["DriverVersion"], ver);
+            checkedCount++;
+        }
+        Assert.True(checkedCount > 0, "no device could be read from the registry");
+    }
+
+    [Fact]
+    public void RegistryRead_UnknownDevice_IsNull() =>
+        Assert.Equal((null, null), DriverStore.ReadInstalledDriver(@"HDAUDIO\NOT_A_REAL_DEVICE\0"));
+}

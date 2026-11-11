@@ -2,7 +2,7 @@ using System.Management;
 
 namespace AutoFixScout.Drivers;
 
-/// <summary>A device's current driver, read with WMI (spec 7.1 probe.drivers). Read-only.</summary>
+/// <summary>A device's current driver (spec 7.1 probe.drivers): IDs and status from WMI, driver from the registry. Read-only.</summary>
 internal sealed record DeviceDriver(string InstanceId, IReadOnlyList<string> HardwareIds, int? ProblemCode, string? InfName, string? Version);
 
 /// <summary>A driver package already in this PC's driver store that fits the device.</summary>
@@ -23,14 +23,38 @@ internal static class DriverStore
         using var dev = new ManagementObjectSearcher($"SELECT HardwareID, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE DeviceID = '{wql}'");
         var entity = dev.Get().Cast<ManagementBaseObject>().FirstOrDefault();
         if (entity is null) return null;
-        using var drv = new ManagementObjectSearcher($"SELECT InfName, DriverVersion FROM Win32_PnPSignedDriver WHERE DeviceID = '{wql}'");
-        var driver = drv.Get().Cast<ManagementBaseObject>().FirstOrDefault();
+        var (inf, version) = ReadInstalledDriver(instanceId);
+        if (inf is null || version is null)
+        {
+            // Fallback only: Win32_PnPSignedDriver lags real driver changes (test step 5: still the old version 6 s
+            // after a successful install), which would make the post-check undo a change that worked.
+            using var drv = new ManagementObjectSearcher($"SELECT InfName, DriverVersion FROM Win32_PnPSignedDriver WHERE DeviceID = '{wql}'");
+            var driver = drv.Get().Cast<ManagementBaseObject>().FirstOrDefault();
+            inf ??= driver?["InfName"] as string;
+            version ??= driver?["DriverVersion"] as string;
+        }
         return new DeviceDriver(
             instanceId,
             entity["HardwareID"] as string[] ?? Array.Empty<string>(),
             entity["ConfigManagerErrorCode"] is uint code ? (int)code : null,
-            driver?["InfName"] as string,
-            driver?["DriverVersion"] as string);
+            inf,
+            version);
+    }
+
+    /// <summary>
+    /// The driver Windows has installed on the device right now: Enum\{instance}\Driver points at the device's class key,
+    /// where setup writes InfPath and DriverVersion as part of the install. Readable without admin.
+    /// </summary>
+    internal static (string? InfName, string? Version) ReadInstalledDriver(string instanceId)
+    {
+        try
+        {
+            using var enumKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Enum\{instanceId}");
+            if (enumKey?.GetValue("Driver") is not string classKey) return (null, null);
+            using var cls = Microsoft.Win32.Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Control\Class\{classKey}");
+            return (cls?.GetValue("InfPath") as string, cls?.GetValue("DriverVersion") as string);
+        }
+        catch (Exception) { return (null, null); }
     }
 
     /// <summary>
