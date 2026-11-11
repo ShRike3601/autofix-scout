@@ -40,12 +40,40 @@ public static class AudioLadder
                 $"Your sound device \"{broken.Name}\" reports a problem. I'd like to switch it off and on again. Windows will ask for permission.",
                 broken.InstanceId));
         // T2, last before escalating (spec 8.1): often the real fix for "it broke after an update".
-        var rollback = state.Devices.OrderByDescending(d => d.ProblemCode is > 0)
+        var rollback = RollbackTargets(state)
             .Select(d => DriverRules.Rollback("sound", d.Name, d.InstanceId, d.Driver)).FirstOrDefault(r => r != null);
         if (rollback != null) rungs.Add(rollback);
         if (broken != null && DriverRules.WindowsUpdate("sound", broken.Name, broken.InstanceId, broken.ProblemCode) is { } wu) rungs.Add(wu);
         return rungs;
     }
+
+    /// <summary>
+    /// Devices a driver rollback may target, most likely culprit first (test step 5 found the HDMI audio driver offered
+    /// when the problem was the laptop speakers): devices reporting an error, then the device behind the default output.
+    /// Other devices only when the default output's device is unknown. A display-audio (HDMI/DisplayPort) device only
+    /// when the default output is on it, or is HDMI and its device is unknown, or there is no default output at all.
+    /// </summary>
+    public static IEnumerable<AudioDeviceInfo> RollbackTargets(AudioState state)
+    {
+        var def = state.Endpoints.FirstOrDefault(e => e.IsDefault);
+        var defDevice = def?.DeviceInstanceId is { } id
+            ? state.Devices.FirstOrDefault(d => string.Equals(d.InstanceId, id, StringComparison.OrdinalIgnoreCase))
+            : null;
+        bool Allowed(AudioDeviceInfo d) =>
+            def is null || d == defDevice || !IsDisplayAudio(d) || (defDevice is null && def.KindGuess == "Hdmi");
+        return state.Devices
+            .Where(d => Allowed(d) && (defDevice is null || d == defDevice || d.ProblemCode is > 0))
+            .OrderByDescending(d => d.ProblemCode is > 0);
+    }
+
+    /// <summary>
+    /// HDMI/DisplayPort audio of a graphics chip: an Intel, NVIDIA or AMD function on the HD Audio bus (Intel makes no
+    /// speaker/headphone codecs), or a name that says so.
+    /// </summary>
+    public static bool IsDisplayAudio(AudioDeviceInfo d) =>
+        System.Text.RegularExpressions.Regex.IsMatch(d.InstanceId, @"^(HDAUDIO|INTELAUDIO)\\FUNC_\d+&VEN_(8086|10DE|1002)&",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+        || new[] { "display audio", "hdmi", "displayport" }.Any(k => d.Name.Contains(k, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Spec 8.1 escalation: no output endpoint and a device still reporting an error.</summary>
     public static bool ProbablyHardware(AudioState state) =>

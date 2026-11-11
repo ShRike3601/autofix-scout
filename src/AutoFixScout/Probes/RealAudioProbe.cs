@@ -27,11 +27,12 @@ public sealed class RealAudioProbe : IAudioProbe
             catch (InvalidOperationException) { return new ServiceInfo(name, "NotFound"); }
         }).ToList();
 
-        try { ReadEndpoints(state); }
-        catch (Exception ex) { errors.Add($"Core Audio: {ex.Message}"); }
-
+        // Devices first, so each output can be tied to the device it belongs to.
         try { state.Devices = ReadMediaDevices(); }
         catch (Exception ex) { errors.Add($"WMI: {ex.Message}"); }
+
+        try { ReadEndpoints(state); }
+        catch (Exception ex) { errors.Add($"Core Audio: {ex.Message}"); }
 
         return state;
     }
@@ -51,9 +52,54 @@ public sealed class RealAudioProbe : IAudioProbe
         // NotPresent is excluded: Windows keeps every endpoint ever seen, which would flood the list.
         var states = DeviceState.Active | DeviceState.Unplugged | DeviceState.Disabled;
         state.Endpoints = enumerator.EnumerateAudioEndPoints(DataFlow.Render, states)
-            .Select(d => new AudioEndpointInfo(d.FriendlyName, d.ID == defaultId, d.State == DeviceState.Active, GuessKind(d)))
+            .Select(d => new AudioEndpointInfo(d.FriendlyName, d.ID == defaultId, d.State == DeviceState.Active, GuessKind(d),
+                OwningDevice(d, state.Devices)))
             .ToList();
     }
+
+    /// <summary>
+    /// The sound device an output belongs to, so a driver rollback targets the device the person is listening on
+    /// (test step 5 offered the HDMI audio driver for a laptop-speaker problem). The output's own device node is a
+    /// child of that device; the nearest ancestor that is one of the MEDIA devices wins. Null = couldn't tell.
+    /// </summary>
+    private static string? OwningDevice(MMDevice endpoint, IReadOnlyList<AudioDeviceInfo> devices)
+    {
+        try
+        {
+            if (endpoint.Properties[EndpointInstanceId]?.Value is not string id) return null;
+            return MatchDevice(Ancestors(id), devices.Select(d => d.InstanceId));
+        }
+        catch (Exception) { return null; }
+    }
+
+    internal static string? MatchDevice(IEnumerable<string> ancestors, IEnumerable<string> devices)
+    {
+        var known = devices.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return ancestors.FirstOrDefault(known.Contains) is { } match ? known.First(k => k.Equals(match, StringComparison.OrdinalIgnoreCase)) : null;
+    }
+
+    /// <summary>PKEY_Device_InstanceId of the endpoint ("SWD\MMDEVAPI\{0.0.0.00000000}.{guid}").</summary>
+    private static readonly PropertyKey EndpointInstanceId = new(new Guid("78c34fc8-104a-4aca-9ea4-524d52996e57"), 256);
+
+    private static IEnumerable<string> Ancestors(string instanceId)
+    {
+        if (CM_Locate_DevNodeW(out var node, instanceId, 0) != 0) yield break;
+        var buffer = new char[400];
+        for (var i = 0; i < 4 && CM_Get_Parent(out node, node, 0) == 0; i++)
+        {
+            if (CM_Get_Device_IDW(node, buffer, buffer.Length, 0) != 0) yield break;
+            yield return new string(buffer, 0, Array.IndexOf(buffer, '\0') is var n and >= 0 ? n : buffer.Length);
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("cfgmgr32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int CM_Locate_DevNodeW(out uint devInst, string deviceId, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("cfgmgr32.dll")]
+    private static extern int CM_Get_Parent(out uint parent, uint devInst, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("cfgmgr32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int CM_Get_Device_IDW(uint devInst, char[] buffer, int bufferLen, uint flags);
 
     internal static string GuessKind(MMDevice d)
     {
