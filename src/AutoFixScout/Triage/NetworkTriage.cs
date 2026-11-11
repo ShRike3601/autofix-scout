@@ -73,6 +73,13 @@ public static class NetworkTriage
                 if (code == FindingCode.DnsFailing)
                     rungs.Add(new("flush_dns", "network.flush_dns", 1,
                         "I'd like to clear your computer's list of website addresses. This is safe."));
+                // A hand-typed DNS server survives a flush and an adapter restart (found in test step 3d). Loopback ones
+                // belong to a VPN such as Cloudflare WARP, which manages them itself, so those are left alone.
+                if (code == FindingCode.DnsFailing && s.StaticDnsAdapterId != null
+                    && s.StaticDnsServers.Count > 0 && !s.StaticDnsServers.All(d => d.StartsWith("127.") || d == "::1"))
+                    rungs.Add(new("reset_dns", "network.reset_dns", 1,
+                        $"Your computer is set to use a fixed website-lookup (DNS) server ({string.Join(", ", s.StaticDnsServers)}) " +
+                        "that isn't answering. I'd like to switch it back to automatic. Windows will ask for permission.", s.StaticDnsAdapterId));
                 if (connected != null)
                     rungs.Add(new("toggle_adapter", "device.disable_enable", 1,
                         $"I'd like to switch your network adapter \"{connected.Name}\" off and on again. Windows will ask for permission.", connected.InstanceId));

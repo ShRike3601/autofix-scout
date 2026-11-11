@@ -70,6 +70,29 @@ public class NetworkTriageTests
     }
 
     [Fact]
+    public void DnsFailing_HandTypedServer_OffersResetAfterFlush()
+    {
+        // Test step 3d: a bogus DNS server survives a flush and an adapter restart.
+        var s = Online(Tri.Yes, Tri.No, Tri.No);
+        s.StaticDnsServers = new[] { "192.0.2.1" };
+        s.StaticDnsAdapterId = WifiUp.InstanceId;
+        var ladder = NetworkTriage.Ladder(s, NetworkTriage.Evaluate(s));
+        Assert.Equal(new[] { "flush_dns", "reset_dns", "toggle_adapter", "restart_router" }, ladder.Select(r => r.Id));
+        Assert.Equal(WifiUp.InstanceId, ladder[1].Arg);
+        Assert.Contains("192.0.2.1", ladder[1].Say);
+    }
+
+    [Fact]
+    public void DnsFailing_VpnLoopbackServers_NotReset()
+    {
+        // Cloudflare WARP puts 127.0.2.2/.3 on the Wi-Fi adapter and manages them itself.
+        var s = Online(Tri.Yes, Tri.No, Tri.No);
+        s.StaticDnsServers = new[] { "127.0.2.2", "127.0.2.3" };
+        s.StaticDnsAdapterId = WifiUp.InstanceId;
+        Assert.DoesNotContain("reset_dns", Ladder(s));
+    }
+
+    [Fact]
     public void RouterSilentAndDnsFails_GatewayUnreachable_HintNamesRouter()
     {
         var f = NetworkTriage.Evaluate(Online(Tri.No, Tri.No, Tri.No));

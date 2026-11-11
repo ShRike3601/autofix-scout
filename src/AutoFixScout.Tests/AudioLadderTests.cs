@@ -128,5 +128,9 @@ public class AudioLadderTests
         Assert.Equal(2, ExecutorProgram.Main(new[] { "cmd.exe", "/c whoami" }));
         Assert.Equal(2, ExecutorProgram.Main(new[] { "service.restart", "WinDefend" }));
         Assert.Equal(2, ExecutorProgram.Main(new[] { "service.restart" }));
+        // reset_dns takes an adapter instance id only: no addresses, names or quotes.
+        Assert.Equal(2, ExecutorProgram.Main(new[] { "network.reset_dns", "Wi-Fi\" & whoami" }));
+        Assert.Equal(2, ExecutorProgram.Main(new[] { "network.reset_dns", "8.8.8.8 1.1.1.1" }));
+        Assert.Equal(2, ExecutorProgram.Main(new[] { "network.reset_dns" }));
     }
 }

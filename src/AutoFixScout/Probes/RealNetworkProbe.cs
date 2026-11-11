@@ -25,6 +25,14 @@ public sealed class RealNetworkProbe : INetworkProbe
         state.AirplaneMode = ReadAirplaneMode();
         if (!state.Adapters.Any(a => a.Connected)) return state; // nothing to test through
 
+        try
+        {
+            var connected = state.Adapters.OrderByDescending(a => a.IsWireless).First(a => a.Connected);
+            state.StaticDnsServers = ReadStaticDns(connected.InstanceId);
+            state.StaticDnsAdapterId = connected.InstanceId;
+        }
+        catch (Exception ex) { errors.Add($"DNS settings: {ex.Message}"); }
+
         state.GatewayReachable = await PingGatewayAsync();
         try
         {
@@ -88,7 +96,29 @@ public sealed class RealNetworkProbe : INetworkProbe
         foreach (var gw in gateways)
             for (var attempt = 0; attempt < 2; attempt++)
                 try { if ((await ping.SendPingAsync(gw, 1000)).Status == IPStatus.Success) return Tri.Yes; } catch (PingException) { }
-        // Some routers ignore ping; triage only treats this as the cause when DNS fails too.
+        // Some networks block ping to the router (the test laptop's campus Wi-Fi does). The ping still makes Windows
+        // look the router up on the local network, so a "Reachable" neighbour entry means it answered.
+        try { if (gateways.Any(NeighbourReachable)) return Tri.Yes; } catch (Exception) { }
         return Tri.No;
+    }
+
+    /// <summary>MSFT_NetNeighbor State: 5 Reachable, 6 Permanent. Stale/Probe/Incomplete don't prove the router is there now.</summary>
+    private static bool NeighbourReachable(IPAddress gateway)
+    {
+        using var q = new ManagementObjectSearcher(@"root\StandardCimv2",
+            $"SELECT State FROM MSFT_NetNeighbor WHERE IPAddress = '{gateway}'");
+        return q.Get().Cast<ManagementBaseObject>().Any(n => Convert.ToInt32(n["State"]) is 5 or 6);
+    }
+
+    /// <summary>Hand-typed DNS servers live in the interface's NameServer value; DHCP ones in DhcpNameServer.</summary>
+    private static List<string> ReadStaticDns(string instanceId)
+    {
+        using var q = new ManagementObjectSearcher(
+            $"SELECT GUID FROM Win32_NetworkAdapter WHERE PNPDeviceID = '{instanceId.Replace(@"\", @"\\").Replace("'", "")}'");
+        var guid = q.Get().Cast<ManagementBaseObject>().Select(a => a["GUID"] as string).FirstOrDefault(g => g != null);
+        if (guid is null) return new List<string>();
+        using var key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{guid}");
+        return ((key?.GetValue("NameServer") as string) ?? "")
+            .Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
     }
 }

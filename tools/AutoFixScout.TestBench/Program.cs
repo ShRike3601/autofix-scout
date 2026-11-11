@@ -399,13 +399,33 @@ static class Warp
     public static bool MayPause;
     public static bool WasPausedByBench;
 
-    public static bool Connected() => File.Exists(Cli) && Bench.Run(Cli, "status").Output.Contains("Connected") && !Bench.Run(Cli, "status").Output.Contains("Disconnected");
+    public static bool Connected()
+    {
+        if (!File.Exists(Cli)) return false;
+        var status = Bench.Run(Cli, "status").Output;
+        return status.Contains("Connected") && !status.Contains("Disconnected");
+    }
 
     public static void Set(bool connect)
     {
-        var (code, output) = Bench.Run(Cli, connect ? "connect" : "disconnect");
-        Bench.Log($"  warp-cli {(connect ? "connect" : "disconnect")} exit {code}: {output.Trim()}");
-        WasPausedByBench = !connect;
+        if (!connect)
+        {
+            var (code, output) = Bench.Run(Cli, "disconnect");
+            Bench.Log($"  warp-cli disconnect exit {code}: {output.Trim()}");
+            WasPausedByBench = true;
+            return;
+        }
+        // In batch 2 one "connect" reported Success but WARP stayed disconnected, so retry until it says Connected.
+        var sw = Stopwatch.StartNew();
+        for (var attempt = 1; attempt <= 4 && !Connected(); attempt++)
+        {
+            var (code, output) = Bench.Run(Cli, "connect");
+            Bench.Log($"  warp-cli connect (attempt {attempt}) exit {code}: {output.Trim()}");
+            for (var i = 0; i < 8 && !Connected(); i++) Thread.Sleep(2000);
+        }
+        var ok = Connected();
+        Bench.Log(ok ? $"  WARP connected after {sw.Elapsed.TotalSeconds:0}s" : "  WARNING: WARP still not connected; the failsafe task will retry");
+        WasPausedByBench = !ok;
     }
 }
 

@@ -30,7 +30,7 @@ from it that the code follows:
 | Session log (SQLite, spec schema) | `src/AutoFixScout/SessionLog.cs` -> `%LOCALAPPDATA%\AutoFixScout\session.db` |
 | Helper report | `src/AutoFixScout/HelperReport.cs` -> `%LOCALAPPDATA%\AutoFixScout\reports\` |
 | UI (screens + flow) | `src/AutoFixScout.UI/MainWindow.xaml(.cs)` |
-| Tests (73, all pass in CI) | `src/AutoFixScout.Tests/` |
+| Tests (77, all pass in CI) | `src/AutoFixScout.Tests/` |
 
 Unused leftovers from the first skeleton (safe to delete, not yet removed): `Orchestrator.cs`, `SessionManager.cs`,
 `Simulator.cs`, `ActionCatalog.cs`, `ActionContext.cs` (both projects), `IProbe.cs`, `IExecutor.cs`, `Probes.cs`,
@@ -64,8 +64,8 @@ Ethernet, Cloudflare WARP on (Wi-Fi DNS = 127.0.2.2/.3), Location services off, 
 |---|---|---|
 | 1. Healthy machine | **Passed after fix** (2026-11-11) | See below. Probes ran fine; no device/service/DNS/privacy/default-output change; WARP DNS not blamed. |
 | 2. Sound faults | **Passed after fixes** (2026-11-11) | Muted -> unmute (no UAC). AudioSrv stopped -> restart_services (UAC). Realtek disabled (code 22) -> restart (no) then toggle_device (yes). Default = Bluetooth JBL Go 3 -> wrong_output after fix (see below). |
-| 3. Network faults | not run | |
-| 4. Camera faults | not run | Watch the CS8848 warning at `RealCameraProbe.cs:66` (privacy `Allowed()` switch). |
+| 3. Network faults | **Passed after fixes** (2026-11-11, TestBench) | Wi-Fi disabled -> enable_adapter. Wi-Fi disconnected -> pick_wifi (internet back 7 s after reconnect). Bogus DNS (WARP paused) -> flush_dns (no) then new reset_dns (yes). Airplane mode **not run yet** (needs a person: no reliable way to switch it from a script). |
+| 4. Camera faults | **Passed / changed** (2026-11-11, TestBench) | Each privacy switch off -> privacy rung, named correctly. Camera disabled -> enable_camera. "Camera app holding it" can't be detected on this Windows build (see below); ladder changed. Human check of the real Camera-app test still to do with the new UI. |
 | 5. Rollback | not run | |
 | 6. Windows Update driver | not run | |
 | 7. session.db + report | checked for step 1 | |
@@ -89,9 +89,40 @@ Step 2 findings:
 - **Fixed:** helper report printed "DefaultMuted value: 0" for a muted device (`Tri.Yes` = 0); now prints the name.
 - HDMI as wrong default not tried (no HDMI sink attached); same code path as Bluetooth.
 
+Step 3 findings:
+- **Fixed:** this network (campus Wi-Fi) blocks ping to the router, so a bad DNS server was reported as "can't
+  reach your router, it's probably the router". The probe now falls back to the neighbour (ARP) table:
+  `MSFT_NetNeighbor` State Reachable/Permanent for the gateway counts as reachable.
+- **Fixed:** a hand-typed DNS server survives flush_dns and an adapter restart, so nothing fixed it. New T1 rung
+  `reset_dns` / executor action `network.reset_dns <adapter instance id>` (WMI
+  `Win32_NetworkAdapterConfiguration.SetDNSServerSearchOrder(null)`), offered only for DnsFailing with
+  non-loopback static servers (loopback = a VPN such as WARP, left alone). The previous servers are in the probe
+  state / helper report (`StaticDnsServers`).
+- Cloudflare WARP hides DNS faults (it answers DNS itself); the bench pauses it with `--pause-warp` and
+  reconnects it, retrying (one `warp-cli connect` once reported Success but stayed disconnected).
+
+Step 4 findings:
+- **Changed:** Windows 26300 no longer writes live camera use to the consent-store registry a non-admin app can
+  read (it moved to the admin-only `C:\ProgramData\Microsoft\Windows\CapabilityAccessManager\CapabilityAccessManager.db`),
+  and `MediaCapture` exclusive control is granted even while the Camera app streams. So CameraInUse only fires on
+  older builds; the LooksNormal ladder now starts with `close_other_apps` (Teams, Zoom, WhatsApp, browser call),
+  and the finding says "no app reported holding it".
+- CS8848 at `RealCameraProbe.cs:66` was harmless (parsed as intended); parenthesised.
+
+### TestBench (batch runner)
+
+`tools/AutoFixScout.TestBench` runs the plan without the UI: per scenario it creates the fault, runs the app's
+real probe + triage + ladder (executor rungs for real, "open Settings / please do X" rungs played as the person),
+checks healthy, and always restores. One UAC prompt per batch; refuses to run off AFS-TESTBENCH; arms a scheduled
+failsafe restore (`AFS-TestBench-Failsafe`, script in `C:\ProgramData\AFS-TestBench`) and removes it at the end.
+
+    AutoFixScout.TestBench.exe [sound] [network] [camera] [--only 3c,3d] [--pause-warp] --out C:\afs\docs\testbench-results
+
+Reports (`docs/testbench-results/*.md`) are committed; raw logs aren't (they can name local networks, repo is public).
+It can't judge what only a person can (hearing the beep, seeing yourself); those stay manual.
+
 Still never run on real hardware: `UpdateDriverForPlugAndPlayDevices`, `pnputil /export-driver`, the save point
-ACL/owner checks, restore point creation, the WUA calls, and the fix rungs themselves (only `service.restart`
-ran once, exit 0).
+ACL/owner checks, restore point creation, the WUA calls (steps 5 and 6).
 
 ## Test plan (only on AFS-TESTBENCH)
 

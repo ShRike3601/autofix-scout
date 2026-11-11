@@ -14,6 +14,10 @@ public sealed class NetworkState
     public Tri GatewayReachable { get; set; } = Tri.Unknown;
     public Tri DnsResolving { get; set; } = Tri.Unknown;
     public Tri InternetReachable { get; set; } = Tri.Unknown;
+    /// <summary>DNS servers typed in by hand on the connected adapter (empty = automatic). VPNs like WARP set 127.x here.</summary>
+    public IReadOnlyList<string> StaticDnsServers { get; set; } = new List<string>();
+    /// <summary>The adapter StaticDnsServers belongs to.</summary>
+    public string? StaticDnsAdapterId { get; set; }
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
 }
 

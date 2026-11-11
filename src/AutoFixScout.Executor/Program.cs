@@ -33,6 +33,7 @@ public static class Program
                 (_, "service.restart") when RestartableServices.Contains(args[1]) => RestartService(args[1]),
                 (_, "device.disable_enable") when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) => ToggleDevice(args[1]),
                 (_, "device.enable") when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) => Pnputil("/enable-device", args[1]) == 0 ? 0 : 1,
+                (_, "network.reset_dns") when IsValidInstanceId(args[1]) && IsNetAdapter(args[1]) => ResetDns(args[1]),
                 _ => 2,
             };
         }
@@ -54,6 +55,32 @@ public static class Program
     {
         using var q = new ManagementObjectSearcher($"SELECT PNPClass FROM Win32_PnPEntity WHERE DeviceID = '{id.Replace(@"\", @"\\")}'");
         return q.Get().Cast<ManagementBaseObject>().Any(d => ToggleableClasses.Contains(d["PNPClass"] as string, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static bool IsNetAdapter(string id)
+    {
+        using var q = new ManagementObjectSearcher($"SELECT PNPClass FROM Win32_PnPEntity WHERE DeviceID = '{id.Replace(@"\", @"\\")}'");
+        return q.Get().Cast<ManagementBaseObject>().Any(d => string.Equals(d["PNPClass"] as string, "Net", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Hand-typed DNS servers back to automatic (DHCP) on one adapter. The previous servers are in the app's probe state
+    /// and helper report, so a helper can put them back. No netsh, no command line: WMI on the adapter's own configuration.
+    /// </summary>
+    private static int ResetDns(string instanceId)
+    {
+        using var a = new ManagementObjectSearcher($"SELECT GUID FROM Win32_NetworkAdapter WHERE PNPDeviceID = '{instanceId.Replace(@"\", @"\\")}'");
+        var guid = a.Get().Cast<ManagementBaseObject>().Select(x => x["GUID"] as string).FirstOrDefault(g => g != null);
+        if (guid is null) return 1;
+        using var c = new ManagementObjectSearcher($"SELECT * FROM Win32_NetworkAdapterConfiguration WHERE SettingID = '{guid}'");
+        foreach (ManagementObject cfg in c.Get())
+        {
+            var inParams = cfg.GetMethodParameters("SetDNSServerSearchOrder");
+            inParams["DNSServerSearchOrder"] = null; // null = obtain DNS servers automatically
+            var result = Convert.ToUInt32(cfg.InvokeMethod("SetDNSServerSearchOrder", inParams, null)["ReturnValue"]);
+            return result is 0 or 1 ? 0 : 1; // 1 = done, restart suggested
+        }
+        return 1;
     }
 
     private static int RestartService(string name)
