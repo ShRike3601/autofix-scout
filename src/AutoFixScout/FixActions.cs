@@ -113,21 +113,27 @@ public static class FixActions
     public static IReadOnlyList<string> OpenSavePoints() =>
         Directory.Exists(PendingDir) ? Directory.GetFiles(PendingDir).Select(Path.GetFileName).OfType<string>().ToList() : Array.Empty<string>();
 
-    /// <summary>Save point, roll back, post-check, auto-undo, all inside one elevated run (one permission prompt).</summary>
-    public static async Task<(bool Ok, string Detail, string? SavePointId)> RollbackDriverAsync(string instanceId)
+    public static bool IsDriverChange(string actionId) => actionId is "driver.rollback" or "driver.install_from_windows_update";
+
+    /// <summary>Save point, change, post-check, auto-undo, all inside one elevated run (one permission prompt).</summary>
+    public static async Task<(bool Ok, string Detail, string? SavePointId)> ChangeDriverAsync(string actionId, string instanceId)
     {
+        if (!IsDriverChange(actionId)) return (false, $"action not allowed: {actionId}", null);
         var id = Guid.NewGuid().ToString("N");
         Directory.CreateDirectory(PendingDir);
         // Written before the change starts, so a crash or forced restart mid-change is caught next time.
         File.WriteAllText(Path.Combine(PendingDir, id), instanceId);
-        var code = await Task.Run(() => RunElevated("driver.rollback", instanceId, id));
+        var code = await Task.Run(() => RunElevated(actionId, instanceId, id));
+        var change = actionId == "driver.rollback" ? "rolled back" : "installed the Windows Update driver";
         var detail = code switch
         {
             null => Declined,
-            0 => $"rolled back; save point {id}",
-            3 => "no previous driver to go back to; nothing changed",
-            4 => $"rolled back, but the device didn't come up right, so it was put back automatically (save point {id})",
-            6 => $"rolled back, the device didn't come up right, and putting it back FAILED. Save point {id} is kept for a helper.",
+            0 => $"{change}; save point {id}",
+            3 => actionId == "driver.rollback"
+                ? "no previous driver to go back to; nothing changed"
+                : "Windows Update had no driver for this device, or couldn't be reached; nothing changed",
+            4 => $"{change}, but the device didn't come up right, so it was put back automatically (save point {id})",
+            6 => $"{change}, the device didn't come up right, and putting it back FAILED. Save point {id} is kept for a helper.",
             _ => $"couldn't make a save point (exit code {code}); nothing changed",
         };
         // Only a live change (0) or a failed restore (6) leaves something to settle.

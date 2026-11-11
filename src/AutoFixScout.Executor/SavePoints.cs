@@ -17,37 +17,66 @@ internal sealed record SavePoint(string Id, string InstanceId, string HardwareId
 internal static class SavePoints
 {
     // Exit codes the app understands (also in FixActions).
-    public const int Ok = 0, Failed = 1, NothingToRollBackTo = 3, ChangedButUndone = 4, RestoreFailed = 6;
+    public const int Ok = 0, Failed = 1, NothingToDo = 3, ChangedButUndone = 4, RestoreFailed = 6;
 
     private static readonly SecurityIdentifier Admins = new(WellKnownSidType.BuiltinAdministratorsSid, null);
     private static readonly SecurityIdentifier SystemSid = new(WellKnownSidType.LocalSystemSid, null);
 
     public static string Root => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "AutoFixScout", "savepoints");
 
-    public static int Rollback(string instanceId, string savePointId)
+    /// <summary>A planned driver change: does the install and says which driver version should be running afterwards (null = any but the old one).</summary>
+    public delegate Version? Plan();
+
+    public static int Rollback(string instanceId, string savePointId) => Change(instanceId, savePointId, device =>
+    {
+        var previous = DriverStore.FindPrevious(device);
+        if (previous is null) return null;
+        return () => { Install(previous.MatchedHardwareId, previous.InfPath); return previous.Version; };
+    });
+
+    public static int InstallFromWindowsUpdate(string instanceId, string savePointId) => Change(instanceId, savePointId, device =>
+    {
+        // Searching is read-only, so it happens before the save point; "nothing offered" changes nothing.
+        var update = WindowsUpdateDrivers.Find(device.HardwareIds);
+        if (update is null) return null;
+        return () => { WindowsUpdateDrivers.Install(update); return null; };
+    });
+
+    /// <summary>Spec 10 steps 1-9: save point, change, post-check, automatic undo on any failure.</summary>
+    private static int Change(string instanceId, string savePointId, Func<DeviceDriver, Plan?> plan)
     {
         var device = DriverStore.Read(instanceId);
-        if (device?.InfName is null || device.Version is null) return Failed;
-        var previous = DriverStore.FindPrevious(device);
-        if (previous is null) return NothingToRollBackTo;
+        if (device?.InfName is null || device.Version is null || !Version.TryParse(device.Version, out var before)) return Failed;
+        var change = plan(device);
+        if (change is null) return NothingToDo;
 
         // 1. Save point. If this fails nothing has changed, so stop.
-        var dir = Path.Combine(EnsureRoot(), savePointId);
+        var root = EnsureRoot();
+        Prune(root);
+        var dir = Path.Combine(root, savePointId);
         Directory.CreateDirectory(Path.Combine(dir, "driver"));
         if (Program.Pnputil("/export-driver", device.InfName, Path.Combine(dir, "driver")) != 0) return Failed;
         var exported = Directory.EnumerateFiles(Path.Combine(dir, "driver"), "*.inf", SearchOption.AllDirectories).FirstOrDefault();
         if (exported is null) return Failed;
-        var sp = new SavePoint(savePointId, instanceId, previous.MatchedHardwareId, device.InfName, device.Version, exported, TryCreateRestorePoint());
+        var sp = new SavePoint(savePointId, instanceId, RestoreHardwareId(device), device.InfName, device.Version, exported, TryCreateRestorePoint());
         WriteManifest(dir, sp);
 
         // 2. Change, 3. post-check, 4. undo on any failure.
         try
         {
-            Install(previous.MatchedHardwareId, previous.InfPath);
-            if (PostCheck(instanceId, previous.Version.ToString())) return Ok;
+            var expected = change();
+            if (PostCheck(instanceId, v => expected is null ? v != before : v == expected)) return Ok;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex.Message); }
         return Restore(sp) ? ChangedButUndone : RestoreFailed;
+    }
+
+    /// <summary>The most specific hardware ID the current driver's INF covers, so the restore force-installs it on this device.</summary>
+    private static string RestoreHardwareId(DeviceDriver device)
+    {
+        var inf = Path.Combine(DriverStore.InfDirectory, device.InfName!);
+        var text = File.Exists(inf) ? File.ReadAllText(inf) : "";
+        return device.HardwareIds.FirstOrDefault(h => text.Contains(h, StringComparison.OrdinalIgnoreCase)) ?? device.HardwareIds[0];
     }
 
     public static int Restore(string savePointId)
@@ -69,20 +98,20 @@ internal static class SavePoints
         try
         {
             Install(sp.HardwareId, source);
-            return PostCheck(sp.InstanceId, sp.Version);
+            var original = Version.Parse(sp.Version);
+            return PostCheck(sp.InstanceId, v => v == original);
         }
         catch (Exception ex) { Console.Error.WriteLine(ex.Message); return false; }
     }
 
     /// <summary>Spec 10 post-check: device present, no error code, and the driver we expect.</summary>
-    private static bool PostCheck(string instanceId, string expectedVersion)
+    private static bool PostCheck(string instanceId, Func<Version, bool> isExpected)
     {
         for (var i = 0; i < 15; i++)
         {
             var d = DriverStore.Read(instanceId);
             // Compare parsed versions: WMI and the INF may format the same version differently ("10.0.01" vs "10.0.1").
-            if (d is { ProblemCode: 0 } && Version.TryParse(d.Version, out var actual) && Version.TryParse(expectedVersion, out var expected)
-                && actual == expected) return true;
+            if (d is { ProblemCode: 0 } && Version.TryParse(d.Version, out var actual) && isExpected(actual)) return true;
             Thread.Sleep(1000); // PnP takes a moment to settle after an install
         }
         return false;
@@ -129,6 +158,15 @@ internal static class SavePoints
         acl.SetOwner(Admins);
         root.SetAccessControl(acl);
         return root.FullName;
+    }
+
+    /// <summary>Each save point holds a driver copy, so keep only the newest few (well above the 3 T2 changes per session).</summary>
+    internal const int KeepSavePoints = 10;
+
+    internal static void Prune(string root)
+    {
+        foreach (var old in new DirectoryInfo(root).GetDirectories().OrderByDescending(d => d.CreationTimeUtc).Skip(KeepSavePoints - 1))
+            try { old.Delete(recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
     }
 
     private static void WriteManifest(string dir, SavePoint sp)

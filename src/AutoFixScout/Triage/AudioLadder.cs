@@ -43,6 +43,7 @@ public static class AudioLadder
         var rollback = state.Devices.OrderByDescending(d => d.ProblemCode is > 0)
             .Select(d => DriverRules.Rollback("sound", d.Name, d.InstanceId, d.Driver)).FirstOrDefault(r => r != null);
         if (rollback != null) rungs.Add(rollback);
+        if (broken != null && DriverRules.WindowsUpdate("sound", broken.Name, broken.InstanceId, broken.ProblemCode) is { } wu) rungs.Add(wu);
         return rungs;
     }
 
@@ -63,6 +64,17 @@ public static class DriverRules
                 $"and that's often when problems start. I'd like to put back the previous version ({driver.PreviousVersion}). " +
                 "I'll make a save point first, and if anything goes wrong I'll put everything back automatically. " +
                 "Windows will ask for permission.", instanceId)
+            : null;
+
+    /// <summary>
+    /// Only for a device that still reports an error: a working device is never touched because a newer driver exists (spec 2).
+    /// </summary>
+    public static Rung? WindowsUpdate(string what, string deviceName, string instanceId, int? problemCode) =>
+        problemCode is > 0 and not 22
+            ? new Rung("windows_update_driver", "driver.install_from_windows_update", 2,
+                $"Your {what} device \"{deviceName}\" still reports a problem. I'd like to ask Windows Update for a driver for it. " +
+                "I'll make a save point first, and if anything goes wrong I'll put everything back automatically. " +
+                "This needs the internet, can take a few minutes, and Windows will ask for permission.", instanceId)
             : null;
 }
 

@@ -74,6 +74,8 @@ public static class CameraTriage
         var rollback = s.Devices.OrderByDescending(d => d.PnpClass == "Camera")
             .Select(d => DriverRules.Rollback("camera", d.Name, d.InstanceId, d.Driver)).FirstOrDefault(r => r != null);
         if (rollback != null) rungs.Add(rollback);
+        var broken = s.Devices.FirstOrDefault(d => d.ProblemCode is > 0 and not 22);
+        if (broken != null && DriverRules.WindowsUpdate("camera", broken.Name, broken.InstanceId, broken.ProblemCode) is { } wu) rungs.Add(wu);
         rungs.Add(new("shutter", "ui.human_step", 0, ShutterHint));
         return rungs.DistinctBy(r => r.Id).ToList();
     }

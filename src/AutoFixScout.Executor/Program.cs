@@ -8,7 +8,7 @@ namespace AutoFixScout.Executor;
 /// <summary>
 /// Elevated executor (spec 5). Accepts only an allowlisted action id plus arguments validated for that action.
 /// Never a command string, script, path or URL. Exit codes: 0 ok, 1 action failed, 2 rejected input,
-/// and for drivers 3 nothing to roll back to, 4 changed but undone, 6 restore failed (see SavePoints).
+/// and for drivers 3 nothing to do (no older driver / nothing offered), 4 changed but undone, 6 restore failed (see SavePoints).
 /// </summary>
 public static class Program
 {
@@ -24,8 +24,10 @@ public static class Program
         {
             return (args.Length, args.ElementAtOrDefault(0)) switch
             {
-                (3, "driver.rollback") when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) && IsValidSavePointId(args[2])
+                (3, "driver.rollback") when IsValidInstanceId(args[1]) && IsValidSavePointId(args[2]) && IsToggleableDevice(args[1])
                     => SavePoints.Rollback(args[1], args[2]),
+                (3, "driver.install_from_windows_update") when IsValidInstanceId(args[1]) && IsValidSavePointId(args[2]) && IsToggleableDevice(args[1])
+                    => SavePoints.InstallFromWindowsUpdate(args[1], args[2]),
                 (2, "driver.restore") when IsValidSavePointId(args[1]) => SavePoints.Restore(args[1]),
                 (not 2, _) => 2,
                 (_, "service.restart") when RestartableServices.Contains(args[1]) => RestartService(args[1]),

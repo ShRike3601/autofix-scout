@@ -218,10 +218,12 @@ public partial class MainWindow : Window, IFixHost
 
     async Task<(bool Ok, string Detail)> IFixHost.RunAsync(Rung rung)
     {
-        if (rung.ActionId == "driver.rollback")
+        if (FixActions.IsDriverChange(rung.ActionId))
         {
-            ShowBusy("Making a save point and changing the driver. This can take a minute...");
-            var (ok, detail, savePoint) = await FixActions.RollbackDriverAsync(rung.Arg!);
+            ShowBusy(rung.ActionId == "driver.rollback"
+                ? "Making a save point and changing the driver. This can take a minute..."
+                : "Making a save point and asking Windows Update for a driver. This can take a few minutes...");
+            var (ok, detail, savePoint) = await FixActions.ChangeDriverAsync(rung.ActionId, rung.Arg!);
             if (savePoint != null) _savePoints[rung.Id] = savePoint;
             return (ok, detail);
         }

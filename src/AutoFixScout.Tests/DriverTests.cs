@@ -118,6 +118,42 @@ public class DriverLadderTests
             NetworkTriage.Ladder(s, NetworkTriage.Evaluate(s)).Select(r => r.Id));
     }
 
+    [Fact]
+    public void WindowsUpdate_OnlyForDevicesStillReportingAnError()
+    {
+        Assert.NotNull(DriverRules.WindowsUpdate("sound", "Realtek", "X", 10));
+        Assert.Null(DriverRules.WindowsUpdate("sound", "Realtek", "X", 0));   // working device: never touched
+        Assert.Null(DriverRules.WindowsUpdate("sound", "Realtek", "X", 22));  // just disabled: enabling is the fix
+        Assert.Null(DriverRules.WindowsUpdate("sound", "Realtek", "X", null)); // unknown: fail closed
+    }
+
+    [Fact]
+    public void Audio_BrokenDevice_ToggleThenRollbackThenWindowsUpdate()
+    {
+        var s = new AudioState
+        {
+            Services = new[] { new ServiceInfo("AudioSrv", "Running"), new ServiceInfo("AudioEndpointBuilder", "Running") },
+            Endpoints = new[] { new AudioEndpointInfo("Speakers", true, true, "Speakers") },
+            DefaultMuted = Tri.No, DefaultVolumePercent = 50,
+            Devices = new[] { new AudioDeviceInfo("Realtek Audio", @"HDAUDIO\X\1", 10, null, null, null, Recent()) },
+        };
+        var ladder = AudioLadder.For(s, AudioTriage.Evaluate(s));
+        Assert.Equal(new[] { "restart_services", "toggle_device", "rollback_driver", "windows_update_driver" }, ladder.Select(r => r.Id));
+        Assert.All(ladder.Where(r => r.Tier == 2), r => Assert.Contains("save point", r.Say));
+    }
+
+    [Fact]
+    public void Camera_BrokenDevice_WindowsUpdateBeforeShutter()
+    {
+        var s = new CameraState
+        {
+            Devices = new[] { new CameraDeviceInfo("Integrated Camera", @"USB\C\1", "Camera", 10) },
+            DeviceAccess = Tri.Yes, AppAccess = Tri.Yes, DesktopAppAccess = Tri.Yes,
+        };
+        Assert.Equal(new[] { "toggle_camera", "windows_update_driver", "shutter" },
+            CameraTriage.Ladder(s, CameraTriage.Evaluate(s)).Select(r => r.Id));
+    }
+
     // ---- runner: save point settle / undo ----
 
     private sealed class T2Host(bool runOk, bool fixedIt, bool settleOk) : IFixHost
@@ -200,5 +236,7 @@ public class DriverLadderTests
         Assert.Equal(2, ExecutorProgram.Main(new[] { "driver.restore", "..\\evil" }));
         Assert.Equal(2, ExecutorProgram.Main(new[] { "driver.rollback", "a b", "0123456789abcdef0123456789abcdef" }));
         Assert.Equal(2, ExecutorProgram.Main(new[] { "driver.rollback", "only-two-args" }));
+        Assert.Equal(2, ExecutorProgram.Main(new[] { "driver.install_from_windows_update", "x'; --", "0123456789abcdef0123456789abcdef" }));
+        Assert.Equal(2, ExecutorProgram.Main(new[] { "driver.install_from_windows_update", @"HDAUDIO\X", "not-a-guid" }));
     }
 }
