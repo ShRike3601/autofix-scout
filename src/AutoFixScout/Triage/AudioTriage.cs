@@ -162,5 +162,11 @@ public enum FindingCode
     GatewayUnreachable,
     DnsFailing,
     NoInternet,
+    // camera (spec 8.2)
+    NoCamera,
+    CameraDisabled,
+    CameraError,
+    CameraPrivacyOff,
+    CameraInUse,
     LooksNormal
 }

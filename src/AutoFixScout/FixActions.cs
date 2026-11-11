@@ -24,6 +24,7 @@ public static class FixActions
                         "camera" => "ms-settings:privacy-webcam",
                         "airplane" => "ms-settings:network-airplanemode",
                         "wifi" => "ms-settings:network-wifi",
+                        "camera_app" => "microsoft.windows.camera:",
                         _ => throw new ArgumentException(rung.Arg),
                     };
                     Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });

@@ -10,6 +10,7 @@ public partial class MainWindow : Window, IFixHost
     private const string AppName = "AutoFix Scout";
     private readonly IAudioProbe _audioProbe = new RealAudioProbe();
     private readonly INetworkProbe _networkProbe = new RealNetworkProbe();
+    private readonly ICameraProbe _cameraProbe = new RealCameraProbe();
     private string? _lastReportPath;
     private TaskCompletionSource<bool>? _choice;
     private Func<Task<bool>> _test = () => Task.FromResult(false);
@@ -141,6 +142,27 @@ public partial class MainWindow : Window, IFixHost
         return false;
     }
 
+    // ---- camera ----
+
+    private async void OnCameraClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync("camera", "camera", DiagnoseCameraAsync, CameraTestAsync);
+
+    private async Task<Diagnosis> DiagnoseCameraAsync()
+    {
+        var s = await Task.Run(_cameraProbe.Read);
+        var f = CameraTriage.Evaluate(s);
+        return new Diagnosis(s, f, CameraTriage.Ladder(s, f), CameraTriage.ProbablyHardware(s));
+    }
+
+    /// <summary>Real test: the built-in Camera app shows a live picture. shortcut: no in-app preview, add one with MediaCapture if pilots find the app switch confusing.</summary>
+    private async Task<bool> CameraTestAsync()
+    {
+        await ShowStepAsync("Now I'll open the Camera app so you can check.", "Open the Camera app");
+        var (ok, _) = await FixActions.RunAsync(new Rung("camera_test", "ui.open_settings_page", 0, "", "camera_app"));
+        if (!ok) return false;
+        return await ShowStepAsync("Can you see yourself in the Camera app? You can close it afterwards.", "Yes, I can see myself", "No");
+    }
+
     // ---- IFixHost ----
 
     Task<bool> IFixHost.ConfirmAsync(Rung rung) => ShowStepAsync(rung.Say, "Yes, try it", "Not now");
@@ -167,7 +189,6 @@ public partial class MainWindow : Window, IFixHost
             Process.Start(new ProcessStartInfo("notepad.exe", $"\"{_lastReportPath}\""));
     }
 
-    private void OnCameraClicked(object sender, RoutedEventArgs e) => Stub("Camera");
     private void OnOtherClicked(object sender, RoutedEventArgs e) => Stub("Other");
     private void OnSettingsClicked(object sender, RoutedEventArgs e) => Stub("Settings");
 
