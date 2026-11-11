@@ -30,7 +30,7 @@ from it that the code follows:
 | Session log (SQLite, spec schema) | `src/AutoFixScout/SessionLog.cs` -> `%LOCALAPPDATA%\AutoFixScout\session.db` |
 | Helper report | `src/AutoFixScout/HelperReport.cs` -> `%LOCALAPPDATA%\AutoFixScout\reports\` |
 | UI (screens + flow) | `src/AutoFixScout.UI/MainWindow.xaml(.cs)` |
-| Tests (77, all pass in CI) | `src/AutoFixScout.Tests/` |
+| Tests (83, all pass in CI) | `src/AutoFixScout.Tests/` |
 
 Unused leftovers from the first skeleton (safe to delete, not yet removed): `Orchestrator.cs`, `SessionManager.cs`,
 `Simulator.cs`, `ActionCatalog.cs`, `ActionContext.cs` (both projects), `IProbe.cs`, `IExecutor.cs`, `Probes.cs`,
@@ -66,9 +66,9 @@ Ethernet, Cloudflare WARP on (Wi-Fi DNS = 127.0.2.2/.3), Location services off, 
 | 2. Sound faults | **Passed after fixes** (2026-11-11) | Muted -> unmute (no UAC). AudioSrv stopped -> restart_services (UAC). Realtek disabled (code 22) -> restart (no) then toggle_device (yes). Default = Bluetooth JBL Go 3 -> wrong_output after fix (see below). |
 | 3. Network faults | **Passed after fixes** (2026-11-11, TestBench) | Wi-Fi disabled -> enable_adapter. Wi-Fi disconnected -> pick_wifi (internet back 7 s after reconnect). Bogus DNS (WARP paused) -> flush_dns (no) then new reset_dns (yes). Airplane mode **not run yet** (needs a person: no reliable way to switch it from a script). |
 | 4. Camera faults | **Passed / changed** (2026-11-11, TestBench) | Each privacy switch off -> privacy rung, named correctly. Camera disabled -> enable_camera. "Camera app holding it" can't be detected on this Windows build (see below); ladder changed. Human check of the real Camera-app test still to do with the new UI. |
-| 5. Rollback | not run | |
-| 6. Windows Update driver | not run | |
-| 7. session.db + report | checked for step 1 | |
+| 5. Rollback | **Passed after fix** (2026-11-11, TestBench + manual) | Intel Display Audio 10.27.0.8 -> 10.27.0.9 staged as "the recent update". 5a "works" -> 10.27.0.8 stays, marker cleared. 5b "doesn't" -> 10.27.0.9 restored from the save point. 5c app closed right after the change, reopened -> offered "Put it back", restored (owner, by hand). 5d non-admin can read but not write the save point folder. |
+| 6. Windows Update driver | **Partly** (2026-11-11, TestBench) | Only "nothing offered": WU has no driver for the Realtek device here, so no change and no save point. A real WU install + undo is still untested on hardware. |
+| 7. session.db + report | checked for step 1 | Not re-checked for steps 2-6. |
 
 Step 1 findings:
 - **Fixed:** with "looks normal" findings the app still offered fixes before testing (sound offered and ran
@@ -109,6 +109,25 @@ Step 4 findings:
   and the finding says "no app reported holding it".
 - CS8848 at `RealCameraProbe.cs:66` was harmless (parsed as intended); parenthesised.
 
+Steps 5-6 findings:
+- **Fixed (real bug):** `DriverStore.Read` took the driver version from `Win32_PnPSignedDriver`, which lags real
+  changes (still the old version 6 s after setupapi logged a successful install). The executor's post-check uses the
+  same reader, so it could have undone driver changes that worked. Now reads `Enum\<instance>\Driver` ->
+  `Control\Class\<key>` `InfPath`/`DriverVersion` (live, no admin needed); WMI is only a fallback.
+- **Weak heuristic:** "driver changed in the last 30 days" = oem*.inf creation date. On a freshly set up PC every
+  oem*.inf is recent, so every driver counts as "just updated".
+- **Wrong device can be offered:** the sound flow offers rollback for any MEDIA device with an older package in the
+  store, e.g. the HDMI audio driver when the problem is the laptop speakers. Should prefer the default output device.
+- Save point folders are kept after a successful restore (3 so far); nothing cleans them up yet.
+- Staging a newer driver needs `UpdateDriverForPlugAndPlayDevices` with INSTALLFLAG_FORCE: `pnputil /add-driver
+  /install` keeps the installed driver when it matches the device more specifically.
+- **Bench bug, laptop changed:** the first `--only unstage` used a regex over the whole pnputil output that ran from
+  one entry into the next; it deleted the laptop's original Intel Display Audio package (oem9.inf, 10.27.0.8) instead
+  of the test one. Intel Display Audio now runs 10.27.0.9 (oem42.inf, Microsoft-signed, works). Fixed: `PnpDrivers`
+  parses entry by entry; `stage` writes `C:\ProgramData\AFS-TestBench\driver-stage.txt` (original + staged package)
+  and `unstage` deletes only the staged package, only while the original is still in the store (tests in
+  `PnpDriversTests`). Getting 10.27.0.8 back needs the MSI/Intel graphics package; not done.
+
 ### TestBench (batch runner)
 
 `tools/AutoFixScout.TestBench` runs the plan without the UI: per scenario it creates the fault, runs the app's
@@ -116,13 +135,18 @@ real probe + triage + ladder (executor rungs for real, "open Settings / please d
 checks healthy, and always restores. One UAC prompt per batch; refuses to run off AFS-TESTBENCH; arms a scheduled
 failsafe restore (`AFS-TestBench-Failsafe`, script in `C:\ProgramData\AFS-TestBench`) and removes it at the end.
 
-    AutoFixScout.TestBench.exe [sound] [network] [camera] [--only 3c,3d] [--pause-warp] --out C:\afs\docs\testbench-results
+    AutoFixScout.TestBench.exe [sound] [network] [camera] [drivers] [--only 3c,3d] [--pause-warp] [--newer-inf <path>] --out C:\afs\docs\testbench-results
+
+`drivers` needs `--newer-inf`: a newer official INF for Intel Display Audio (used: 10.27.0.9 from the Intel graphics
+cab on the Microsoft Update Catalog). `--only stage` leaves it installed for a manual test in the app;
+`--only unstage` undoes exactly that stage.
 
 Reports (`docs/testbench-results/*.md`) are committed; raw logs aren't (they can name local networks, repo is public).
 It can't judge what only a person can (hearing the beep, seeing yourself); those stay manual.
 
-Still never run on real hardware: `UpdateDriverForPlugAndPlayDevices`, `pnputil /export-driver`, the save point
-ACL/owner checks, restore point creation, the WUA calls (steps 5 and 6).
+Run on real hardware now: rollback via `UpdateDriverForPlugAndPlayDevices`, `pnputil /export-driver`, save point
+ACL, restore point creation, restore from a save point, the WUA search. Still never run: a WU driver actually
+downloaded and installed (WU offers nothing for this laptop's devices). Airplane mode (3a) needs a person.
 
 ## Test plan (only on AFS-TESTBENCH)
 
