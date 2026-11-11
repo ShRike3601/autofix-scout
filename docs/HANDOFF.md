@@ -29,7 +29,7 @@ from it that the code follows:
 | Elevated executor | `src/AutoFixScout.Executor/{Program,SavePoints,WindowsUpdateDrivers}.cs` |
 | Session log (SQLite, spec schema) | `src/AutoFixScout/SessionLog.cs` -> `%LOCALAPPDATA%\AutoFixScout\session.db` |
 | Helper report | `src/AutoFixScout/HelperReport.cs` -> `%LOCALAPPDATA%\AutoFixScout\reports\` |
-| UI (screens + flow) | `src/AutoFixScout.UI/MainWindow.xaml(.cs)` |
+| UI (screens + flow) | `src/AutoFixScout.UI/MainWindow.xaml(.cs)`, look in `MainWindow.Visuals.cs` + `Theme/` (see UI below) |
 | Tests (107, all pass in CI) | `src/AutoFixScout.Tests/` |
 
 The unused first-skeleton leftovers (Orchestrator, SessionManager, Simulator, ActionCatalog, ActionContext, IProbe, IExecutor, Probes, StepResult, the legacy models in Models.cs, and the Serilog/YamlDotNet packages) are removed. Still to remove after the UI redesign lands: UI `IActionContext.cs` and unused UI packages (e.g. System.Data.SqlClient).
@@ -200,6 +200,37 @@ downloaded and installed (WU offers nothing for this laptop's devices). Airplane
 The executor can also be run directly from an admin terminal, e.g.
 `AutoFixScout.Executor.exe driver.rollback "<instance id>" <32-hex save point id>` then `echo $LASTEXITCODE`.
 UAC prompts can't be clicked by automation; run the app from an elevated terminal on the test laptop to avoid them.
+
+## UI
+
+Plain WPF, no UI library. Presentation is kept apart from the flow: `MainWindow.xaml.cs` decides what to show,
+`MainWindow.Visuals.cs` only draws it (`PresentStep` / `PresentHome`, the picture above each sentence, transitions).
+`ShowStepAsync` has an optional `look` argument that changes nothing but the picture.
+
+| What | Where |
+|---|---|
+| Colours (light / dark) | `src/AutoFixScout.UI/Theme/Light.xaml`, `Dark.xaml` (same keys in both, always `DynamicResource`) |
+| High contrast | `ThemeManager.HighContrastPalette` maps every key onto the user's system colours |
+| Buttons, focus ring, scroll bar, type scale | `Theme/Styles.xaml` |
+| Theme switching + Mica | `Theme/ThemeManager.cs` |
+| Animation | `Theme/Motion.cs` |
+
+- **Theme**: follows Windows light/dark (`AppsUseLightTheme`) and high contrast live (WM_SETTINGCHANGE). Mica backdrop
+  on Windows 11 22H2+ with transparency on; solid `#F3F3F3` / `#202020` otherwise (Windows 10, high contrast).
+  `AUTOFIXSCOUT_THEME=light|dark` forces a theme for screenshots.
+- **Colours**: Windows 11 accent blue (`#005FB8` light, `#60CDFF` dark). Text `#1B1B1B` / white, secondary text kept
+  dark enough for older eyes (~8:1). Each topic has its own tile colour (sound blue, camera orange, internet green);
+  endings: fixed = green animated check, no fault = blue check, not fixed / probably hardware = amber (and the
+  "Details for my helper" button gets an accent outline), error = red, abandoned = grey info.
+- **Type**: Segoe UI Variable (falls back to Segoe UI); title 34, message 24, card titles 22, buttons 19, captions 15.
+  Icons from Segoe Fluent Icons (falls back to Segoe MDL2 Assets on Windows 10).
+- **Shape**: cards 10-14 px corners, buttons 8 px; answer buttons are full width, 58 px tall, main answer filled.
+- **Motion**: everything goes through `Motion`, which checks `SystemParameters.ClientAreaAnimation` each time
+  (Windows "Animation effects" off = no movement at all). Screens fade + slide up (220 ms fade, 320 ms exponential
+  ease-out), home cards stagger by 25 ms, buttons lift on hover / dip on press (90-200 ms), the check pops and draws
+  itself. Repeated busy screens don't re-animate. Colour changes are instant. Nothing waits for an animation.
+- **Accessibility**: two-ring keyboard focus visual, `AutomationProperties.Name` on the cards, the sentence is a live
+  region so screen readers read each new step, window fits the work area and scrolls when small (min 420 x 460).
 
 ## Shortcuts taken (search the code for `shortcut:`)
 
