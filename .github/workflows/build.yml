@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write   # only used by the release step, which runs on version tags (v*)
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
@@ -28,6 +30,21 @@ jobs:
             if ((Get-Content "$out/AutoFixScout.Executor.runtimeconfig.json" -Raw) -notmatch 'includedFrameworks') { Write-Error "executor not self-contained ($rid)"; exit 1 }
             Copy-Item docs/TESTERS.md "$out/READ ME FIRST.md"
           }
+      # One setup for x64 and ARM64 PCs (installs to Program Files; see installer/AutoFixScout.iss).
+      - name: Build installer
+        id: setup
+        run: |
+          $version = if ("${{ github.ref }}" -like 'refs/tags/v*') { "${{ github.ref_name }}".TrimStart('v') } else { "0.0.${{ github.run_number }}-dev" }
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $iscc)) { choco install innosetup -y --no-progress; if ($LASTEXITCODE) { exit 1 } }
+          & $iscc /Q "/DAppVersion=$version" "/DSourceX64=$PWD\publish\win-x64" "/DSourceArm64=$PWD\publish\win-arm64" "/DOutDir=$PWD\dist" installer\AutoFixScout.iss
+          if ($LASTEXITCODE) { exit 1 }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Get-ChildItem dist | Format-Table Name, Length
+      - uses: actions/upload-artifact@v7
+        with:
+          name: AutoFixScout-Setup
+          path: dist/
       - uses: actions/upload-artifact@v7
         with:
           name: AutoFixScout-win-x64
@@ -36,3 +53,11 @@ jobs:
         with:
           name: AutoFixScout-win-arm64
           path: publish/win-arm64/
+      # Push a tag like v0.1.0 to publish a GitHub Release anyone can download from (no GitHub account needed).
+      - name: GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/*.exe --prerelease --title "AutoFix Scout ${{ steps.setup.outputs.version }} (test build)" --notes-file docs/TESTERS.md
+          if ($LASTEXITCODE) { exit 1 }
