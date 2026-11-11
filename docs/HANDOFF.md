@@ -32,9 +32,7 @@ from it that the code follows:
 | UI (screens + flow) | `src/AutoFixScout.UI/MainWindow.xaml(.cs)` |
 | Tests (85, all pass in CI) | `src/AutoFixScout.Tests/` |
 
-Unused leftovers from the first skeleton (safe to delete, not yet removed): `Orchestrator.cs`, `SessionManager.cs`,
-`Simulator.cs`, `ActionCatalog.cs`, `ActionContext.cs` (both projects), `IProbe.cs`, `IExecutor.cs`, `Probes.cs`,
-`StepResult.cs`, UI `IActionContext.cs`.
+The unused first-skeleton leftovers (Orchestrator, SessionManager, Simulator, ActionCatalog, ActionContext, IProbe, IExecutor, Probes, StepResult, the legacy models in Models.cs, and the Serilog/YamlDotNet packages) are removed. Still to remove after the UI redesign lands: UI `IActionContext.cs` and unused UI packages (e.g. System.Data.SqlClient).
 
 ## Done
 
