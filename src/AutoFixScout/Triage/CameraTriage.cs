@@ -58,6 +58,7 @@ public static class CameraTriage
                 rungs.Add(new("shutter", "ui.human_step", 0, ShutterHint));
                 break;
             case FindingCode.NoCamera:
+                rungs.Add(Rescan.Rung("camera", "camera"));
                 rungs.Add(new("shutter", "ui.human_step", 0, ShutterHint));
                 break;
             case FindingCode.CameraDisabled:

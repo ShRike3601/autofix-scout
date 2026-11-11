@@ -47,6 +47,9 @@ public static class NetworkTriage
         var rungs = new List<Rung>();
         switch (code)
         {
+            case FindingCode.NoNetworkAdapter:
+                rungs.Add(Rescan.Rung("network", "Wi-Fi or network adapter"));
+                break;
             case FindingCode.AirplaneModeOn:
                 rungs.Add(new("airplane", "ui.open_settings_page", 0,
                     "Airplane mode is on. I'll open the Airplane mode settings. Please switch \"Airplane mode\" to Off.", "airplane"));
