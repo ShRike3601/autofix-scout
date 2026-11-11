@@ -6,16 +6,21 @@ namespace AutoFixScout;
 /// <summary>Session log (spec 12). Local only; one row per session and per offered step.</summary>
 public sealed class SessionLog : IDisposable
 {
-    // Spec 12 schema, verbatim apart from IF NOT EXISTS so it can run on every start.
-    private const string Schema = """
+    // Spec 12 schema, verbatim apart from IF NOT EXISTS so it can run on every start,
+    // and the added 'no_fault_found' outcome (owner decision 2026-11-11, found in real-hardware test step 1).
+    private const string SessionTable = """
         CREATE TABLE IF NOT EXISTS session (
           session_id TEXT PRIMARY KEY,
           started_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
           ended_at TEXT,
           symptom TEXT NOT NULL CHECK (symptom IN ('audio','camera','network','other')),
-          outcome TEXT CHECK (outcome IN ('fixed','not_fixed','probable_hardware','abandoned')),
+          outcome TEXT CHECK (outcome IN ('fixed','not_fixed','probable_hardware','abandoned','no_fault_found')),
           app_version TEXT NOT NULL,
           playbook_version TEXT NOT NULL);
+
+        """;
+
+    private const string Schema = SessionTable + """
         CREATE TABLE IF NOT EXISTS step_log (
           step_id INTEGER PRIMARY KEY AUTOINCREMENT,
           session_id TEXT NOT NULL REFERENCES session(session_id),
@@ -69,8 +74,23 @@ public sealed class SessionLog : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         _db = new SqliteConnection($"Data Source={path}");
         _db.Open();
+        MigrateSessionOutcomes();
         Exec("PRAGMA foreign_keys = ON;");
         Exec(Schema);
+    }
+
+    /// <summary>
+    /// A session table made before 'no_fault_found' existed has a CHECK that rejects it. SQLite can't change a CHECK,
+    /// so the table is rebuilt with its rows kept. Runs with foreign keys off (step_log points at session).
+    /// </summary>
+    private void MigrateSessionOutcomes()
+    {
+        var sql = Scalar("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'session'") as string;
+        if (sql is null || sql.Contains("no_fault_found")) return;
+        Exec("PRAGMA foreign_keys = OFF;");
+        Exec("BEGIN;" +
+             SessionTable.Replace("EXISTS session (", "EXISTS session_new (") +
+             "INSERT INTO session_new SELECT * FROM session; DROP TABLE session; ALTER TABLE session_new RENAME TO session; COMMIT;");
     }
 
     public string Start(string symptom)
@@ -103,6 +123,7 @@ public sealed class SessionLog : IDisposable
                 Outcome.Fixed => "fixed",
                 Outcome.NotFixed => "not_fixed",
                 Outcome.ProbableHardware => "probable_hardware",
+                Outcome.NoFaultFound => "no_fault_found",
                 _ => "abandoned",
             }));
 

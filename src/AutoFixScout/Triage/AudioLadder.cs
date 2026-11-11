@@ -97,6 +97,15 @@ public static class LadderRunner
     public const int MaxT2PerSession = 3;
 
     /// <summary>
+    /// Act on symptoms (spec 2): when the check found nothing wrong, run the real test before offering any fix.
+    /// Returns NoFaultFound if it works; null means go on to the ladder (something's wrong, or the test failed).
+    /// </summary>
+    public static async Task<Outcome?> NoFaultAsync(IReadOnlyList<Finding> findings, Func<Task<bool>> test) =>
+        findings.Count > 0 && findings.All(f => f.Code == FindingCode.LooksNormal) && await test()
+            ? Outcome.NoFaultFound
+            : null;
+
+    /// <summary>
     /// Runs each rung at most once (spec 6: no loops) and stops at the first confirmed fix.
     /// Every rung offered gets a step_log row; nothing defaults to success (spec 12).
     /// </summary>

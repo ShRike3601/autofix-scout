@@ -86,6 +86,31 @@ public class AudioLadderTests
         Assert.All(log, s => Assert.Equal((true, StepResult.Failed, (bool?)null), (s.Approved, s.Result, s.UserConfirmedFixed)));
     }
 
+    // ---- test before fixing when nothing looks wrong (found in real-hardware test step 1) ----
+
+    private static readonly Triage.Finding Normal = new(FindingCode.LooksNormal, "fine", "");
+
+    [Fact]
+    public async Task NoFault_LooksNormalAndTestWorks_NoFaultFound()
+    {
+        var tests = 0;
+        Assert.Equal(Outcome.NoFaultFound, await LadderRunner.NoFaultAsync(new[] { Normal }, () => { tests++; return Task.FromResult(true); }));
+        Assert.Equal(1, tests);
+    }
+
+    [Fact]
+    public async Task NoFault_TestFails_GoesOnToLadder() =>
+        Assert.Null(await LadderRunner.NoFaultAsync(new[] { Normal }, () => Task.FromResult(false)));
+
+    [Fact]
+    public async Task NoFault_RealFinding_DoesNotRunTest()
+    {
+        var tested = false;
+        var findings = new[] { new Triage.Finding(FindingCode.Muted, "muted", ""), Normal };
+        Assert.Null(await LadderRunner.NoFaultAsync(findings, () => { tested = true; return Task.FromResult(true); }));
+        Assert.False(tested);
+    }
+
     // ---- executor input validation (trust boundary) ----
 
     [Theory]

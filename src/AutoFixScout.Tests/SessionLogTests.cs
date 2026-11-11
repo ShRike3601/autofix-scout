@@ -51,6 +51,49 @@ public class SessionLogTests : IDisposable
         Assert.Equal(0L, again.Scalar("SELECT COUNT(*) FROM session"));
     }
 
+    [Fact]
+    public void NoFaultFound_IsStored()
+    {
+        using var db = new SessionLog(_path);
+        var id = db.Start("network");
+        db.End(id, Outcome.NoFaultFound);
+        Assert.Equal("no_fault_found", db.Scalar($"SELECT outcome FROM session WHERE session_id = '{id}'"));
+    }
+
+    [Fact]
+    public void OldDatabase_IsMigrated_KeepingRows()
+    {
+        // A session.db created by the earlier app: its CHECK doesn't know 'no_fault_found'.
+        using (var old = new SqliteConnection($"Data Source={_path}"))
+        {
+            old.Open();
+            using var cmd = old.CreateCommand();
+            cmd.CommandText = """
+                CREATE TABLE session (session_id TEXT PRIMARY KEY,
+                  started_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), ended_at TEXT,
+                  symptom TEXT NOT NULL CHECK (symptom IN ('audio','camera','network','other')),
+                  outcome TEXT CHECK (outcome IN ('fixed','not_fixed','probable_hardware','abandoned')),
+                  app_version TEXT NOT NULL, playbook_version TEXT NOT NULL);
+                CREATE TABLE step_log (step_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  session_id TEXT NOT NULL REFERENCES session(session_id), playbook_step TEXT NOT NULL, action_id TEXT NOT NULL,
+                  tier INTEGER NOT NULL, proposed_by TEXT NOT NULL, approved INTEGER NOT NULL DEFAULT 0, approved_at TEXT,
+                  started_at TEXT, finished_at TEXT, result TEXT, user_confirmed_fixed INTEGER, error TEXT);
+                INSERT INTO session (session_id, symptom, outcome, app_version, playbook_version) VALUES ('old1', 'audio', 'fixed', '1', '0.1.0');
+                INSERT INTO step_log (session_id, playbook_step, action_id, tier, proposed_by) VALUES ('old1', 'unmute', 'audio.unmute_and_set_volume', 1, 'playbook');
+                """;
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        using var db = new SessionLog(_path);
+        db.End(db.Start("camera"), Outcome.NoFaultFound);
+        Assert.Equal("fixed", db.Scalar("SELECT outcome FROM session WHERE session_id = 'old1'"));
+        Assert.Equal(1L, db.Scalar("SELECT COUNT(*) FROM session WHERE outcome = 'no_fault_found'"));
+        Assert.Equal(1L, db.Scalar("SELECT COUNT(*) FROM step_log WHERE session_id = 'old1'"));
+        Assert.Equal(0L, db.Scalar("SELECT COUNT(*) FROM pragma_foreign_key_check"));
+        Assert.Throws<SqliteException>(() => db.Start("printer")); // other CHECKs still enforced
+    }
+
     private sealed class Host : IFixHost
     {
         private int _tests;

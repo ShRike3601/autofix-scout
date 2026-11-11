@@ -90,8 +90,8 @@ public partial class MainWindow : Window, IFixHost
 
             var log = new List<StepLog>();
             var after = before;
-            var outcome = Outcome.NotFixed;
-            if (before.Ladder.Count > 0)
+            var outcome = await LadderRunner.NoFaultAsync(before.Findings, test) ?? Outcome.NotFixed;
+            if (outcome != Outcome.NoFaultFound && before.Ladder.Count > 0)
             {
                 _test = test;
                 outcome = await LadderRunner.RunAsync(before.Ladder, this, log);
@@ -137,6 +137,8 @@ public partial class MainWindow : Window, IFixHost
     private static string EndMessage(Outcome outcome, string what) => outcome switch
     {
         Outcome.Fixed => $"Your {what} is working again.",
+        Outcome.NoFaultFound => $"Your {what} seems to be working fine, so I didn't change anything. " +
+                                "If the problem comes back, run the check again while it's happening.",
         Outcome.ProbableHardware => "This is probably a hardware fault. A repair shop can check it. " +
                                     "Press \"Details for my helper\" to see a report you can show them.",
         Outcome.Abandoned => "Okay, nothing else was changed. You can come back any time.",

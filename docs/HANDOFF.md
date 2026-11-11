@@ -30,7 +30,7 @@ from it that the code follows:
 | Session log (SQLite, spec schema) | `src/AutoFixScout/SessionLog.cs` -> `%LOCALAPPDATA%\AutoFixScout\session.db` |
 | Helper report | `src/AutoFixScout/HelperReport.cs` -> `%LOCALAPPDATA%\AutoFixScout\reports\` |
 | UI (screens + flow) | `src/AutoFixScout.UI/MainWindow.xaml(.cs)` |
-| Tests (68, all pass in CI) | `src/AutoFixScout.Tests/` |
+| Tests (73, all pass in CI) | `src/AutoFixScout.Tests/` |
 
 Unused leftovers from the first skeleton (safe to delete, not yet removed): `Orchestrator.cs`, `SessionManager.cs`,
 `Simulator.cs`, `ActionCatalog.cs`, `ActionContext.cs` (both projects), `IProbe.cs`, `IExecutor.cs`, `Probes.cs`,
@@ -55,16 +55,41 @@ Unused leftovers from the first skeleton (safe to delete, not yet removed): `Orc
   - Executor exit codes: 0 ok, 1 failed (nothing changed), 2 rejected input, 3 nothing to do, 4 changed but undone,
     6 restore failed (save point kept).
 
-## Never tested on real hardware
+## Real-hardware test results (AFS-TESTBENCH)
 
-Everything that touches Windows has only been compiled, not run: all probes, `UpdateDriverForPlugAndPlayDevices`,
-`pnputil /export-driver`, the save point ACL/owner checks, restore point creation, the WUA calls, the UI flow.
-That is the next job, on the test laptop.
+Laptop: MSI, Realtek audio (+ NVIDIA/Intel HDMI audio, Nahimic), Chicony "HD Webcam", Intel AX201 Wi-Fi, Realtek
+Ethernet, Cloudflare WARP on (Wi-Fi DNS = 127.0.2.2/.3), Location services off, Windows 11 build 26300.
+
+| Step | Status | Notes |
+|---|---|---|
+| 1. Healthy machine | **Passed after fix** (2026-11-11) | See below. Probes ran fine; no device/service/DNS/privacy/default-output change; WARP DNS not blamed. |
+| 2. Sound faults | not run | |
+| 3. Network faults | not run | |
+| 4. Camera faults | not run | Watch the CS8848 warning at `RealCameraProbe.cs:66` (privacy `Allowed()` switch). |
+| 5. Rollback | not run | |
+| 6. Windows Update driver | not run | |
+| 7. session.db + report | checked for step 1 | |
+
+Step 1 findings:
+- **Fixed:** with "looks normal" findings the app still offered fixes before testing (sound offered and ran
+  `restart_services`; camera asked about the shutter) and logged them as `fixed`; network logged `not_fixed`.
+  Now `LadderRunner.NoFaultAsync` runs the real test first when every finding is LooksNormal; if it works the flow
+  ends with outcome `NoFaultFound` and offers nothing. Owner decision: new session outcome `no_fault_found`
+  (spec 12 schema extended; `SessionLog` migrates older session.db files by rebuilding the session table).
+- **Not a bug, test-setup trap:** an app launched from the Claude desktop app (an MSIX-packaged app) inherits its
+  file-system virtualization, so `%LOCALAPPDATA%\AutoFixScout` is silently redirected to
+  `%LOCALAPPDATA%\Packages\anthropicpbc.claude_*\LocalCache\Local\AutoFixScout` and Notepad shows "The system cannot
+  find the path specified" for the helper report. **Have the owner start the app from Explorer** (or a terminal
+  they opened themselves). Same applies when reading session.db from a Claude shell: the sandboxed copy wins.
+
+Still never run on real hardware: `UpdateDriverForPlugAndPlayDevices`, `pnputil /export-driver`, the save point
+ACL/owner checks, restore point creation, the WUA calls, and the fix rungs themselves (only `service.restart`
+ran once, exit 0).
 
 ## Test plan (only on AFS-TESTBENCH)
 
-1. Run the app (CI artifact or `dotnet run --project src/AutoFixScout.UI`). Try each button on a healthy machine:
-   findings should be sensible, nothing changed.
+1. Run the app (CI artifact or the built `AutoFixScout.UI.exe`, started from Explorer, see above). Try each button
+   on a healthy machine: findings should be sensible, no fix offered, outcome `no_fault_found`, nothing changed.
 2. Sound: mute; stop Windows Audio service (admin); disable the sound device; switch default output to HDMI/BT.
    Each should be found and fixed by the right rung.
 3. Network: airplane mode on; disable Wi-Fi adapter; disconnect Wi-Fi; set a bogus DNS server.
