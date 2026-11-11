@@ -97,7 +97,7 @@ public static partial class AudioTriage
             findings.Add(new Finding(
                 FindingCode.Muted,
                 _plainMessages[FindingCode.Muted],
-                $"DefaultMuted value: {(int)state.DefaultMuted}"));
+                $"DefaultMuted: {state.DefaultMuted}"));
         }
 
         // Rule 8: DefaultVolumePercent is not null and < 5 -> VolumeVeryLow

@@ -61,11 +61,18 @@ public sealed class RealAudioProbe : IAudioProbe
         int? formFactor = null;
         try { formFactor = Convert.ToInt32(d.Properties[PropertyKeys.PKEY_AudioEndpoint_FormFactor]?.Value); } catch { }
         if (formFactor == 9) return "Hdmi";
-        return GuessKind(d.FriendlyName, formFactor);
+        string? bus = null;
+        try { bus = d.Properties[EnumeratorName]?.Value as string; } catch { }
+        return GuessKind(d.FriendlyName, formFactor, bus);
     }
 
-    internal static string GuessKind(string name, int? formFactor = null)
+    /// <summary>PKEY_Device_EnumeratorName: the bus the endpoint's device is on ("BTHENUM", "HDAUDIO", "USB", ...).</summary>
+    private static readonly PropertyKey EnumeratorName = new(new Guid("a45c254e-df1c-4efd-8020-67d146a850e0"), 24);
+
+    internal static string GuessKind(string name, int? formFactor = null, string? bus = null)
     {
+        // Bus first: Bluetooth speakers are often named just "Speakers (JBL Go 3)" (found in test step 2d).
+        if (bus?.StartsWith("BTH", StringComparison.OrdinalIgnoreCase) == true) return "Bluetooth";
         var n = name.ToLowerInvariant();
         if (n.Contains("bluetooth") || n.Contains("hands-free") || n.Contains("airpods")) return "Bluetooth";
         if (n.Contains("hdmi") || n.Contains("displayport")) return "Hdmi";

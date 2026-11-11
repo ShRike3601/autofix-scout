@@ -16,8 +16,12 @@ public class AudioTriageTests
         Assert.Equal(FindingCode.LooksNormal, Top(new() { Services = Running, Endpoints = new[] { Speakers }, DefaultMuted = Tri.No, DefaultVolumePercent = 50 }));
 
     [Fact]
-    public void Muted_IsReported() =>
-        Assert.Equal(FindingCode.Muted, Top(new() { Services = Running, Endpoints = new[] { Speakers }, DefaultMuted = Tri.Yes, DefaultVolumePercent = 50 }));
+    public void Muted_IsReported()
+    {
+        var top = AudioTriage.Evaluate(new AudioState { Services = Running, Endpoints = new[] { Speakers }, DefaultMuted = Tri.Yes, DefaultVolumePercent = 50 })[0];
+        Assert.Equal(FindingCode.Muted, top.Code);
+        Assert.Equal("DefaultMuted: Yes", top.TechnicalDetail); // helper report printed "0" for muted (test step 2a)
+    }
 
     [Fact]
     public void ProbeError_FailsClosed() =>
@@ -37,9 +41,11 @@ public class AudioTriageTests
     }
 
     [Theory]
-    [InlineData("Headphones (WH-1000XM4 Hands-Free)", null, "Bluetooth")]
-    [InlineData("Speakers (Realtek(R) Audio)", 1, "Speakers")]
-    [InlineData("Realtek Audio", 3, "Headphones")]
-    public void GuessKind_FromNameAndFormFactor(string name, int? formFactor, string expected) =>
-        Assert.Equal(expected, RealAudioProbe.GuessKind(name, formFactor));
+    [InlineData("Headphones (WH-1000XM4 Hands-Free)", null, null, "Bluetooth")]
+    [InlineData("Speakers (Realtek(R) Audio)", 1, "HDAUDIO", "Speakers")]
+    [InlineData("Realtek Audio", 3, null, "Headphones")]
+    [InlineData("Speakers (JBL Go 3)", 1, "BTHENUM", "Bluetooth")] // real endpoint from test step 2d
+    [InlineData("Headphones (LE Buds)", 3, "BTHLEDevice", "Bluetooth")]
+    public void GuessKind_FromBusNameAndFormFactor(string name, int? formFactor, string? bus, string expected) =>
+        Assert.Equal(expected, RealAudioProbe.GuessKind(name, formFactor, bus));
 }

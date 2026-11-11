@@ -63,7 +63,7 @@ Ethernet, Cloudflare WARP on (Wi-Fi DNS = 127.0.2.2/.3), Location services off, 
 | Step | Status | Notes |
 |---|---|---|
 | 1. Healthy machine | **Passed after fix** (2026-11-11) | See below. Probes ran fine; no device/service/DNS/privacy/default-output change; WARP DNS not blamed. |
-| 2. Sound faults | not run | |
+| 2. Sound faults | **Passed after fixes** (2026-11-11) | Muted -> unmute (no UAC). AudioSrv stopped -> restart_services (UAC). Realtek disabled (code 22) -> restart (no) then toggle_device (yes). Default = Bluetooth JBL Go 3 -> wrong_output after fix (see below). |
 | 3. Network faults | not run | |
 | 4. Camera faults | not run | Watch the CS8848 warning at `RealCameraProbe.cs:66` (privacy `Allowed()` switch). |
 | 5. Rollback | not run | |
@@ -81,6 +81,13 @@ Step 1 findings:
   `%LOCALAPPDATA%\Packages\anthropicpbc.claude_*\LocalCache\Local\AutoFixScout` and Notepad shows "The system cannot
   find the path specified" for the helper report. **Have the owner start the app from Explorer** (or a terminal
   they opened themselves). Same applies when reading session.db from a Claude shell: the sandboxed copy wins.
+
+Step 2 findings:
+- **Fixed:** Bluetooth outputs were detected by name only; Windows names a JBL Go 3 "Speakers (JBL Go 3)", so
+  the default-is-Bluetooth finding never fired. `GuessKind` now checks the endpoint's bus
+  (`PKEY_Device_EnumeratorName` = `BTHENUM`/`BTHLE*`) first.
+- **Fixed:** helper report printed "DefaultMuted value: 0" for a muted device (`Tri.Yes` = 0); now prints the name.
+- HDMI as wrong default not tried (no HDMI sink attached); same code path as Bluetooth.
 
 Still never run on real hardware: `UpdateDriverForPlugAndPlayDevices`, `pnputil /export-driver`, the save point
 ACL/owner checks, restore point creation, the WUA calls, and the fix rungs themselves (only `service.restart`
