@@ -6,26 +6,31 @@ using System.Text.RegularExpressions;
 namespace AutoFixScout.Executor;
 
 /// <summary>
-/// Elevated executor (spec 5). Accepts only an allowlisted action id plus one argument validated for that action.
-/// Never a command string, script, path or URL. Exit codes: 0 ok, 1 action failed, 2 rejected input.
+/// Elevated executor (spec 5). Accepts only an allowlisted action id plus arguments validated for that action.
+/// Never a command string, script, path or URL. Exit codes: 0 ok, 1 action failed, 2 rejected input,
+/// and for drivers 3 nothing to roll back to, 4 changed but undone, 6 restore failed (see SavePoints).
 /// </summary>
 public static class Program
 {
     internal static readonly HashSet<string> RestartableServices = new(StringComparer.OrdinalIgnoreCase)
         { "AudioSrv", "AudioEndpointBuilder", "WlanSvc" };
 
+    // Sound, camera and network only (spec 3). Display and storage drivers are never touched: a bad one can stop Windows starting.
     private static readonly string[] ToggleableClasses = { "MEDIA", "Camera", "Image", "Net" };
 
     public static int Main(string[] args)
     {
-        if (args.Length != 2) return 2;
         try
         {
-            return args[0] switch
+            return (args.Length, args.ElementAtOrDefault(0)) switch
             {
-                "service.restart" when RestartableServices.Contains(args[1]) => RestartService(args[1]),
-                "device.disable_enable" when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) => ToggleDevice(args[1]),
-                "device.enable" when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) => Pnputil("/enable-device", args[1]) == 0 ? 0 : 1,
+                (3, "driver.rollback") when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) && IsValidSavePointId(args[2])
+                    => SavePoints.Rollback(args[1], args[2]),
+                (2, "driver.restore") when IsValidSavePointId(args[1]) => SavePoints.Restore(args[1]),
+                (not 2, _) => 2,
+                (_, "service.restart") when RestartableServices.Contains(args[1]) => RestartService(args[1]),
+                (_, "device.disable_enable") when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) => ToggleDevice(args[1]),
+                (_, "device.enable") when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) => Pnputil("/enable-device", args[1]) == 0 ? 0 : 1,
                 _ => 2,
             };
         }
@@ -36,8 +41,11 @@ public static class Program
         }
     }
 
+    /// <summary>Save point ids are app-generated GUIDs ("N" format), never paths.</summary>
+    public static bool IsValidSavePointId(string id) => Regex.IsMatch(id, "^[0-9a-f]{32}$");
+
     // PnP instance ids: letters, digits and & \ _ . # { } -. No quotes or spaces, so they are safe in WQL and as a pnputil argument.
-    internal static bool IsValidInstanceId(string id) =>
+    public static bool IsValidInstanceId(string id) =>
         id.Length is > 0 and < 400 && Regex.IsMatch(id, @"^[A-Za-z0-9\\&_.#{}\-]+$");
 
     private static bool IsToggleableDevice(string id)
@@ -77,11 +85,10 @@ public static class Program
         return disabled == 0 && enabled == 0 ? 0 : 1;
     }
 
-    private static int Pnputil(string verb, string id)
+    internal static int Pnputil(params string[] args)
     {
         var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "pnputil.exe")) { UseShellExecute = false, CreateNoWindow = true };
-        psi.ArgumentList.Add(verb);
-        psi.ArgumentList.Add(id);
+        foreach (var a in args) psi.ArgumentList.Add(a);
         using var p = Process.Start(psi)!;
         p.WaitForExit();
         return p.ExitCode;

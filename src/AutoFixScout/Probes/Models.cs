@@ -17,7 +17,8 @@ public sealed record AudioDeviceInfo(
     int? ProblemCode,
     string? DriverVersion,
     string? DriverDate,
-    string? DriverProvider
+    string? DriverProvider,
+    AutoFixScout.Drivers.DriverStatus? Driver = null
 );
 
 public sealed class AudioState

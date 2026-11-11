@@ -39,7 +39,8 @@ public static class FixActions
                 case "service.restart":
                 case "device.disable_enable":
                 case "device.enable":
-                    return await Task.Run(() => RunElevated(rung.ActionId, rung.Arg!));
+                    var code = await Task.Run(() => RunElevated(rung.ActionId, rung.Arg!));
+                    return (code == 0, code is null ? Declined : $"executor exit code {code}");
                 default:
                     return (false, $"action not allowed: {rung.ActionId}");
             }
@@ -85,18 +86,61 @@ public static class FixActions
     /// Starts the executor through UAC with an action id and one argument only (spec 5).
     /// shortcut: one UAC prompt per admin action, switch to a long-lived executor on a named pipe if prompts annoy pilot users.
     /// </summary>
-    private static (bool Ok, string Detail) RunElevated(string actionId, string arg)
+    /// <returns>The executor's exit code, or null if the person declined the Windows permission prompt.</returns>
+    private static int? RunElevated(params string[] args)
     {
         var exe = Path.Combine(AppContext.BaseDirectory, "AutoFixScout.Executor.exe");
         var psi = new ProcessStartInfo(exe) { UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden };
-        psi.ArgumentList.Add(actionId);
-        psi.ArgumentList.Add(arg);
+        foreach (var a in args) psi.ArgumentList.Add(a);
         try
         {
             using var p = Process.Start(psi)!;
             p.WaitForExit();
-            return (p.ExitCode == 0, $"executor exit code {p.ExitCode}");
+            return p.ExitCode;
         }
-        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223) { return (false, "person declined the Windows permission prompt"); }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223) { return null; }
+    }
+
+    private const string Declined = "person declined the Windows permission prompt";
+
+    // ---- save points (T2) ----
+    // The executor keeps the save point itself (admin-only folder). The app keeps an "open" marker per save point
+    // until the person confirms the fix; a marker found at startup means the app never got that far, so it restores.
+
+    private static string PendingDir => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AutoFixScout", "pending-savepoints");
+
+    public static IReadOnlyList<string> OpenSavePoints() =>
+        Directory.Exists(PendingDir) ? Directory.GetFiles(PendingDir).Select(Path.GetFileName).OfType<string>().ToList() : Array.Empty<string>();
+
+    /// <summary>Save point, roll back, post-check, auto-undo, all inside one elevated run (one permission prompt).</summary>
+    public static async Task<(bool Ok, string Detail, string? SavePointId)> RollbackDriverAsync(string instanceId)
+    {
+        var id = Guid.NewGuid().ToString("N");
+        Directory.CreateDirectory(PendingDir);
+        // Written before the change starts, so a crash or forced restart mid-change is caught next time.
+        File.WriteAllText(Path.Combine(PendingDir, id), instanceId);
+        var code = await Task.Run(() => RunElevated("driver.rollback", instanceId, id));
+        var detail = code switch
+        {
+            null => Declined,
+            0 => $"rolled back; save point {id}",
+            3 => "no previous driver to go back to; nothing changed",
+            4 => $"rolled back, but the device didn't come up right, so it was put back automatically (save point {id})",
+            6 => $"rolled back, the device didn't come up right, and putting it back FAILED. Save point {id} is kept for a helper.",
+            _ => $"couldn't make a save point (exit code {code}); nothing changed",
+        };
+        // Only a live change (0) or a failed restore (6) leaves something to settle.
+        if (code is not (0 or 6)) File.Delete(Path.Combine(PendingDir, id));
+        return (code == 0, detail, code is 0 or 6 ? id : null);
+    }
+
+    /// <summary>keep: the person confirmed the fix, close the save point. Otherwise restore it. True when the system is settled.</summary>
+    public static async Task<bool> SettleSavePointAsync(string id, bool keep)
+    {
+        var marker = Path.Combine(PendingDir, id);
+        if (!keep && await Task.Run(() => RunElevated("driver.restore", id)) != 0) return false;
+        File.Delete(marker);
+        return true;
     }
 }

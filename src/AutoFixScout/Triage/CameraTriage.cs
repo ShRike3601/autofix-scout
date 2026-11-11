@@ -71,6 +71,9 @@ public static class CameraTriage
         if (target != null)
             rungs.Add(new("toggle_camera", "device.disable_enable", 1,
                 $"I'd like to switch your camera \"{target.Name}\" off and on again. Windows will ask for permission.", target.InstanceId));
+        var rollback = s.Devices.OrderByDescending(d => d.PnpClass == "Camera")
+            .Select(d => DriverRules.Rollback("camera", d.Name, d.InstanceId, d.Driver)).FirstOrDefault(r => r != null);
+        if (rollback != null) rungs.Add(rollback);
         rungs.Add(new("shutter", "ui.human_step", 0, ShutterHint));
         return rungs.DistinctBy(r => r.Id).ToList();
     }

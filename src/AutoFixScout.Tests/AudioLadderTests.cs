@@ -55,6 +55,7 @@ public class AudioLadderTests
         public Task<bool> ConfirmAsync(Rung rung) => Task.FromResult(confirm);
         public Task<(bool, string)> RunAsync(Rung rung) { Ran.Add(rung.Id); return Task.FromResult((runOk, "")); }
         public Task<bool> TestAsync() => Task.FromResult(heard[_tests++]);
+        public Task<bool> SettleAsync(Rung rung, bool keep) => Task.FromResult(true);
     }
 
     private static readonly Rung[] TwoRungs = { new("a", "x", 1, "a"), new("b", "y", 1, "b") };

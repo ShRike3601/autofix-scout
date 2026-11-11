@@ -58,7 +58,8 @@ public sealed class RealNetworkProbe : INetworkProbe
                 name, id,
                 IsWireless: label.Contains("wi-fi") || label.Contains("wireless") || label.Contains("wlan") || label.Contains("802.11"),
                 Connected: a["NetConnectionStatus"] is ushort status && status == 2,
-                ProblemCode: a["ConfigManagerErrorCode"] is uint code ? (int)code : null));
+                ProblemCode: a["ConfigManagerErrorCode"] is uint code ? (int)code : null,
+                Driver: Drivers.DriverStatus.For(id)));
         }
         return list;
     }

@@ -57,5 +57,6 @@ public class SessionLogTests : IDisposable
         public Task<bool> ConfirmAsync(Rung rung) => Task.FromResult(true);
         public Task<(bool Ok, string Detail)> RunAsync(Rung rung) => Task.FromResult((true, ""));
         public Task<bool> TestAsync() => Task.FromResult(_tests++ == 1);
+        public Task<bool> SettleAsync(Rung rung, bool keep) => Task.FromResult(true);
     }
 }

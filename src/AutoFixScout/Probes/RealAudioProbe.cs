@@ -95,7 +95,8 @@ public sealed class RealAudioProbe : IAudioProbe
                 dev["ConfigManagerErrorCode"] is uint code ? (int)code : null,
                 drv?["DriverVersion"] as string,
                 drv?["DriverDate"] is string date ? ManagementDateTimeConverter.ToDateTime(date).ToString("yyyy-MM-dd") : null,
-                drv?["DriverProviderName"] as string));
+                drv?["DriverProviderName"] as string,
+                Drivers.DriverStatus.For(id)));
         }
         return result;
     }

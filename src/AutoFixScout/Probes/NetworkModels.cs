@@ -1,7 +1,7 @@
 namespace AutoFixScout.Probes;
 
 /// <summary>A physical network adapter. ProblemCode 22 means "disabled" (Device Manager code).</summary>
-public sealed record NetAdapterInfo(string Name, string InstanceId, bool IsWireless, bool Connected, int? ProblemCode)
+public sealed record NetAdapterInfo(string Name, string InstanceId, bool IsWireless, bool Connected, int? ProblemCode, Drivers.DriverStatus? Driver = null)
 {
     public bool Disabled => ProblemCode == 22;
 }

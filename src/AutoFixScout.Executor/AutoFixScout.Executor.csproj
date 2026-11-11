@@ -10,7 +10,8 @@
   <ItemGroup>
     <PackageReference Include="System.Management" Version="8.0.0" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.0" />
-    <InternalsVisibleTo Include="AutoFixScout.Tests" />
+    <!-- Same code as the app, so both agree on what "the previous driver" is. -->
+    <Compile Include="../AutoFixScout/Drivers/DriverStore.cs" Link="DriverStore.cs" />
   </ItemGroup>
 
 </Project>

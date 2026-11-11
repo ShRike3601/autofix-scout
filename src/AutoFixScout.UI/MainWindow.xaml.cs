@@ -14,8 +14,35 @@ public partial class MainWindow : Window, IFixHost
     private string? _lastReportPath;
     private TaskCompletionSource<bool>? _choice;
     private Func<Task<bool>> _test = () => Task.FromResult(false);
+    private readonly Dictionary<string, string> _savePoints = new(); // rung id -> open save point id
 
-    public MainWindow() => InitializeComponent();
+    public MainWindow()
+    {
+        InitializeComponent();
+        Loaded += async (_, _) => await RecoverOpenSavePointsAsync();
+    }
+
+    /// <summary>
+    /// A save point still open at startup means a driver change was never confirmed (crash, restart, app closed).
+    /// Put it back, as promised before the change.
+    /// </summary>
+    private async Task RecoverOpenSavePointsAsync()
+    {
+        var open = FixActions.OpenSavePoints();
+        if (open.Count == 0) return;
+        var restore = await ShowStepAsync(
+            "Last time I changed a driver, I didn't get to finish checking it. To be safe, I'd like to put the old driver back. " +
+            "Windows will ask for permission.", "Put it back", "Not now");
+        if (!restore) { ShowHome(); return; }
+        ShowBusy("Putting your driver back. This can take a minute...");
+        var failed = 0;
+        foreach (var id in open)
+            if (!await FixActions.SettleSavePointAsync(id, keep: false)) failed++;
+        await ShowStepAsync(failed == 0
+            ? "Done. Your driver is back the way it was."
+            : "I couldn't put the driver back. Please ask your helper; the save point is kept so they can do it.", "OK");
+        ShowHome();
+    }
 
     // ---- screens ----
 
@@ -185,10 +212,19 @@ public partial class MainWindow : Window, IFixHost
 
     // ---- IFixHost ----
 
-    Task<bool> IFixHost.ConfirmAsync(Rung rung) => ShowStepAsync(rung.Say, "Yes, try it", "Not now");
+    // T2 needs an explicit "I understand" step in Simple mode (spec 6).
+    Task<bool> IFixHost.ConfirmAsync(Rung rung) =>
+        ShowStepAsync(rung.Say, rung.Tier >= 2 ? "I understand, go ahead" : "Yes, try it", "Not now");
 
     async Task<(bool Ok, string Detail)> IFixHost.RunAsync(Rung rung)
     {
+        if (rung.ActionId == "driver.rollback")
+        {
+            ShowBusy("Making a save point and changing the driver. This can take a minute...");
+            var (ok, detail, savePoint) = await FixActions.RollbackDriverAsync(rung.Arg!);
+            if (savePoint != null) _savePoints[rung.Id] = savePoint;
+            return (ok, detail);
+        }
         ShowBusy("Working on it...");
         var result = await FixActions.RunAsync(rung);
         // Steps the person does themselves: wait until they say they're done before testing.
@@ -198,6 +234,15 @@ public partial class MainWindow : Window, IFixHost
     }
 
     Task<bool> IFixHost.TestAsync() => _test();
+
+    async Task<bool> IFixHost.SettleAsync(Rung rung, bool keep)
+    {
+        if (!_savePoints.TryGetValue(rung.Id, out var id)) return true; // nothing was changed
+        if (!keep) ShowBusy("That didn't help, so I'm putting the old driver back...");
+        var settled = await FixActions.SettleSavePointAsync(id, keep);
+        if (settled) _savePoints.Remove(rung.Id);
+        return settled;
+    }
 
     // ---- other ----
 

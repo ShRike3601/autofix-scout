@@ -60,6 +60,7 @@ public static class NetworkTriage
                 var broken = s.Adapters.First(a => a.ProblemCode is > 0);
                 rungs.Add(new("toggle_adapter", "device.disable_enable", 1,
                     $"Your network adapter \"{broken.Name}\" reports a problem. I'd like to switch it off and on again. Windows will ask for permission.", broken.InstanceId));
+                AddIfNotNull(rungs, DriverRules.Rollback("network", broken.Name, broken.InstanceId, broken.Driver));
                 break;
             case FindingCode.NotConnected:
                 rungs.Add(s.Adapters.Any(a => a.IsWireless)
@@ -75,12 +76,16 @@ public static class NetworkTriage
                 if (connected != null)
                     rungs.Add(new("toggle_adapter", "device.disable_enable", 1,
                         $"I'd like to switch your network adapter \"{connected.Name}\" off and on again. Windows will ask for permission.", connected.InstanceId));
+                if (connected != null)
+                    AddIfNotNull(rungs, DriverRules.Rollback("network", connected.Name, connected.InstanceId, connected.Driver));
                 rungs.Add(new("restart_router", "ui.human_step", 0,
                     "Please unplug your router for 30 seconds, then plug it back in. Wait about two minutes until its lights settle."));
                 break;
         }
         return rungs;
     }
+
+    private static void AddIfNotNull(List<Rung> rungs, Rung? rung) { if (rung != null) rungs.Add(rung); }
 
     public static bool ProbablyHardware(NetworkState s) =>
         s.ProbeErrors.Count == 0 && (s.Adapters.Count == 0 || s.Adapters.All(a => a.ProblemCode is > 0 and not 22));

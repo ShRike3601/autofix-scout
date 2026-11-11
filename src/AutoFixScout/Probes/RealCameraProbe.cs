@@ -4,7 +4,7 @@ using Microsoft.Win32;
 namespace AutoFixScout.Probes;
 
 /// <summary>A camera device. ProblemCode 22 means "disabled" (Device Manager code).</summary>
-public sealed record CameraDeviceInfo(string Name, string InstanceId, string PnpClass, int? ProblemCode)
+public sealed record CameraDeviceInfo(string Name, string InstanceId, string PnpClass, int? ProblemCode, Drivers.DriverStatus? Driver = null)
 {
     public bool Disabled => ProblemCode == 22;
 }
@@ -59,7 +59,8 @@ public sealed class RealCameraProbe : ICameraProbe
             d["Name"] as string ?? "(unnamed)",
             d["DeviceID"] as string ?? "",
             d["PNPClass"] as string ?? "",
-            d["ConfigManagerErrorCode"] is uint code ? (int)code : null)).ToList();
+            d["ConfigManagerErrorCode"] is uint code ? (int)code : null,
+            Drivers.DriverStatus.For(d["DeviceID"] as string ?? ""))).ToList();
     }
 
     private static Tri Allowed(RegistryKey? key) => key?.GetValue("Value") as string switch
