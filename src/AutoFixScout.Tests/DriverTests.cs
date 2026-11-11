@@ -102,7 +102,7 @@ public class DriverLadderTests
             Devices = new[] { new CameraDeviceInfo("Integrated Camera", "USB\\C\\1", "Camera", 0, Recent()) },
             DeviceAccess = Tri.Yes, AppAccess = Tri.Yes, DesktopAppAccess = Tri.Yes,
         };
-        Assert.Equal(new[] { "shutter", "toggle_camera", "rollback_driver" },
+        Assert.Equal(new[] { "close_other_apps", "shutter", "toggle_camera", "rollback_driver" },
             CameraTriage.Ladder(s, CameraTriage.Evaluate(s)).Select(r => r.Id));
     }
 

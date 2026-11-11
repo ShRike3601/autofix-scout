@@ -12,6 +12,10 @@ public static class CameraTriage
         "Many laptops have a small sliding cover over the camera, or a key with a camera picture on it (often one of the F keys). " +
         "Please check the cover is open and try pressing that key once.";
 
+    private const string CloseAppsHint =
+        "Another app may be using your camera. Please close any app that could be using it, such as Teams, Zoom, Skype, " +
+        "WhatsApp or a video call in your web browser, then come back here.";
+
     public static IReadOnlyList<Finding> Evaluate(CameraState s)
     {
         if (s.ProbeErrors.Count > 0)
@@ -36,7 +40,9 @@ public static class CameraTriage
         // Fail closed: unread privacy switches mean we can't say it looks normal.
         if (new[] { s.DeviceAccess, s.AppAccess, s.DesktopAppAccess }.Contains(Tri.Unknown))
             return new[] { F(FindingCode.ProbeIncomplete, "We couldn't complete the camera check.", $"privacy device={s.DeviceAccess} apps={s.AppAccess} desktop={s.DesktopAppAccess}") };
-        return new[] { F(FindingCode.LooksNormal, "Your camera looks fine to Windows.", "Device ok, privacy allowed, no app holding it") };
+        // Newer Windows builds (26300 on the test laptop) no longer write live camera use to the consent store, so
+        // "no app holding it" only means none was reported; the ladder still asks the person to close other apps.
+        return new[] { F(FindingCode.LooksNormal, "Your camera looks fine to Windows.", "Device ok, privacy allowed, no app reported holding it") };
     }
 
     public static IReadOnlyList<Rung> Ladder(CameraState s, IReadOnlyList<Finding> findings)
@@ -46,8 +52,12 @@ public static class CameraTriage
         {
             case FindingCode.ProbeIncomplete:
                 return rungs; // fail closed: don't change what we couldn't read
-            case FindingCode.NoCamera:
             case FindingCode.LooksNormal:
+                // Another app holding the camera is the most common cause, and Windows may not report it (see Evaluate).
+                rungs.Add(new("close_other_apps", "ui.human_step", 0, CloseAppsHint));
+                rungs.Add(new("shutter", "ui.human_step", 0, ShutterHint));
+                break;
+            case FindingCode.NoCamera:
                 rungs.Add(new("shutter", "ui.human_step", 0, ShutterHint));
                 break;
             case FindingCode.CameraDisabled:

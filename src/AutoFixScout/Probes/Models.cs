@@ -9,7 +9,7 @@ public sealed record AudioEndpointInfo(
     bool IsDefault,
     bool IsActive,
     string KindGuess
-); // KindGuess: Speakers, Headphones, Hdmi, Bluetooth, Other (guessed from the name text only)
+); // KindGuess: Speakers, Headphones, Hdmi, Bluetooth, Other (guessed from the bus, form factor and name)
 
 public sealed record AudioDeviceInfo(
     string Name,

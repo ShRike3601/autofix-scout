@@ -63,7 +63,7 @@ public sealed class RealCameraProbe : ICameraProbe
             Drivers.DriverStatus.For(d["DeviceID"] as string ?? ""))).ToList();
     }
 
-    private static Tri Allowed(RegistryKey? key) => key?.GetValue("Value") as string switch
+    private static Tri Allowed(RegistryKey? key) => (key?.GetValue("Value") as string) switch
     {
         "Allow" => Tri.Yes,
         "Deny" => Tri.No,

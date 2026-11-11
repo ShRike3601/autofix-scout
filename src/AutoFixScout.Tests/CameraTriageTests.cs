@@ -18,11 +18,12 @@ public class CameraTriageTests
     private static string[] Ladder(CameraState s) => CameraTriage.Ladder(s, CameraTriage.Evaluate(s)).Select(r => r.Id).ToArray();
 
     [Fact]
-    public void Healthy_LooksNormal_ShutterThenToggle()
+    public void Healthy_LooksNormal_CloseAppsThenShutterThenToggle()
     {
         var s = Ok();
         Assert.Equal(FindingCode.LooksNormal, Code(s));
-        Assert.Equal(new[] { "shutter", "toggle_camera" }, Ladder(s));
+        // Windows 26300 doesn't report live camera use (test step 4d), so "close other apps" comes first.
+        Assert.Equal(new[] { "close_other_apps", "shutter", "toggle_camera" }, Ladder(s));
     }
 
     [Fact]
