@@ -8,7 +8,8 @@ public sealed record AudioEndpointInfo(
     string Name,
     bool IsDefault,
     bool IsActive,
-    string KindGuess
+    string KindGuess,
+    string? DeviceInstanceId = null // the MEDIA device (in AudioState.Devices) this output belongs to; null = unknown
 ); // KindGuess: Speakers, Headphones, Hdmi, Bluetooth, Other (guessed from the bus, form factor and name)
 
 public sealed record AudioDeviceInfo(

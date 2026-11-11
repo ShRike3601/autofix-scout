@@ -14,7 +14,7 @@ internal sealed record SavePoint(string Id, string InstanceId, string HardwareId
 /// Save points for T2 driver changes (spec 10): export the current package, change, post-check, auto-undo.
 /// Stored where only administrators can write, because the elevated restore trusts what it reads there.
 /// </summary>
-internal static class SavePoints
+public static class SavePoints
 {
     // Exit codes the app understands (also in FixActions).
     public const int Ok = 0, Failed = 1, NothingToDo = 3, ChangedButUndone = 4, RestoreFailed = 6;
@@ -52,12 +52,13 @@ internal static class SavePoints
 
         // 1. Save point. If this fails nothing has changed, so stop.
         var root = EnsureRoot();
-        Prune(root);
+        Prune(root, DateTime.UtcNow, HasOpenMarker);
         var dir = Path.Combine(root, savePointId);
         Directory.CreateDirectory(Path.Combine(dir, "driver"));
-        if (Program.Pnputil("/export-driver", device.InfName, Path.Combine(dir, "driver")) != 0) return Failed;
-        var exported = Directory.EnumerateFiles(Path.Combine(dir, "driver"), "*.inf", SearchOption.AllDirectories).FirstOrDefault();
-        if (exported is null) return Failed;
+        var exported = Program.Pnputil("/export-driver", device.InfName, Path.Combine(dir, "driver")) == 0
+            ? Directory.EnumerateFiles(Path.Combine(dir, "driver"), "*.inf", SearchOption.AllDirectories).FirstOrDefault()
+            : null;
+        if (exported is null) { Delete(root, savePointId); return Failed; }
         var sp = new SavePoint(savePointId, instanceId, RestoreHardwareId(device), device.InfName, device.Version, exported, TryCreateRestorePoint());
         WriteManifest(dir, sp);
 
@@ -68,7 +69,19 @@ internal static class SavePoints
             if (PostCheck(instanceId, v => expected is null ? v != before : v == expected)) return Ok;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex.Message); }
-        return Restore(sp) ? ChangedButUndone : RestoreFailed;
+        return Settle(root, sp, Restore(sp)) == Ok ? ChangedButUndone : RestoreFailed;
+    }
+
+    /// <summary>
+    /// After a restore: done means the save point is spent, so its folder goes. Failed means it's the helper's only way
+    /// back, so it's flagged and never pruned (exit code 6).
+    /// </summary>
+    private static int Settle(string root, SavePoint sp, bool restored)
+    {
+        if (restored) { Delete(root, sp.Id); return Ok; }
+        try { File.WriteAllText(Path.Combine(root, sp.Id, RestoreFailedFlag), DateTime.UtcNow.ToString("o")); }
+        catch (Exception ex) { Console.Error.WriteLine(ex.Message); }
+        return RestoreFailed;
     }
 
     /// <summary>The most specific hardware ID the current driver's INF covers, so the restore force-installs it on this device.</summary>
@@ -79,14 +92,19 @@ internal static class SavePoints
         return device.HardwareIds.FirstOrDefault(h => text.Contains(h, StringComparison.OrdinalIgnoreCase)) ?? device.HardwareIds[0];
     }
 
-    public static int Restore(string savePointId)
+    public static int Restore(string savePointId) => Restore(Root, savePointId);
+
+    public static int Restore(string root, string savePointId)
     {
-        var manifest = Path.Combine(Root, savePointId, "savepoint.json");
+        var manifest = Path.Combine(root, savePointId, "savepoint.json");
+        // The manifest is written before any change, so without one nothing was changed: nothing to put back
+        // (also the case after a restore that already succeeded and removed the folder).
+        if (!File.Exists(manifest)) { Delete(root, savePointId); return NothingToDo; }
         // Only trust a manifest an administrator wrote; a standard user could otherwise plant one.
-        if (!File.Exists(manifest) || !IsAdminOwned(manifest)) return Failed;
+        if (!IsAdminOwned(manifest)) return Failed;
         var sp = JsonSerializer.Deserialize<SavePoint>(File.ReadAllText(manifest));
         if (sp is null || sp.Id != savePointId || !Program.IsValidInstanceId(sp.InstanceId)) return Failed;
-        return Restore(sp) ? Ok : RestoreFailed;
+        return Settle(root, sp, Restore(sp));
     }
 
     private static bool Restore(SavePoint sp)
@@ -160,13 +178,82 @@ internal static class SavePoints
         return root.FullName;
     }
 
-    /// <summary>Each save point holds a driver copy, so keep only the newest few (well above the 3 T2 changes per session).</summary>
-    internal const int KeepSavePoints = 10;
+    // ---- retention ----
+    // A restored save point is deleted at once (Settle). One the person kept ("it works") can't be deleted then without
+    // another permission prompt, so it stays as a helper's way back and is pruned when the next save point is made.
 
-    internal static void Prune(string root)
+    /// <summary>Written into a save point whose restore failed: kept for the helper, never pruned.</summary>
+    public const string RestoreFailedFlag = "restore-failed";
+
+    internal static readonly TimeSpan KeepSettledFor = TimeSpan.FromDays(30);
+
+    /// <summary>
+    /// Save points that may go: older than 30 days, not flagged restore-failed, and with no open marker in the app
+    /// (an unconfirmed change the app will still offer to put back). Only our own 32-hex folders, never links.
+    /// </summary>
+    public static IReadOnlyList<string> Prunable(string root, DateTime nowUtc, Func<string, bool> hasOpenMarker) =>
+        new DirectoryInfo(root).GetDirectories()
+            .Where(d => Program.IsValidSavePointId(d.Name)
+                        && !d.Attributes.HasFlag(FileAttributes.ReparsePoint)
+                        && nowUtc - d.CreationTimeUtc > KeepSettledFor
+                        && !File.Exists(Path.Combine(d.FullName, RestoreFailedFlag))
+                        && !hasOpenMarker(d.Name))
+            .Select(d => d.Name)
+            .ToList();
+
+    public static void Prune(string root, DateTime nowUtc, Func<string, bool> hasOpenMarker)
     {
-        foreach (var old in new DirectoryInfo(root).GetDirectories().OrderByDescending(d => d.CreationTimeUtc).Skip(KeepSavePoints - 1))
-            try { old.Delete(recursive: true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        try { foreach (var id in Prunable(root, nowUtc, hasOpenMarker)) Delete(root, id); }
+        catch (Exception ex) { Console.Error.WriteLine(ex.Message); } // housekeeping never blocks a save point
+    }
+
+    /// <summary>Deletes one save point folder: a valid id, directly inside the save point root, not a link.</summary>
+    public static bool Delete(string root, string id)
+    {
+        if (!Program.IsValidSavePointId(id)) return false;
+        var dir = new DirectoryInfo(Path.Combine(Path.GetFullPath(root), id));
+        if (!dir.Exists) return true;
+        if (!string.Equals(dir.Parent?.FullName, Path.GetFullPath(root).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)
+            || dir.Attributes.HasFlag(FileAttributes.ReparsePoint)) return false;
+        try
+        {
+            // Exported driver files can be read-only. Links inside aren't followed (enumeration skips them).
+            foreach (var f in dir.EnumerateFiles("*", new System.IO.EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint }))
+                if (f.IsReadOnly) f.IsReadOnly = false;
+            dir.Delete(recursive: true);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Console.Error.WriteLine(ex.Message); return false; }
+    }
+
+    /// <summary>
+    /// Is the app still holding this save point open (%LOCALAPPDATA%\AutoFixScout\pending-savepoints\&lt;id&gt;)? The
+    /// executor may run as another account than the app (a standard user typing an admin password), so every profile
+    /// is checked, including MSIX-redirected copies (HANDOFF step 1). Can't tell = yes: keep it.
+    /// </summary>
+    internal static bool HasOpenMarker(string id)
+    {
+        try
+        {
+            var locals = new List<string> { Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) };
+            using (var profiles = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList"))
+                foreach (var sid in profiles?.GetSubKeyNames() ?? Array.Empty<string>())
+                {
+                    using var p = profiles!.OpenSubKey(sid);
+                    if (p?.GetValue("ProfileImagePath") is string path)
+                        locals.Add(Path.Combine(Environment.ExpandEnvironmentVariables(path), "AppData", "Local"));
+                }
+            foreach (var local in locals.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (File.Exists(Path.Combine(local, "AutoFixScout", "pending-savepoints", id))) return true;
+                var packages = Path.Combine(local, "Packages");
+                if (Directory.Exists(packages) && Directory.EnumerateDirectories(packages).Any(p =>
+                        File.Exists(Path.Combine(p, "LocalCache", "Local", "AutoFixScout", "pending-savepoints", id))))
+                    return true;
+            }
+            return false;
+        }
+        catch (Exception) { return true; }
     }
 
     private static void WriteManifest(string dir, SavePoint sp)
