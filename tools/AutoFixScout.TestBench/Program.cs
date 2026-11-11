@@ -240,6 +240,21 @@ static class Scenarios
             Setup = () => Bench.Pnp("/disable-device", e.CameraId!),
             Restore = () => Bench.Pnp("/enable-device", e.CameraId!),
         };
+        yield return new Scenario
+        {
+            // Device Manager > Uninstall device (driver kept): the camera vanishes until a hardware scan.
+            Id = "4f", Area = "camera", Title = "Camera uninstalled (driver kept)", Expect = FindingCode.NoCamera, ExpectFirstRung = "rescan",
+            MissingReason = e.CameraId is null ? "no camera found" : null,
+            Setup = () => Bench.Pnp("/remove-device", e.CameraId!),
+            Restore = () => Bench.ScanDevices(),
+        };
+        yield return new Scenario
+        {
+            Id = "2e", Area = "sound", Title = "Sound device uninstalled (driver kept)", Expect = FindingCode.NoActiveOutput, ExpectFirstRung = "restart_services",
+            MissingReason = e.SoundId is null ? "no HD Audio sound device found" : null,
+            Setup = () => Bench.Pnp("/remove-device", e.SoundId!),
+            Restore = () => Bench.ScanDevices(),
+        };
     }
 }
 
@@ -372,6 +387,14 @@ static class Bench
         // 3010 = done, reboot suggested. "already enabled/disabled" = the app's fix already did it, which is fine.
         if (code is not (0 or 3010) && !output.Contains("already", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException($"pnputil {verb} exit {code}: {output.Trim()}");
         return Task.Delay(TimeSpan.FromSeconds(4)); // let PnP and the endpoints settle
+    }
+
+    /// <summary>Restore for the "uninstalled" scenarios; harmless if the app's rescan already brought the device back.</summary>
+    public static Task ScanDevices()
+    {
+        var (code, output) = Run("pnputil.exe", "/scan-devices");
+        if (code != 0) throw new InvalidOperationException($"pnputil /scan-devices exit {code}: {output.Trim()}");
+        return Task.Delay(TimeSpan.FromSeconds(6));
     }
 
     public static async Task Service(string name, bool run)
@@ -650,6 +673,7 @@ static class Failsafe
     public static void Arm(Env e, string dir)
     {
         var ps = new StringBuilder("# Written by AutoFixScout.TestBench: puts the test laptop back if a batch died halfway.\r\n");
+        ps.AppendLine("pnputil /scan-devices"); // brings back a device a "removed" scenario uninstalled
         foreach (var id in new[] { e.SoundId, e.WifiId, e.CameraId }.OfType<string>()) ps.AppendLine($"pnputil /enable-device \"{id}\"");
         ps.AppendLine("Start-Service AudioEndpointBuilder, AudioSrv -ErrorAction SilentlyContinue");
         if (Warp.MayPause) ps.AppendLine("& 'C:\\Program Files\\Cloudflare\\Cloudflare WARP\\warp-cli.exe' connect");

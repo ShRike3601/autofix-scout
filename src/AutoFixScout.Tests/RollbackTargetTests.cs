@@ -95,6 +95,14 @@ public class RollbackTargetTests
         Assert.Equal(RealtekId, RealAudioProbe.MatchDevice(new[] { @"INTELAUDIO\CTLR\1", RealtekId }, devices));
         Assert.Null(RealAudioProbe.MatchDevice(new[] { @"BTHENUM\X\1", @"BTH\MS_BTHBRB\1" }, devices));
     }
+
+    [Fact]
+    public void EndpointNode_IsBuiltFromTheEndpointId()
+    {
+        // AFS-TESTBENCH: the endpoint property store had no PKEY_Device_InstanceId, so no output was ever matched.
+        Assert.Equal(@"SWD\MMDEVAPI\{0.0.0.00000000}.{96c183e6-a44b-46ee-922e-8e357ddef2db}",
+            RealAudioProbe.EndpointNodeId("{0.0.0.00000000}.{96c183e6-a44b-46ee-922e-8e357ddef2db}"));
+    }
 }
 
 /// <summary>Save point retention: restored ones go at once, settled/orphan ones after 30 days, open or failed ones never.</summary>

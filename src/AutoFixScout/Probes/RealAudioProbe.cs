@@ -66,11 +66,16 @@ public sealed class RealAudioProbe : IAudioProbe
     {
         try
         {
-            if (endpoint.Properties[EndpointInstanceId]?.Value is not string id) return null;
+            // The endpoint's property store often lacks PKEY_Device_InstanceId (AFS-TESTBENCH: missing for every output),
+            // but its PnP node is always SWD\MMDEVAPI\<endpoint id>.
+            var id = endpoint.Properties.Contains(EndpointInstanceId) && endpoint.Properties[EndpointInstanceId]?.Value is string s
+                ? s : EndpointNodeId(endpoint.ID);
             return MatchDevice(Ancestors(id), devices.Select(d => d.InstanceId));
         }
         catch (Exception) { return null; }
     }
+
+    internal static string EndpointNodeId(string endpointId) => $@"SWD\MMDEVAPI\{endpointId}";
 
     internal static string? MatchDevice(IEnumerable<string> ancestors, IEnumerable<string> devices)
     {
@@ -83,7 +88,8 @@ public sealed class RealAudioProbe : IAudioProbe
 
     private static IEnumerable<string> Ancestors(string instanceId)
     {
-        if (CM_Locate_DevNodeW(out var node, instanceId, 0) != 0) yield break;
+        // CM_LOCATE_DEVNODE_PHANTOM: unplugged outputs (headphone jack, BT speaker off) have non-present nodes.
+        if (CM_Locate_DevNodeW(out var node, instanceId, 1) != 0) yield break;
         var buffer = new char[400];
         for (var i = 0; i < 4 && CM_Get_Parent(out node, node, 0) == 0; i++)
         {

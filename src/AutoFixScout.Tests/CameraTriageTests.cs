@@ -36,11 +36,12 @@ public class CameraTriageTests
     }
 
     [Fact]
-    public void NoCamera_ShutterOnly_ProbablyHardware()
+    public void NoCamera_RescanThenShutter_ProbablyHardware()
     {
+        // An uninstalled camera (Device Manager > Uninstall device) is gone from the list until a hardware scan.
         var s = new CameraState { DeviceAccess = Tri.Yes, AppAccess = Tri.Yes, DesktopAppAccess = Tri.Yes };
         Assert.Equal(FindingCode.NoCamera, Code(s));
-        Assert.Equal(new[] { "shutter" }, Ladder(s));
+        Assert.Equal(new[] { "rescan", "shutter" }, Ladder(s));
         Assert.True(CameraTriage.ProbablyHardware(s));
     }
 
