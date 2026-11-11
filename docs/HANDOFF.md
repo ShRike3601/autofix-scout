@@ -30,7 +30,7 @@ from it that the code follows:
 | Session log (SQLite, spec schema) | `src/AutoFixScout/SessionLog.cs` -> `%LOCALAPPDATA%\AutoFixScout\session.db` |
 | Helper report | `src/AutoFixScout/HelperReport.cs` -> `%LOCALAPPDATA%\AutoFixScout\reports\` |
 | UI (screens + flow) | `src/AutoFixScout.UI/MainWindow.xaml(.cs)` |
-| Tests (83, all pass in CI) | `src/AutoFixScout.Tests/` |
+| Tests (85, all pass in CI) | `src/AutoFixScout.Tests/` |
 
 Unused leftovers from the first skeleton (safe to delete, not yet removed): `Orchestrator.cs`, `SessionManager.cs`,
 `Simulator.cs`, `ActionCatalog.cs`, `ActionContext.cs` (both projects), `IProbe.cs`, `IExecutor.cs`, `Probes.cs`,
@@ -68,7 +68,7 @@ Ethernet, Cloudflare WARP on (Wi-Fi DNS = 127.0.2.2/.3), Location services off, 
 | 4. Camera faults | **Passed / changed** (2026-11-11, TestBench) | Each privacy switch off -> privacy rung, named correctly. Camera disabled -> enable_camera. "Camera app holding it" can't be detected on this Windows build (see below); ladder changed. Human check of the real Camera-app test still to do with the new UI. |
 | 5. Rollback | **Passed after fix** (2026-11-11, TestBench + manual) | Intel Display Audio 10.27.0.8 -> 10.27.0.9 staged as "the recent update". 5a "works" -> 10.27.0.8 stays, marker cleared. 5b "doesn't" -> 10.27.0.9 restored from the save point. 5c app closed right after the change, reopened -> offered "Put it back", restored (owner, by hand). 5d non-admin can read but not write the save point folder. |
 | 6. Windows Update driver | **Partly** (2026-11-11, TestBench) | Only "nothing offered": WU has no driver for the Realtek device here, so no change and no save point. A real WU install + undo is still untested on hardware. |
-| 7. session.db + report | checked for step 1 | Not re-checked for steps 2-6. |
+| 7. session.db + report | **Passed after fixes** (2026-11-11) | 10 UI sessions (steps 1, 2, BT check) with the right outcomes and steps; reports match and name no network. Cut-off flows weren't logged and `started_at` was wrong (see below). Bench runs don't write session.db (by design). |
 
 Step 1 findings:
 - **Fixed:** with "looks normal" findings the app still offered fixes before testing (sound offered and ran
@@ -128,6 +128,16 @@ Steps 5-6 findings:
   and `unstage` deletes only the staged package, only while the original is still in the store (tests in
   `PnpDriversTests`). Getting 10.27.0.8 back needs the MSI/Intel graphics package; not done.
 
+Step 7 findings:
+- **Fixed:** a flow cut off mid-way (5c: app closed during a driver change; or a crash) left no row at all, because
+  the session was written only at the end. The row is now opened when the flow starts; at the next app start
+  `SessionLog.CloseUnfinished` marks open rows `abandoned`. An exception in the flow also ends it as `abandoned`.
+- **Fixed:** `started_at` was stamped when the row was written at the end (every session lasted ~0.02 s); now the
+  flow start time.
+- Still missing: steps of a cut-off flow (written at the end), the startup "Put it back" restore (not logged
+  anywhere), `device_snapshot` and `undo_record` (never written). Reports include device instance IDs, which for
+  Bluetooth contain the device's MAC address; fine for a helper, worth knowing before any upload feature.
+
 ### TestBench (batch runner)
 
 `tools/AutoFixScout.TestBench` runs the plan without the UI: per scenario it creates the fault, runs the app's
@@ -172,7 +182,7 @@ UAC prompts can't be clicked by automation; run the app from an elevated termina
 
 Ladders hardcoded in C# instead of YAML playbooks; one UAC prompt per admin action (no long-lived executor);
 airplane mode read from an undocumented registry value; "driver changed recently" = package staged date, not WU
-history; camera test uses the Windows Camera app; session written once at the end of a flow.
+history; camera test uses the Windows Camera app; session row opened at flow start but steps written once at the end.
 
 ## Next (owner's choice)
 

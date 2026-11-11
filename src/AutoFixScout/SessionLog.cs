@@ -93,13 +93,28 @@ public sealed class SessionLog : IDisposable
              "INSERT INTO session_new SELECT * FROM session; DROP TABLE session; ALTER TABLE session_new RENAME TO session; COMMIT;");
     }
 
-    public string Start(string symptom)
+    /// <summary>Call when the flow starts, so a flow that never finishes (app closed, crash) still leaves a row.</summary>
+    public string Start(string symptom, DateTime? startedAt = null)
     {
         var id = Guid.NewGuid().ToString("N");
         var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0";
-        Exec("INSERT INTO session (session_id, symptom, app_version, playbook_version) VALUES ($id, $symptom, $app, $pb)",
-            ("$id", id), ("$symptom", symptom), ("$app", version), ("$pb", PlaybookVersion));
+        Exec("""
+            INSERT INTO session (session_id, started_at, symptom, app_version, playbook_version)
+            VALUES ($id, COALESCE($started, strftime('%Y-%m-%dT%H:%M:%fZ','now')), $symptom, $app, $pb)
+            """,
+            ("$id", id), ("$started", Iso(startedAt)), ("$symptom", symptom), ("$app", version), ("$pb", PlaybookVersion));
         return id;
+    }
+
+    /// <summary>
+    /// At app start: a session with no end belongs to a flow that was cut off (test step 5c: app closed mid driver
+    /// change), so it is recorded as abandoned. Returns how many were closed.
+    /// </summary>
+    public int CloseUnfinished()
+    {
+        using var cmd = new SqliteCommand(
+            "UPDATE session SET outcome = 'abandoned', ended_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE ended_at IS NULL", _db);
+        return cmd.ExecuteNonQuery();
     }
 
     public void AddSteps(string sessionId, IEnumerable<StepLog> steps)

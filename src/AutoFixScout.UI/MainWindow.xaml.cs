@@ -19,7 +19,11 @@ public partial class MainWindow : Window, IFixHost
     public MainWindow()
     {
         InitializeComponent();
-        Loaded += async (_, _) => await RecoverOpenSavePointsAsync();
+        Loaded += async (_, _) =>
+        {
+            CloseUnfinishedSessions();
+            await RecoverOpenSavePointsAsync();
+        };
     }
 
     /// <summary>
@@ -82,6 +86,7 @@ public partial class MainWindow : Window, IFixHost
 
     private async Task RunFlowAsync(string topic, string what, Func<Task<Diagnosis>> diagnose, Func<Task<bool>> test)
     {
+        var sessionId = StartSession(topic == "sound" ? "audio" : topic);
         try
         {
             ShowBusy("Checking your computer...");
@@ -104,7 +109,7 @@ public partial class MainWindow : Window, IFixHost
             if (outcome == Outcome.NotFixed && after.ProbablyHardware) outcome = Outcome.ProbableHardware;
 
             var report = HelperReport.Build(topic, before.State, before.Findings, log.Select(l => l.ToString()), outcome);
-            var logError = SaveSession(topic == "sound" ? "audio" : topic, log, outcome);
+            var logError = FinishSession(sessionId, log, outcome);
             if (logError != null) report += $"\nSession log unavailable: {logError}\n";
             _lastReportPath = HelperReport.Save(topic, report);
             var end = outcome == Outcome.NotFixed && after.NotFixedHint is { } hint ? hint : EndMessage(outcome, what);
@@ -112,26 +117,49 @@ public partial class MainWindow : Window, IFixHost
         }
         catch (Exception ex)
         {
+            FinishSession(sessionId, new List<StepLog>(), Outcome.Abandoned);
             await ShowStepAsync($"I couldn't finish the check.\n\n({ex.Message})", "Done");
         }
         ShowHome();
     }
 
-    /// <summary>
-    /// Writes the session to SQLite. A broken log must not stop the person getting help, so failure is reported, not thrown.
-    /// shortcut: written once at the end, so a crash mid-flow loses that session's steps; write per step if pilots crash.
-    /// </summary>
-    private static string? SaveSession(string symptom, List<StepLog> steps, Outcome outcome)
+    // A broken log must not stop the person getting help, so session-log failures are reported, never thrown.
+    // shortcut: steps are written at the end, so a flow cut off mid-way is logged as abandoned without its steps;
+    // write per step if pilots crash.
+
+    /// <summary>Opens the session row when the flow starts. Null if the log can't be written.</summary>
+    private static string? StartSession(string symptom)
     {
         try
         {
             using var db = new SessionLog(SessionLog.DefaultPath);
-            var id = db.Start(symptom);
-            db.AddSteps(id, steps);
-            db.End(id, outcome);
+            return db.Start(symptom, DateTime.UtcNow);
+        }
+        catch (Exception) { return null; }
+    }
+
+    private static string? FinishSession(string? sessionId, List<StepLog> steps, Outcome outcome)
+    {
+        if (sessionId is null) return "could not open session.db";
+        try
+        {
+            using var db = new SessionLog(SessionLog.DefaultPath);
+            db.AddSteps(sessionId, steps);
+            db.End(sessionId, outcome);
             return null;
         }
         catch (Exception ex) { return ex.Message; }
+    }
+
+    /// <summary>Sessions left open by a flow that was cut off (app closed, crash) become "abandoned".</summary>
+    private static void CloseUnfinishedSessions()
+    {
+        try
+        {
+            using var db = new SessionLog(SessionLog.DefaultPath);
+            db.CloseUnfinished();
+        }
+        catch (Exception) { }
     }
 
     private static string EndMessage(Outcome outcome, string what) => outcome switch

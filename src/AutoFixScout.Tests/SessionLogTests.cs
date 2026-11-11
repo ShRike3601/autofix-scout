@@ -35,6 +35,33 @@ public class SessionLogTests : IDisposable
     }
 
     [Fact]
+    public void CutOffFlow_IsClosedAsAbandoned_OnNextStart_FinishedOnesUntouched()
+    {
+        // Test step 5c: the app was closed mid driver change and session.db had no trace of the flow.
+        string cutOff, finished;
+        using (var db = new SessionLog(_path))
+        {
+            cutOff = db.Start("audio");
+            finished = db.Start("network");
+            db.End(finished, Outcome.Fixed);
+        }
+        using var reopened = new SessionLog(_path);
+        Assert.Equal(1, reopened.CloseUnfinished());
+        Assert.Equal("abandoned", reopened.Scalar($"SELECT outcome FROM session WHERE session_id = '{cutOff}'"));
+        Assert.NotNull(reopened.Scalar($"SELECT ended_at FROM session WHERE session_id = '{cutOff}'"));
+        Assert.Equal("fixed", reopened.Scalar($"SELECT outcome FROM session WHERE session_id = '{finished}'"));
+        Assert.Equal(0, reopened.CloseUnfinished());
+    }
+
+    [Fact]
+    public void StartedAt_IsTheFlowStart_NotWhenTheRowWasWritten()
+    {
+        using var db = new SessionLog(_path);
+        var id = db.Start("camera", new DateTime(2026, 11, 11, 9, 0, 0, DateTimeKind.Utc));
+        Assert.Equal("2026-11-11T09:00:00.000Z", db.Scalar($"SELECT started_at FROM session WHERE session_id = '{id}'"));
+    }
+
+    [Fact]
     public void SchemaRejectsUnknownSymptom()
     {
         using var db = new SessionLog(_path);
