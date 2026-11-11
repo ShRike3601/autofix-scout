@@ -71,16 +71,18 @@ public class AudioLadderTests
     public async Task Runner_NotNow_Abandons_AndRunsNothing()
     {
         var host = new FakeHost(false, true);
-        Assert.Equal(Outcome.Abandoned, await LadderRunner.RunAsync(TwoRungs, host, new()));
+        var log = new List<StepLog>();
+        Assert.Equal(Outcome.Abandoned, await LadderRunner.RunAsync(TwoRungs, host, log));
         Assert.Empty(host.Ran);
+        Assert.Equal((false, StepResult.Skipped), (log.Single().Approved, log.Single().Result));
     }
 
     [Fact]
     public async Task Runner_FailedRung_SkipsTest_AndContinues()
     {
-        var log = new List<string>();
+        var log = new List<StepLog>();
         Assert.Equal(Outcome.NotFixed, await LadderRunner.RunAsync(TwoRungs, new FakeHost(true, false), log));
-        Assert.Equal(2, log.Count(l => l.Contains("failed")));
+        Assert.All(log, s => Assert.Equal((true, StepResult.Failed, (bool?)null), (s.Approved, s.Result, s.UserConfirmedFixed)));
     }
 
     // ---- executor input validation (trust boundary) ----

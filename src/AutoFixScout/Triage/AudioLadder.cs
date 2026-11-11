@@ -58,18 +58,26 @@ public interface IFixHost
 
 public static class LadderRunner
 {
-    /// <summary>Runs each rung at most once (spec 6: no loops) and stops at the first confirmed fix.</summary>
-    public static async Task<Outcome> RunAsync(IReadOnlyList<Rung> ladder, IFixHost host, List<string> log)
+    /// <summary>
+    /// Runs each rung at most once (spec 6: no loops) and stops at the first confirmed fix.
+    /// Every rung offered gets a step_log row; nothing defaults to success (spec 12).
+    /// </summary>
+    public static async Task<Outcome> RunAsync(IReadOnlyList<Rung> ladder, IFixHost host, List<StepLog> steps)
     {
         foreach (var rung in ladder)
         {
-            if (!await host.ConfirmAsync(rung)) { log.Add($"{rung.Id}: declined"); return Outcome.Abandoned; }
+            var step = new StepLog { PlaybookStep = rung.Id, ActionId = rung.ActionId, Tier = rung.Tier, ProposedBy = "playbook" };
+            steps.Add(step);
+            if (!await host.ConfirmAsync(rung)) { step.Result = StepResult.Skipped; return Outcome.Abandoned; }
+            step.Approved = true;
+            step.ApprovedAt = step.StartedAt = DateTime.UtcNow;
             var (ok, detail) = await host.RunAsync(rung);
-            log.Add($"{rung.Id} ({rung.ActionId}, T{rung.Tier}): {(ok ? "success" : "failed")} {detail}".TrimEnd());
-            if (!ok) continue;
-            var fixedIt = await host.TestAsync();
-            log.Add($"{rung.Id}: test passed = {fixedIt}");
-            if (fixedIt) return Outcome.Fixed;
+            step.FinishedAt = DateTime.UtcNow;
+            step.Detail = detail;
+            if (!ok) { step.Result = StepResult.Failed; step.Error = detail; continue; }
+            step.Result = StepResult.Success;
+            step.UserConfirmedFixed = await host.TestAsync();
+            if (step.UserConfirmedFixed == true) return Outcome.Fixed;
         }
         return Outcome.NotFixed;
     }

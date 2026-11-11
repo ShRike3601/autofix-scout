@@ -31,6 +31,13 @@ public sealed class StepLog
     public StepResult? Result { get; set; }
     public bool? UserConfirmedFixed { get; set; }
     public string? Error { get; set; }
+    /// <summary>Not a column: what the action reported (e.g. prior volume), shown in the helper report.</summary>
+    public string? Detail { get; set; }
+
+    public override string ToString() =>
+        $"{PlaybookStep} ({ActionId}, T{Tier}): {(Approved ? Result?.ToString() ?? "unknown" : "declined")}" +
+        (UserConfirmedFixed is { } f ? $", fixed it: {(f ? "yes" : "no")}" : "") +
+        (string.IsNullOrEmpty(Detail) ? "" : $" -- {Detail}");
 }
 
 public sealed class UndoRecord

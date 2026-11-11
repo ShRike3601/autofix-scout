@@ -61,7 +61,7 @@ public partial class MainWindow : Window, IFixHost
             var before = await diagnose();
             await ShowStepAsync(before.Findings[0].PlainMessage, "Next");
 
-            var log = new List<string>();
+            var log = new List<StepLog>();
             var after = before;
             var outcome = Outcome.NotFixed;
             if (before.Ladder.Count > 0)
@@ -76,7 +76,10 @@ public partial class MainWindow : Window, IFixHost
             }
             if (outcome == Outcome.NotFixed && after.ProbablyHardware) outcome = Outcome.ProbableHardware;
 
-            _lastReportPath = HelperReport.Save(topic, HelperReport.Build(topic, before.State, before.Findings, log, outcome));
+            var report = HelperReport.Build(topic, before.State, before.Findings, log.Select(l => l.ToString()), outcome);
+            var logError = SaveSession(topic == "sound" ? "audio" : topic, log, outcome);
+            if (logError != null) report += $"\nSession log unavailable: {logError}\n";
+            _lastReportPath = HelperReport.Save(topic, report);
             var end = outcome == Outcome.NotFixed && after.NotFixedHint is { } hint ? hint : EndMessage(outcome, what);
             await ShowStepAsync(end, "Done");
         }
@@ -85,6 +88,23 @@ public partial class MainWindow : Window, IFixHost
             await ShowStepAsync($"I couldn't finish the check.\n\n({ex.Message})", "Done");
         }
         ShowHome();
+    }
+
+    /// <summary>
+    /// Writes the session to SQLite. A broken log must not stop the person getting help, so failure is reported, not thrown.
+    /// shortcut: written once at the end, so a crash mid-flow loses that session's steps; write per step if pilots crash.
+    /// </summary>
+    private static string? SaveSession(string symptom, List<StepLog> steps, Outcome outcome)
+    {
+        try
+        {
+            using var db = new SessionLog(SessionLog.DefaultPath);
+            var id = db.Start(symptom);
+            db.AddSteps(id, steps);
+            db.End(id, outcome);
+            return null;
+        }
+        catch (Exception ex) { return ex.Message; }
     }
 
     private static string EndMessage(Outcome outcome, string what) => outcome switch
