@@ -44,15 +44,18 @@ public partial class MainWindow : Window, IFixHost
             if (!await FixActions.SettleSavePointAsync(id, keep: false)) failed++;
         await ShowStepAsync(failed == 0
             ? "Done. Your driver is back the way it was."
-            : "I couldn't put the driver back. Please ask your helper; the save point is kept so they can do it.", "OK");
+            : "I couldn't put the driver back. Please ask your helper; the save point is kept so they can do it.", "OK",
+            look: failed == 0 ? Look.Fixed : Look.Problem);
         ShowHome();
     }
 
     // ---- screens ----
 
     /// <summary>Shows one sentence and up to two buttons; completes with true for the first button.</summary>
-    private Task<bool> ShowStepAsync(string text, string? primary, string? secondary = null)
+    /// <param name="look">Only changes the picture above the sentence (see MainWindow.Visuals.cs).</param>
+    private Task<bool> ShowStepAsync(string text, string? primary, string? secondary = null, Look look = Look.Step)
     {
+        var from = CaptureScreen();
         HomePanel.Visibility = Visibility.Collapsed;
         StepPanel.Visibility = Visibility.Visible;
         StepText.Text = text;
@@ -60,6 +63,7 @@ public partial class MainWindow : Window, IFixHost
         PrimaryButton.Visibility = primary is null ? Visibility.Collapsed : Visibility.Visible;
         SecondaryButton.Content = secondary;
         SecondaryButton.Visibility = secondary is null ? Visibility.Collapsed : Visibility.Visible;
+        PresentStep(from, primary is null ? Look.Busy : look);
         if (primary is not null) PrimaryButton.Focus();
         _choice = new TaskCompletionSource<bool>();
         return _choice.Task;
@@ -72,6 +76,7 @@ public partial class MainWindow : Window, IFixHost
     {
         StepPanel.Visibility = Visibility.Collapsed;
         HomePanel.Visibility = Visibility.Visible;
+        PresentHome();
     }
 
     private void OnPrimaryClicked(object sender, RoutedEventArgs e) => _choice?.TrySetResult(true);
@@ -86,6 +91,7 @@ public partial class MainWindow : Window, IFixHost
 
     private async Task RunFlowAsync(string topic, string what, Func<Task<Diagnosis>> diagnose, Func<Task<bool>> test)
     {
+        SetTopic(topic);
         var sessionId = StartSession(topic == "sound" ? "audio" : topic);
         try
         {
@@ -113,12 +119,12 @@ public partial class MainWindow : Window, IFixHost
             if (logError != null) report += $"\nSession log unavailable: {logError}\n";
             _lastReportPath = HelperReport.Save(topic, report);
             var end = outcome == Outcome.NotFixed && after.NotFixedHint is { } hint ? hint : EndMessage(outcome, what);
-            await ShowStepAsync(end, "Done");
+            await ShowStepAsync(end, "Done", look: EndLook(outcome));
         }
         catch (Exception ex)
         {
             FinishSession(sessionId, new List<StepLog>(), Outcome.Abandoned);
-            await ShowStepAsync($"I couldn't finish the check.\n\n({ex.Message})", "Done");
+            await ShowStepAsync($"I couldn't finish the check.\n\n({ex.Message})", "Done", look: Look.Problem);
         }
         ShowHome();
     }
