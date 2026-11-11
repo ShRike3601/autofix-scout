@@ -9,67 +9,155 @@ public partial class MainWindow : Window, IFixHost
 {
     private const string AppName = "AutoFix Scout";
     private readonly IAudioProbe _audioProbe = new RealAudioProbe();
+    private readonly INetworkProbe _networkProbe = new RealNetworkProbe();
     private string? _lastReportPath;
+    private TaskCompletionSource<bool>? _choice;
+    private Func<Task<bool>> _test = () => Task.FromResult(false);
 
     public MainWindow() => InitializeComponent();
 
-    private async void OnSoundClicked(object sender, RoutedEventArgs e)
+    // ---- screens ----
+
+    /// <summary>Shows one sentence and up to two buttons; completes with true for the first button.</summary>
+    private Task<bool> ShowStepAsync(string text, string? primary, string? secondary = null)
     {
-        var button = (FrameworkElement)sender;
-        button.IsEnabled = false;
+        HomePanel.Visibility = Visibility.Collapsed;
+        StepPanel.Visibility = Visibility.Visible;
+        StepText.Text = text;
+        PrimaryButton.Content = primary;
+        PrimaryButton.Visibility = primary is null ? Visibility.Collapsed : Visibility.Visible;
+        SecondaryButton.Content = secondary;
+        SecondaryButton.Visibility = secondary is null ? Visibility.Collapsed : Visibility.Visible;
+        if (primary is not null) PrimaryButton.Focus();
+        _choice = new TaskCompletionSource<bool>();
+        return _choice.Task;
+    }
+
+    /// <summary>A screen with no buttons, for "Checking..." and "Working on it...".</summary>
+    private void ShowBusy(string text) => _ = ShowStepAsync(text, null);
+
+    private void ShowHome()
+    {
+        StepPanel.Visibility = Visibility.Collapsed;
+        HomePanel.Visibility = Visibility.Visible;
+    }
+
+    private void OnPrimaryClicked(object sender, RoutedEventArgs e) => _choice?.TrySetResult(true);
+
+    // Esc lands here too (IsCancel); ignore it when the screen has no second choice.
+    private void OnSecondaryClicked(object sender, RoutedEventArgs e)
+    {
+        if (SecondaryButton.Visibility == Visibility.Visible) _choice?.TrySetResult(false);
+    }
+
+    // ---- one flow for every symptom (spec 4.1) ----
+
+    private async Task RunFlowAsync(string topic, string what, Func<Task<Diagnosis>> diagnose, Func<Task<bool>> test)
+    {
         try
         {
-            Title = $"{AppName} - Checking your computer...";
-            // Probes are read-only (T0); run off the UI thread because WMI can take seconds.
-            var state = await Task.Run(_audioProbe.Read);
-            var findings = AudioTriage.Evaluate(state);
-            Title = AppName;
-            MessageBox.Show(this, findings[0].PlainMessage, AppName);
+            ShowBusy("Checking your computer...");
+            var before = await diagnose();
+            await ShowStepAsync(before.Findings[0].PlainMessage, "Next");
 
             var log = new List<string>();
-            var outcome = await LadderRunner.RunAsync(AudioLadder.For(state, findings), this, log);
+            var after = before;
+            var outcome = Outcome.NotFixed;
+            if (before.Ladder.Count > 0)
+            {
+                _test = test;
+                outcome = await LadderRunner.RunAsync(before.Ladder, this, log);
+                if (outcome == Outcome.NotFixed)
+                {
+                    ShowBusy("Checking your computer again...");
+                    after = await diagnose();
+                }
+            }
+            if (outcome == Outcome.NotFixed && after.ProbablyHardware) outcome = Outcome.ProbableHardware;
 
-            var after = outcome == Outcome.Fixed ? state : await Task.Run(_audioProbe.Read);
-            if (outcome == Outcome.NotFixed && AudioLadder.ProbablyHardware(after)) outcome = Outcome.ProbableHardware;
-
-            var report = HelperReport.Build(state, findings) + "\nWhat was tried:\n" +
-                         string.Join("\n", log.Select(l => "  " + l)) + $"\n\nOutcome: {outcome}\n";
-            _lastReportPath = HelperReport.Save(report);
-            MessageBox.Show(this, EndMessage(outcome), AppName);
+            _lastReportPath = HelperReport.Save(topic, HelperReport.Build(topic, before.State, before.Findings, log, outcome));
+            var end = outcome == Outcome.NotFixed && after.NotFixedHint is { } hint ? hint : EndMessage(outcome, what);
+            await ShowStepAsync(end, "Done");
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"We couldn't finish checking your sound.\n\n({ex.Message})", AppName);
+            await ShowStepAsync($"I couldn't finish the check.\n\n({ex.Message})", "Done");
         }
-        finally
-        {
-            Title = AppName;
-            button.IsEnabled = true;
-        }
+        ShowHome();
     }
 
-    private static string EndMessage(Outcome outcome) => outcome switch
+    private static string EndMessage(Outcome outcome, string what) => outcome switch
     {
-        Outcome.Fixed => "Your sound is working again.",
+        Outcome.Fixed => $"Your {what} is working again.",
         Outcome.ProbableHardware => "This is probably a hardware fault. A repair shop can check it. " +
                                     "Press \"Details for my helper\" to see a report you can show them.",
         Outcome.Abandoned => "Okay, nothing else was changed. You can come back any time.",
         _ => "I couldn't fix it this time. Press \"Details for my helper\" for a report you can send to someone who can help.",
     };
 
-    // IFixHost: one decision per message, plain language, Yes = "try it".
-    Task<bool> IFixHost.ConfirmAsync(Rung rung) => Task.FromResult(
-        MessageBox.Show(this, rung.Say + "\n\nPress Yes to try it, or No for not now.", AppName, MessageBoxButton.YesNo) == MessageBoxResult.Yes);
+    // ---- no sound ----
 
-    Task<(bool Ok, string Detail)> IFixHost.RunAsync(Rung rung) => AudioActions.RunAsync(rung);
+    private async void OnSoundClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync("sound", "sound", DiagnoseSoundAsync, BeepTestAsync);
 
-    async Task<bool> IFixHost.TestAsync()
+    private async Task<Diagnosis> DiagnoseSoundAsync()
     {
-        MessageBox.Show(this, "Now I'll play a short beep. Press OK when you're ready to listen.", AppName);
-        try { await Task.Run(AudioActions.PlayTestTone); }
-        catch (Exception) { return false; } // no usable output device: counts as not fixed
-        return MessageBox.Show(this, "Did you hear the beep?", AppName, MessageBoxButton.YesNo) == MessageBoxResult.Yes;
+        // Probes are read-only (T0); run off the UI thread because WMI can take seconds.
+        var s = await Task.Run(_audioProbe.Read);
+        var f = AudioTriage.Evaluate(s);
+        return new Diagnosis(s, f, AudioLadder.For(s, f), AudioLadder.ProbablyHardware(s));
     }
+
+    private async Task<bool> BeepTestAsync()
+    {
+        await ShowStepAsync("Now I'll play a short beep. Please listen.", "Play the beep");
+        ShowBusy("Playing the beep...");
+        try { await Task.Run(FixActions.PlayTestTone); }
+        catch (Exception) { return false; } // no usable output device: counts as not fixed
+        return await ShowStepAsync("Did you hear the beep?", "Yes, I heard it", "No");
+    }
+
+    // ---- can't get online ----
+
+    private async void OnNetworkClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync("network", "internet connection", DiagnoseNetworkAsync, ConnectionTestAsync);
+
+    private async Task<Diagnosis> DiagnoseNetworkAsync()
+    {
+        var s = await Task.Run(_networkProbe.ReadAsync);
+        var f = NetworkTriage.Evaluate(s);
+        return new Diagnosis(s, f, NetworkTriage.Ladder(s, f), NetworkTriage.ProbablyHardware(s), NetworkTriage.NotFixedHint(f));
+    }
+
+    /// <summary>Real test: the same connectivity check Windows uses. Retries because Wi-Fi takes a few seconds to come up.</summary>
+    private async Task<bool> ConnectionTestAsync()
+    {
+        for (var attempt = 0; attempt < 4; attempt++)
+        {
+            ShowBusy("Checking the connection...");
+            if ((await Task.Run(_networkProbe.ReadAsync)).InternetReachable == Tri.Yes) return true;
+            await Task.Delay(TimeSpan.FromSeconds(5));
+        }
+        return false;
+    }
+
+    // ---- IFixHost ----
+
+    Task<bool> IFixHost.ConfirmAsync(Rung rung) => ShowStepAsync(rung.Say, "Yes, try it", "Not now");
+
+    async Task<(bool Ok, string Detail)> IFixHost.RunAsync(Rung rung)
+    {
+        ShowBusy("Working on it...");
+        var result = await FixActions.RunAsync(rung);
+        // Steps the person does themselves: wait until they say they're done before testing.
+        if (rung.ActionId is "ui.open_settings_page" or "ui.human_step" && result.Ok)
+            await ShowStepAsync("When you've done that, come back here and press Next.", "Next");
+        return result;
+    }
+
+    Task<bool> IFixHost.TestAsync() => _test();
+
+    // ---- other ----
 
     private void OnHelperDetailsClicked(object sender, RoutedEventArgs e)
     {
@@ -80,10 +168,8 @@ public partial class MainWindow : Window, IFixHost
     }
 
     private void OnCameraClicked(object sender, RoutedEventArgs e) => Stub("Camera");
-    private void OnNetworkClicked(object sender, RoutedEventArgs e) => Stub("Network");
     private void OnOtherClicked(object sender, RoutedEventArgs e) => Stub("Other");
     private void OnSettingsClicked(object sender, RoutedEventArgs e) => Stub("Settings");
 
-    private static void Stub(string name) =>
-        MessageBox.Show($"{name} is not wired up yet.", AppName);
+    private void Stub(string name) => MessageBox.Show(this, $"{name} is not wired up yet.", AppName);
 }

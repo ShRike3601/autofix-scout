@@ -53,18 +53,6 @@ public enum Symptom { Audio, Camera, Network, Other }
 /// </summary>
 public enum Outcome { Fixed, NotFixed, ProbableHardware, Abandoned }
 
-/// <summary>
-/// Network adapter state (for probe operations).
-/// </summary>
-public sealed class NetworkState
-{
-    public string AdapterName { get; set; } = "";
-    public bool AirplaneMode { get; set; }
-    public bool Enabled { get; set; }
-    public bool GatewayReachable { get; set; }
-    public bool DnsResolving { get; set; }
-}
-
 public sealed class UpdateHistory
 {
     public string AdapterName { get; set; } = "";

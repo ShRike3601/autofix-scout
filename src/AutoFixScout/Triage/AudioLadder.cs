@@ -68,9 +68,12 @@ public static class LadderRunner
             log.Add($"{rung.Id} ({rung.ActionId}, T{rung.Tier}): {(ok ? "success" : "failed")} {detail}".TrimEnd());
             if (!ok) continue;
             var fixedIt = await host.TestAsync();
-            log.Add($"{rung.Id}: person heard test tone = {fixedIt}");
+            log.Add($"{rung.Id}: test passed = {fixedIt}");
             if (fixedIt) return Outcome.Fixed;
         }
         return Outcome.NotFixed;
     }
 }
+
+/// <summary>One symptom's check result: what the probe saw, what triage found, the ladder, and how to end honestly.</summary>
+public sealed record Diagnosis(object State, IReadOnlyList<Finding> Findings, IReadOnlyList<Rung> Ladder, bool ProbablyHardware, string? NotFixedHint = null);

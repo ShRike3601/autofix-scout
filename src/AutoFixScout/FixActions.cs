@@ -7,8 +7,8 @@ using NAudio.Wave.SampleProviders;
 
 namespace AutoFixScout;
 
-/// <summary>Windows side of the no-sound ladder. Non-admin actions run here; admin ones go to the elevated executor.</summary>
-public static class AudioActions
+/// <summary>Windows side of the fix ladders. Non-admin actions run here; admin ones go to the elevated executor.</summary>
+public static class FixActions
 {
     public static async Task<(bool Ok, string Detail)> RunAsync(Rung rung)
     {
@@ -18,19 +18,40 @@ public static class AudioActions
             {
                 case "ui.open_settings_page":
                     // Only fixed pages; the person flips the setting themselves (spec 8.1).
-                    var uri = rung.Arg switch { "sound" => "ms-settings:sound", "camera" => "ms-settings:privacy-webcam", _ => throw new ArgumentException(rung.Arg) };
+                    var uri = rung.Arg switch
+                    {
+                        "sound" => "ms-settings:sound",
+                        "camera" => "ms-settings:privacy-webcam",
+                        "airplane" => "ms-settings:network-airplanemode",
+                        "wifi" => "ms-settings:network-wifi",
+                        _ => throw new ArgumentException(rung.Arg),
+                    };
                     Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
                     return (true, uri);
+                case "ui.human_step":
+                    return (true, "person was asked to do it");
                 case "audio.unmute_and_set_volume":
                     return (true, Unmute());
+                case "network.flush_dns":
+                    // Flushing the resolver cache doesn't need admin, so no UAC prompt.
+                    return await Task.Run(() => RunFixed("ipconfig.exe", "/flushdns"));
                 case "service.restart":
                 case "device.disable_enable":
+                case "device.enable":
                     return await Task.Run(() => RunElevated(rung.ActionId, rung.Arg!));
                 default:
                     return (false, $"action not allowed: {rung.ActionId}");
             }
         }
         catch (Exception ex) { return (false, ex.Message); }
+    }
+
+    private static (bool Ok, string Detail) RunFixed(string exe, string arg)
+    {
+        var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, exe), arg) { UseShellExecute = false, CreateNoWindow = true };
+        using var p = Process.Start(psi)!;
+        p.WaitForExit();
+        return (p.ExitCode == 0, $"{exe} {arg} exit code {p.ExitCode}");
     }
 
     /// <summary>Returns the prior state so the report records what to restore (spec 7.1 undo).</summary>

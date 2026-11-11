@@ -153,5 +153,14 @@ public enum FindingCode
     Muted,
     VolumeVeryLow,
     DeviceError,
+    // network (spec 8.3)
+    AirplaneModeOn,
+    NoNetworkAdapter,
+    NetAdapterDisabled,
+    NetAdapterError,
+    NotConnected,
+    GatewayUnreachable,
+    DnsFailing,
+    NoInternet,
     LooksNormal
 }

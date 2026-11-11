@@ -25,6 +25,7 @@ public static class Program
             {
                 "service.restart" when RestartableServices.Contains(args[1]) => RestartService(args[1]),
                 "device.disable_enable" when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) => ToggleDevice(args[1]),
+                "device.enable" when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) => Pnputil("/enable-device", args[1]) == 0 ? 0 : 1,
                 _ => 2,
             };
         }

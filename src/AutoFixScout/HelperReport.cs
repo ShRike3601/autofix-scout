@@ -1,48 +1,39 @@
 using System.Text;
-using AutoFixScout.Probes;
-using AutoFixScout.Triage;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace AutoFixScout;
 
-/// <summary>report.export (spec 4.3): plain text a helper can read before touching the machine.</summary>
+/// <summary>report.export (spec 4.3): plain text a helper can read before touching the machine. Stays on this PC.</summary>
 public static class HelperReport
 {
-    public static string Build(AudioState state, IReadOnlyList<Triage.Finding> findings)
+    private static readonly JsonSerializerOptions Json = new() { WriteIndented = true, Converters = { new JsonStringEnumConverter() } };
+
+    public static string Build(string topic, object probeState, IReadOnlyList<Triage.Finding> findings, IEnumerable<string> tried, Outcome outcome)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("AutoFix Scout - helper report (sound)");
+        sb.AppendLine($"AutoFix Scout - helper report ({topic})");
         sb.AppendLine($"Created: {DateTime.UtcNow:yyyy-MM-ddTHH:mm:ssZ}");
         sb.AppendLine($"Windows: {Environment.OSVersion.VersionString}");
+        sb.AppendLine($"Outcome: {outcome}");
         sb.AppendLine();
         sb.AppendLine("Findings:");
         foreach (var f in findings) sb.AppendLine($"  [{f.Code}] {f.PlainMessage} -- {f.TechnicalDetail}");
         sb.AppendLine();
-        sb.AppendLine("Services:");
-        foreach (var s in state.Services) sb.AppendLine($"  {s.Name}: {s.Status}");
+        sb.AppendLine("What was tried:");
+        foreach (var t in tried) sb.AppendLine($"  {t}");
         sb.AppendLine();
-        sb.AppendLine($"Default output: muted={state.DefaultMuted}, volume={state.DefaultVolumePercent?.ToString() ?? "unknown"}%");
-        sb.AppendLine("Output endpoints:");
-        foreach (var e in state.Endpoints)
-            sb.AppendLine($"  {(e.IsDefault ? "*" : " ")} {e.Name} [{e.KindGuess}] {(e.IsActive ? "active" : "inactive")}");
-        sb.AppendLine();
-        sb.AppendLine("Sound devices (MEDIA class):");
-        foreach (var d in state.Devices)
-            sb.AppendLine($"  {d.Name}\n    id={d.InstanceId}\n    problem code={d.ProblemCode?.ToString() ?? "unknown"}, driver {d.DriverVersion} ({d.DriverDate}) by {d.DriverProvider}");
-        if (state.ProbeErrors.Count > 0)
-        {
-            sb.AppendLine();
-            sb.AppendLine("Probe errors:");
-            foreach (var err in state.ProbeErrors) sb.AppendLine($"  {err}");
-        }
+        sb.AppendLine("What the computer reported (before any fix):");
+        sb.AppendLine(JsonSerializer.Serialize(probeState, probeState.GetType(), Json));
         return sb.ToString();
     }
 
     /// <summary>Writes the report under %LOCALAPPDATA%\AutoFixScout\reports and returns the path.</summary>
-    public static string Save(string text)
+    public static string Save(string topic, string text)
     {
         var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AutoFixScout", "reports");
         Directory.CreateDirectory(dir);
-        var path = Path.Combine(dir, $"sound-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+        var path = Path.Combine(dir, $"{topic}-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
         File.WriteAllText(path, text);
         return path;
     }
