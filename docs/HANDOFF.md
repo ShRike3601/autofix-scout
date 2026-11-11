@@ -132,6 +132,7 @@ Step 7 findings:
 - **Fixed:** a flow cut off mid-way (5c: app closed during a driver change; or a crash) left no row at all, because
   the session was written only at the end. The row is now opened when the flow starts; at the next app start
   `SessionLog.CloseUnfinished` marks open rows `abandoned`. An exception in the flow also ends it as `abandoned`.
+  Verified in the app: camera check closed on its first screen, reopened -> `abandoned`, started 14 s before it ended.
 - **Fixed:** `started_at` was stamped when the row was written at the end (every session lasted ~0.02 s); now the
   flow start time.
 - Still missing: steps of a cut-off flow (written at the end), the startup "Put it back" restore (not logged
