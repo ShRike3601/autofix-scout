@@ -14,10 +14,25 @@ jobs:
         with:
           dotnet-version: 8.0.x
       - run: dotnet test AutoFixScout.sln -c Release
-      - run: dotnet publish src/AutoFixScout.UI/AutoFixScout.UI.csproj -c Release -r win-x64 --self-contained false -o publish
-      - name: Executor ships next to the app
-        run: if (!(Test-Path publish/AutoFixScout.Executor.exe)) { exit 1 }
+      # Self-contained, so testers need nothing installed. The executor is published separately into the same folder:
+      # as a plain project reference it would be framework-dependent and fail on PCs without .NET.
+      - name: Publish win-x64 and win-arm64
+        run: |
+          foreach ($rid in 'win-x64', 'win-arm64') {
+            $out = "publish/$rid"
+            dotnet publish src/AutoFixScout.UI/AutoFixScout.UI.csproj -c Release -r $rid --self-contained true -o $out
+            if ($LASTEXITCODE) { exit 1 }
+            dotnet publish src/AutoFixScout.Executor/AutoFixScout.Executor.csproj -c Release -r $rid --self-contained true -o $out
+            if ($LASTEXITCODE) { exit 1 }
+            if (!(Test-Path "$out/AutoFixScout.Executor.exe")) { Write-Error "executor missing ($rid)"; exit 1 }
+            if ((Get-Content "$out/AutoFixScout.Executor.runtimeconfig.json" -Raw) -notmatch 'includedFrameworks') { Write-Error "executor not self-contained ($rid)"; exit 1 }
+            Copy-Item docs/TESTERS.md "$out/READ ME FIRST.md"
+          }
       - uses: actions/upload-artifact@v7
         with:
           name: AutoFixScout-win-x64
-          path: publish/
+          path: publish/win-x64/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: AutoFixScout-win-arm64
+          path: publish/win-arm64/
