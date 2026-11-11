@@ -9,6 +9,7 @@ using System.ServiceProcess;
 using System.Text;
 using AutoFixScout;
 using AutoFixScout.Probes;
+using AutoFixScout.TestBench;
 using AutoFixScout.Triage;
 using Microsoft.Win32;
 using NAudio.CoreAudioApi;
@@ -22,8 +23,10 @@ if (!Environment.MachineName.Equals(BenchHost, StringComparison.OrdinalIgnoreCas
 
 var outIdx = Array.IndexOf(args, "--out");
 var outDir = outIdx >= 0 && outIdx + 1 < args.Length ? args[outIdx + 1] : Path.Combine(AppContext.BaseDirectory, "results");
-var areas = args.Select(a => a.ToLowerInvariant()).Where(a => a is "sound" or "network" or "camera").ToHashSet();
+var areas = args.Select(a => a.ToLowerInvariant()).Where(a => a is "sound" or "network" or "camera" or "drivers").ToHashSet();
 if (areas.Count == 0) areas = new() { "sound", "network", "camera" };
+// drivers: the T2 save point tests (steps 5-6). Needs a newer INF for Intel Display Audio to stage (see DriverTests).
+var newerInf = args.SkipWhile(a => a != "--newer-inf").Skip(1).FirstOrDefault();
 Warp.MayPause = args.Contains("--pause-warp");
 var only = args.SkipWhile(a => a != "--only").Skip(1).FirstOrDefault()?.Split(',').ToHashSet();
 Directory.CreateDirectory(outDir);
@@ -52,6 +55,7 @@ try
         foreach (var sc in scenarios.Where(s => s.Area == area))
             results.Add(await Bench.RunAsync(sc));
     }
+    if (areas.Contains("drivers")) results.AddRange(await DriverTests.RunAsync(newerInf, only));
 }
 finally
 {
@@ -390,6 +394,197 @@ static class Bench
 
     public static (int Code, string Output) Ps(string script) =>
         Run("powershell.exe", $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"{script.Replace("\"", "\\\"")}\"");
+}
+
+/// <summary>
+/// Steps 5-6: T2 driver changes through the app's own FixActions (save point, change, post-check, settle/undo), which
+/// start the real elevated executor. Target: Intel Display Audio (the unused HDMI audio output), never the speakers.
+/// A newer intcdaud.inf is staged first so the installed one becomes "previous", which is what rollback needs.
+/// </summary>
+static class DriverTests
+{
+    const string DisplayAudioHwid = @"HDAUDIO\FUNC_01&VEN_8086&DEV_280B";
+
+    static Scenario Sc(string id, string title) => new()
+    {
+        Id = id, Area = "drivers", Title = title, Expect = FindingCode.LooksNormal, ExpectFirstRung = "-",
+        Setup = () => Task.CompletedTask, Restore = () => Task.CompletedTask,
+    };
+
+    static string? Version(string instanceId) => AutoFixScout.Drivers.DriverStatus.For(instanceId)?.Version;
+
+    static string PendingDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AutoFixScout", "pending-savepoints");
+    static string SavePointDir(string id) => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "AutoFixScout", "savepoints", id);
+
+    public static async Task<List<Result>> RunAsync(string? newerInf, HashSet<string>? only)
+    {
+        var results = new List<Result>();
+        var audio = new RealAudioProbe().Read();
+        var da = audio.Devices.FirstOrDefault(d => d.InstanceId.StartsWith(DisplayAudioHwid, StringComparison.OrdinalIgnoreCase));
+        // --only unstage: put the original driver back and delete every staged copy of the newer package (after a manual test).
+        if (da != null && only?.Contains("unstage") == true)
+        {
+            // Only undo what "stage" wrote down; never guess which package is the original.
+            var record = PnpDrivers.StageRecord.Parse(File.Exists(StageRecordPath) ? File.ReadAllText(StageRecordPath) : null);
+            var store = PnpDrivers.Parse(Bench.Run("pnputil.exe", "/enum-drivers /class Media").Output);
+            var delete = PnpDrivers.ToDelete(store, record);
+            if (delete is null)
+            {
+                Bench.Log($"[drivers] unstage: nothing safe to delete (record: {record?.Serialize().Replace('\n', ' ') ?? "none"}); left as is");
+                return results;
+            }
+            if (!string.Equals(CurrentInf(da.InstanceId), record!.OriginalOem, StringComparison.OrdinalIgnoreCase))
+                ForceInstall(da.InstanceId, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "INF", record.OriginalOem));
+            Bench.Log($"[drivers] unstage {delete}: exit {Bench.Run("pnputil.exe", $"/delete-driver {delete} /uninstall /force").Code}");
+            File.Delete(StageRecordPath);
+            await Task.Delay(TimeSpan.FromSeconds(5));
+            Bench.Log($"[drivers] Intel Display Audio now {Version(da.InstanceId)} ({CurrentInf(da.InstanceId)})");
+            return results;
+        }
+        if (da is null || newerInf is null || !File.Exists(newerInf))
+        {
+            results.Add(Result.Skipped(Sc("5", "Driver rollback"), da is null ? "no Intel Display Audio device" : "--newer-inf missing"));
+            return results;
+        }
+        var original = Version(da.InstanceId);
+        Bench.Log($"[drivers] Intel Display Audio {da.InstanceId} at {original}");
+
+        // Stage the newer package and make it current: same as "Windows Update just installed a newer driver".
+        var originalInf = CurrentInf(da.InstanceId);
+        var (addCode, addOut) = Bench.Run("pnputil.exe", $"/add-driver \"{newerInf}\" /install");
+        var newOem = System.Text.RegularExpressions.Regex.Match(addOut, @"oem\d+\.inf", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Value;
+        // Windows keeps the installed driver when it matches the device more specifically (seen here), so force it,
+        // as "Update driver > Have disk" would.
+        ForceInstall(da.InstanceId, newerInf);
+        await Task.Delay(TimeSpan.FromSeconds(5));
+        var newer = Version(da.InstanceId);
+        Bench.Log($"[drivers] staged {newOem} (pnputil exit {addCode}), forced onto the device; device now at {newer} (was {original}, {originalInf})");
+        // --only stage: leave the newer driver in place for a manual test in the app; "--only unstage" undoes it.
+        if (only?.Contains("stage") == true)
+        {
+            if (newOem.Length > 0 && originalInf != null && !newOem.Equals(originalInf, StringComparison.OrdinalIgnoreCase))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(StageRecordPath)!);
+                File.WriteAllText(StageRecordPath, new PnpDrivers.StageRecord(originalInf, newOem).Serialize());
+            }
+            return results;
+        }
+
+        try
+        {
+            if (Want(only, "5a")) results.Add(await RollbackAsync("5a", "Rollback, person says it works: older driver stays", da.InstanceId, da.Name, keep: true, original, newer, newerInf));
+            if (Want(only, "5b")) results.Add(await RollbackAsync("5b", "Rollback, person says it doesn't: newer driver comes back", da.InstanceId, da.Name, keep: false, original, newer, newerInf));
+            if (Want(only, "6"))
+            {
+                var realtek = audio.Devices.FirstOrDefault(d => d.InstanceId.StartsWith(@"HDAUDIO\", StringComparison.OrdinalIgnoreCase) && d.Name.Contains("Realtek"));
+                if (realtek != null) results.Add(await WindowsUpdateNothingOfferedAsync(realtek.InstanceId));
+            }
+        }
+        finally
+        {
+            // Put the laptop back: remove the staged package; Windows reinstalls the best remaining driver (the original).
+            if (newOem.Length > 0)
+            {
+                if (Version(da.InstanceId) != original && originalInf != null)
+                    try { ForceInstall(da.InstanceId, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "INF", originalInf)); } catch (Exception ex) { Bench.Log($"[drivers] put-back failed: {ex.Message}"); }
+                var (code, output) = Bench.Run("pnputil.exe", $"/delete-driver {newOem} /uninstall /force");
+                await Task.Delay(TimeSpan.FromSeconds(5));
+                Bench.Log($"[drivers] removed {newOem} (exit {code}); device now at {Version(da.InstanceId)} (originally {original}). {output.Trim().Split('\n').LastOrDefault()}");
+            }
+        }
+        return results;
+    }
+
+    static string StageRecordPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "AFS-TestBench", "driver-stage.txt");
+
+    static bool Want(HashSet<string>? only, string id) => only is null || only.Contains(id);
+
+    static async Task MakeCurrentAsync(string instanceId, string inf, string? version)
+    {
+        if (Version(instanceId) == version) return;
+        ForceInstall(instanceId, inf);
+        await Task.Delay(TimeSpan.FromSeconds(5));
+    }
+
+    // Same live source as the app (WMI lags real changes).
+    static string? CurrentInf(string instanceId)
+    {
+        using var enumKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Enum\{instanceId}");
+        if (enumKey?.GetValue("Driver") is not string classKey) return null;
+        using var cls = Microsoft.Win32.Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Control\Class\{classKey}");
+        return cls?.GetValue("InfPath") as string;
+    }
+
+    [System.Runtime.InteropServices.DllImport("newdev.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    static extern bool UpdateDriverForPlugAndPlayDevicesW(IntPtr hwnd, string hardwareId, string infPath, uint flags, out bool reboot);
+
+    /// <summary>Installs this INF on the device even if Windows ranks the current driver higher (INSTALLFLAG_FORCE | NONINTERACTIVE).</summary>
+    static void ForceInstall(string instanceId, string infPath)
+    {
+        using var q = new System.Management.ManagementObjectSearcher($"SELECT HardwareID FROM Win32_PnPEntity WHERE DeviceID = '{instanceId.Replace(@"\", @"\\")}'");
+        var ids = q.Get().Cast<System.Management.ManagementBaseObject>().SelectMany(d => d["HardwareID"] as string[] ?? Array.Empty<string>()).ToList();
+        var text = File.ReadAllText(infPath);
+        var hwid = ids.FirstOrDefault(h => text.Contains(h, StringComparison.OrdinalIgnoreCase))
+                   ?? throw new InvalidOperationException($"{Path.GetFileName(infPath)} names none of the device's hardware IDs");
+        if (!UpdateDriverForPlugAndPlayDevicesW(IntPtr.Zero, hwid, infPath, 0x1 | 0x4, out _))
+            throw new InvalidOperationException($"UpdateDriverForPlugAndPlayDevices failed: {System.Runtime.InteropServices.Marshal.GetLastWin32Error()}");
+        Bench.Log($"  forced {Path.GetFileName(infPath)} onto the device via {hwid}");
+    }
+
+    static async Task<Result> RollbackAsync(string id, string title, string instanceId, string name, bool keep, string? original, string? newer, string newerInf)
+    {
+        var sw = Stopwatch.StartNew();
+        var trail = new List<string>();
+        var problems = new List<string>();
+        await MakeCurrentAsync(instanceId, newerInf, newer);
+        var status = AutoFixScout.Drivers.DriverStatus.For(instanceId);
+        trail.Add($"before: {status?.Version}, previous in store: {status?.PreviousVersion}, staged {status?.StagedUtc:u}");
+        var rung = DriverRules.Rollback("sound", name, instanceId, status);
+        if (rung is null) problems.Add("rollback not offered");
+        else
+        {
+            trail.Add($"offered: {rung.Say}");
+            var (ok, detail, sp) = await FixActions.ChangeDriverAsync(rung.ActionId, instanceId);
+            trail.Add($"change: ok={ok} {detail}");
+            var after = Version(instanceId);
+            trail.Add($"after change: {after}");
+            if (!ok || after != original) problems.Add($"rollback gave {after}, expected {original}");
+            if (sp != null)
+            {
+                trail.Add($"save point folder exists: {Directory.Exists(SavePointDir(sp))}, manifest: {File.Exists(Path.Combine(SavePointDir(sp), "savepoint.json"))}, " +
+                          $"exported INF: {Directory.Exists(Path.Combine(SavePointDir(sp), "driver")) && Directory.EnumerateFiles(Path.Combine(SavePointDir(sp), "driver"), "*.inf", SearchOption.AllDirectories).Any()}");
+                trail.Add($"open marker before settle: {File.Exists(Path.Combine(PendingDir, sp))}");
+                var settled = await FixActions.SettleSavePointAsync(sp, keep);
+                var final = Version(instanceId);
+                trail.Add($"settle keep={keep}: {settled}; driver now {final}; marker left: {File.Exists(Path.Combine(PendingDir, sp))}");
+                var expected = keep ? original : newer;
+                if (!settled || final != expected) problems.Add($"after settle {final}, expected {expected}");
+                if (File.Exists(Path.Combine(PendingDir, sp))) problems.Add("pending marker not removed");
+            }
+            else problems.Add("no save point id returned");
+        }
+        foreach (var t in trail) Bench.Log($"[{id}]   {t}");
+        var verdict = problems.Count == 0 ? "PASS" : "FAIL";
+        Bench.Log($"[{id}] {verdict} {string.Join("; ", problems)}");
+        return new Result(Sc(id, title), verdict, string.Join("; ", problems), null, null, rung?.Id, Array.Empty<string>(), null, trail, null, sw.Elapsed);
+    }
+
+    static async Task<Result> WindowsUpdateNothingOfferedAsync(string instanceId)
+    {
+        var sw = Stopwatch.StartNew();
+        var before = Version(instanceId);
+        var (ok, detail, sp) = await FixActions.ChangeDriverAsync("driver.install_from_windows_update", instanceId);
+        var after = Version(instanceId);
+        var trail = new List<string> { $"Realtek before {before}, after {after}", $"result: ok={ok} {detail}, save point {sp ?? "none"}" };
+        var problems = new List<string>();
+        if (ok || sp != null) problems.Add("expected 'nothing offered' (exit 3)");
+        if (after != before) problems.Add("driver changed");
+        foreach (var t in trail) Bench.Log($"[6]   {t}");
+        var verdict = problems.Count == 0 ? "PASS" : "FAIL";
+        Bench.Log($"[6] {verdict} {string.Join("; ", problems)}");
+        return new Result(Sc("6", "Windows Update driver: nothing offered for Realtek -> nothing changed"), verdict, string.Join("; ", problems),
+            null, null, null, Array.Empty<string>(), null, trail, null, sw.Elapsed);
+    }
 }
 
 /// <summary>Cloudflare WARP on the test laptop. Only paused with --pause-warp, and always reconnected afterwards.</summary>

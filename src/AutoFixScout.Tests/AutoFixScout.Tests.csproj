@@ -23,6 +23,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Bench driver-store bookkeeping, tested without admin. -->
+    <Compile Include="..\..\tools\AutoFixScout.TestBench\PnpDrivers.cs" Link="Bench\PnpDrivers.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\AutoFixScout\AutoFixScout.csproj" />
     <ProjectReference Include="..\AutoFixScout.Executor\AutoFixScout.Executor.csproj" />
   </ItemGroup>
