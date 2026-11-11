@@ -33,6 +33,9 @@ public static class AudioLadder
 
         rungs.Add(new("restart_services", "service.restart", 1,
             "I'd like to restart the part of Windows that plays sound. Windows will ask for permission.", "AudioEndpointBuilder"));
+        // An uninstalled or vanished sound device leaves no active output; Windows reinstalls it on a hardware scan.
+        if (codes.Contains(FindingCode.NoOutputEndpoint) || codes.Contains(FindingCode.NoActiveOutput))
+            rungs.Add(Rescan.Rung("audio", "sound device"));
 
         var broken = state.Devices.FirstOrDefault(d => d.ProblemCode is > 0);
         if (broken != null)
@@ -50,6 +53,20 @@ public static class AudioLadder
     /// <summary>Spec 8.1 escalation: no output endpoint and a device still reporting an error.</summary>
     public static bool ProbablyHardware(AudioState state) =>
         state.ProbeErrors.Count == 0 && !state.Endpoints.Any(e => e.IsActive) && state.Devices.Any(d => d.ProblemCode is > 0);
+}
+
+/// <summary>
+/// "Scan for hardware changes" (T1): brings back a device that was uninstalled in Device Manager or dropped off after
+/// an update, using the driver already on the PC. Changes nothing that's already there.
+/// </summary>
+public static class Rescan
+{
+    public static readonly string[] Areas = { "audio", "camera", "network" };
+
+    public static Rung Rung(string area, string what) =>
+        new("rescan", "device.rescan", 1,
+            $"Windows can't see your {what} right now. I'd like to ask Windows to look for it again, like " +
+            "\"Scan for hardware changes\" in Device Manager. Windows will ask for permission.", area);
 }
 
 /// <summary>Shared T2 rule (spec 7): roll back only if the driver changed recently and an older package that fits is on this PC.</summary>

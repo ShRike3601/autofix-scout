@@ -40,7 +40,8 @@ public static class FixActions
                 case "device.disable_enable":
                 case "device.enable":
                 case "network.reset_dns":
-                    var code = await Task.Run(() => RunElevated(rung.ActionId, rung.Arg!));
+                case "device.rescan":
+                    var code =await Task.Run(() => RunElevated(rung.ActionId, rung.Arg!));
                     return (code == 0, code is null ? Declined : $"executor exit code {code}");
                 default:
                     return (false, $"action not allowed: {rung.ActionId}");

@@ -15,6 +15,9 @@ public static class Program
     internal static readonly HashSet<string> RestartableServices = new(StringComparer.OrdinalIgnoreCase)
         { "AudioSrv", "AudioEndpointBuilder", "WlanSvc" };
 
+    /// <summary>Same as Triage.Rescan.Areas (a test keeps them equal).</summary>
+    public static readonly string[] RescanAreas = { "audio", "camera", "network" };
+
     // Sound, camera and network only (spec 3). Display and storage drivers are never touched: a bad one can stop Windows starting.
     private static readonly string[] ToggleableClasses = { "MEDIA", "Camera", "Image", "Net" };
 
@@ -34,6 +37,8 @@ public static class Program
                 (_, "device.disable_enable") when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) => ToggleDevice(args[1]),
                 (_, "device.enable") when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) => Pnputil("/enable-device", args[1]) == 0 ? 0 : 1,
                 (_, "network.reset_dns") when IsValidInstanceId(args[1]) && IsNetAdapter(args[1]) => ResetDns(args[1]),
+                // The area is only recorded; the scan itself takes no input.
+                (_, "device.rescan") when RescanAreas.Contains(args[1]) => ScanForHardwareChanges(),
                 _ => 2,
             };
         }
@@ -112,6 +117,29 @@ public static class Program
         // Always try to re-enable, even if disable reported failure: leaving a device off is the harm we must avoid.
         var enabled = Pnputil("/enable-device", id);
         return disabled == 0 && enabled == 0 ? 0 : 1;
+    }
+
+    [System.Runtime.InteropServices.DllImport("cfgmgr32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int CM_Locate_DevNodeW(out uint devInst, string? deviceId, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("cfgmgr32.dll")]
+    private static extern int CM_Reenumerate_DevNode(uint devInst, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("cfgmgr32.dll")]
+    private static extern uint CMP_WaitNoPendingInstallEvents(uint timeoutMs);
+
+    /// <summary>
+    /// Device Manager's "Scan for hardware changes": re-enumerate from the root so devices that were uninstalled (driver
+    /// kept) come back, then wait for Windows to finish installing them. Works on every Windows 10/11 build, unlike
+    /// pnputil /scan-devices (2004+). Adds devices only; never removes or changes one.
+    /// </summary>
+    private static int ScanForHardwareChanges()
+    {
+        if (CM_Locate_DevNodeW(out var root, null, 0) != 0) return 1;
+        if (CM_Reenumerate_DevNode(root, 0x1 /* CM_REENUMERATE_SYNCHRONOUS */) != 0) return 1;
+        CMP_WaitNoPendingInstallEvents(60_000); // WAIT_TIMEOUT just means "still busy"; the real test decides
+        Thread.Sleep(2000); // audio endpoints / camera stacks appear a moment after the device starts
+        return 0;
     }
 
     internal static int Pnputil(params string[] args)
