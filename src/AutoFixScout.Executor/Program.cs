@@ -13,7 +13,10 @@ namespace AutoFixScout.Executor;
 public static class Program
 {
     internal static readonly HashSet<string> RestartableServices = new(StringComparer.OrdinalIgnoreCase)
-        { "AudioSrv", "AudioEndpointBuilder", "WlanSvc" };
+        { "AudioSrv", "AudioEndpointBuilder", "WlanSvc", "wuauserv", "BITS", "CryptSvc" };
+
+    /// <summary>Windows Update services a person may have switched off; service.set_manual puts them back to Manual (Windows' default).</summary>
+    public static readonly HashSet<string> ManualStartServices = new(StringComparer.OrdinalIgnoreCase) { "wuauserv", "BITS", "CryptSvc" };
 
     /// <summary>Same as Triage.Rescan.Areas (a test keeps them equal).</summary>
     public static readonly string[] RescanAreas = { "audio", "camera", "network" };
@@ -39,6 +42,7 @@ public static class Program
                 (_, "network.reset_dns") when IsValidInstanceId(args[1]) && IsNetAdapter(args[1]) => ResetDns(args[1]),
                 // The area is only recorded; the scan itself takes no input.
                 (_, "device.rescan") when RescanAreas.Contains(args[1]) => ScanForHardwareChanges(),
+                (_, "service.set_manual") when ManualStartServices.Contains(args[1]) => SetManualAndStart(args[1]),
                 _ => 2,
             };
         }
@@ -140,6 +144,15 @@ public static class Program
         CMP_WaitNoPendingInstallEvents(60_000); // WAIT_TIMEOUT just means "still busy"; the real test decides
         Thread.Sleep(2000); // audio endpoints / camera stacks appear a moment after the device starts
         return 0;
+    }
+
+    /// <summary>Start type back to Manual (Windows' default for these), then start it. Name is allowlisted by the caller.</summary>
+    private static int SetManualAndStart(string service)
+    {
+        var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "sc.exe")) { UseShellExecute = false, CreateNoWindow = true };
+        foreach (var a in new[] { "config", service, "start=", "demand" }) psi.ArgumentList.Add(a);
+        using (var p = Process.Start(psi)!) { p.WaitForExit(); if (p.ExitCode != 0) return 1; }
+        return RestartService(service);
     }
 
     internal static int Pnputil(params string[] args)
