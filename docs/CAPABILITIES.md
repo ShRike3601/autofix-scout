@@ -40,7 +40,7 @@ Status: **Done** = built, unit-tested and checked on the test laptop (admin repa
 | Network extras | no address from the router, weak Wi-Fi, IP conflict, metered connection | renew address, guided | Planned (R4) |
 | Temporary user profile | "my desktop and files are gone" | explanation and guided recovery | Planned (R5) |
 | Keyboard, mouse, touchpad | touchpad off, Sticky/Filter Keys, input device errors | switch back on, guided | Planned (R6) |
-| Clock settings | automatic time or time zone off | Settings steps, clock sync | Planned (R7) |
+| Clock settings (in the full check-up) | wrong clock with "Set time automatically" off | Date and time settings step, then clock sync | Done |
 
 ## Safety rules the code enforces
 - The UI never runs elevated; the executor accepts only allowlisted action ids with fixed or validated arguments.

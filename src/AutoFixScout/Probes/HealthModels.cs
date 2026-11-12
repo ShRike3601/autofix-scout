@@ -35,6 +35,8 @@ public sealed class HealthState
 
     /// <summary>Computer clock minus internet time, in seconds. Null = could not be measured (for example offline).</summary>
     public double? ClockOffsetSeconds { get; set; }
+    /// <summary>"Set time automatically" is off (W32Time Parameters Type = NoSync).</summary>
+    public bool AutoTimeOff { get; set; }
 
     public bool UserProxyEnabled { get; set; }
     public string? UserProxyServer { get; set; }

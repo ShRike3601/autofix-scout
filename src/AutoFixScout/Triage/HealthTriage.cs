@@ -60,8 +60,9 @@ public static class HealthTriage
             f.Add(F(FindingCode.HealthDiskErrors, "Windows has recorded errors while reading from or writing to the drive.",
                 $"disk/NTFS errors in 14 days: {s.DiskErrors}"));
         if (s.ClockOffsetSeconds is { } off && Math.Abs(off) > ClockTolerSeconds)
-            f.Add(F(FindingCode.HealthClockWrong, "The computer's clock is wrong. A wrong clock causes secure web sites, sign-in and updates to fail.",
-                $"clock offset {off:0} s"));
+            f.Add(F(FindingCode.HealthClockWrong, "The computer's clock is wrong. A wrong clock causes secure web sites, sign-in and updates to fail." +
+                (s.AutoTimeOff ? " The setting \"Set time automatically\" is switched off." : ""),
+                $"clock offset {off:0} s; automatic time {(s.AutoTimeOff ? "off" : "on")}"));
         if (s.UserProxyReachable == Tri.No)
             f.Add(F(FindingCode.HealthDeadProxy, "Your internet settings send web traffic through a proxy server that does not respond. Web sites and apps may not load.",
                 s.UserProxyEnabled ? $"proxy {s.UserProxyServer} unreachable" : $"setup script {s.AutoConfigUrl} unreachable"));
@@ -150,6 +151,9 @@ public static class HealthTriage
             r.Add(new("back_up_files", "ui.open_settings_page", 0,
                 "Please copy your important files (documents, photos) to a USB drive or to OneDrive before anything else. " +
                 "AutoFix Scout will open the \"Windows Backup\" settings, which can do this for you.", "backup"));
+        if (codes.Contains(FindingCode.HealthClockWrong) && s.AutoTimeOff)
+            r.Add(new("auto_time_on", "ui.open_settings_page", 0,
+                "AutoFix Scout will open the \"Date and time\" settings. Please switch on \"Set time automatically\", and check that the time zone is correct.", "dateandtime"));
         if (codes.Contains(FindingCode.HealthClockWrong))
             r.Add(Admin("sync_clock", "time.resync", "AutoFix Scout can set the clock from Microsoft's internet time server."));
         if (codes.Contains(FindingCode.HealthDeadProxy))

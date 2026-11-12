@@ -44,6 +44,7 @@ public static class FixActions
                         "display" => "ms-settings:display",
                         "apps" => "ms-settings:appsfeatures",
                         "backup" => "ms-settings:backup",
+                        "dateandtime" => "ms-settings:dateandtime",
                         "bluetooth" => "ms-settings:bluetooth",
                         "windowsdefender" => "windowsdefender:",
                         "windowsdefender_appbrowser" => "windowsdefender://appbrowser",

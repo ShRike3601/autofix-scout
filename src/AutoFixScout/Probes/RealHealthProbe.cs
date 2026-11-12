@@ -31,6 +31,11 @@ public sealed class RealHealthProbe : IHealthProbe
         Part("event log (programs)", () => ReadAppEvents(s));
         Part("event log (system)", () => ReadSystemEvents(s));
         Part("clock", () => s.ClockOffsetSeconds = ReadClockOffset());
+        Part("clock settings", () =>
+        {
+            using var k = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\W32Time\Parameters");
+            s.AutoTimeOff = string.Equals(k?.GetValue("Type") as string, "NoSync", StringComparison.OrdinalIgnoreCase);
+        });
         Part("proxy", () => ReadUserProxy(s));
         Part("system proxy", () => ReadWinHttpProxy(s));
         Part("hosts file", () => s.HostsHijacks = HostsFile.Suspicious(File.ReadAllLines(HostsPath)).Select(e => new HostsHijack(e.Host, e.Ip)).ToList());

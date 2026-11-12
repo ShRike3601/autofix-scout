@@ -200,6 +200,17 @@ public class HealthTests
     }
 
     [Fact]
+    public void WrongClock_WithAutomaticTimeOff_GuidesToSwitchItOnFirst()
+    {
+        var s = Healthy(); s.ClockOffsetSeconds = -7200; s.AutoTimeOff = true;
+        var (f, l) = Run(s);
+        Assert.Contains("Set time automatically", f[0].PlainMessage);
+        Assert.Equal(new[] { "auto_time_on", "sync_clock" }, l.Take(2).Select(r => r.Id));
+        s.AutoTimeOff = false;
+        Assert.Equal("sync_clock", Run(s).L[0].Id);
+    }
+
+    [Fact]
     public void SingleCrash_IsNotAFault()
     {
         var s = Healthy();
