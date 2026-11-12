@@ -306,4 +306,6 @@ public enum FindingCode
     // Scanners (Printer area)
     ScannerServiceOff,
     ScannerDeviceError,
+    // Blue-screen causes and virtual memory
+    HealthPageFileTooSmall,
 }

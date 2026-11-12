@@ -64,6 +64,7 @@ public static class Program
                 (_, "security.firewall_on") when args[1] == Repairs.System => Repairs.FirewallOn(),
                 (_, "security.uac_on") when args[1] == Repairs.System => Repairs.UacOn(),
                 (_, "security.remove_browser_policies") when args[1] == Repairs.System => Repairs.RemoveBrowserPolicies(),
+                (_, "system.pagefile_auto") when args[1] == Repairs.System => Repairs.PageFileAuto(),
                 _ => 2,
             };
         }
