@@ -4,13 +4,26 @@ using AutoFixScout.Repair;
 namespace AutoFixScout.Triage;
 
 /// <summary>Which of the area's problems the person described. All = not said; every part is checked.</summary>
-public enum AppsFocus { All, Store, Office, OneDrive }
+public enum AppsFocus { All, Store, Office, OneDrive, Install }
 
 /// <summary>Microsoft Office installed by Click-to-Run (null in the state when it is not).</summary>
 public sealed record OfficeInstall(string Platform, string Version, string Products);
 
 /// <summary>OneDrive as found on this computer. The install path stays out of the state (it names the user).</summary>
 public sealed record OneDriveInstall(bool PerUser, bool Running);
+
+/// <summary>One finished or failed install or removal recorded by Windows Installer (MsiInstaller events).</summary>
+public sealed record InstallEvent(DateTime Time, int EventId, string Product, int Code);
+
+/// <summary>The Windows Installer part of probe.apps (focus Install). Product names and status codes only.</summary>
+public sealed class InstallState
+{
+    public UpdateServiceInfo? Service { get; set; }
+    /// <summary>Events 11708, 1033 and 1034 of the last 7 days, newest first.</summary>
+    public IReadOnlyList<InstallEvent> Events { get; set; } = new List<InstallEvent>();
+    public bool RestartPending { get; set; }
+    public long? SystemDriveFreeBytes { get; set; }
+}
 
 /// <summary>probe.apps: Store packages and services, the clock, Click-to-Run Office and OneDrive.</summary>
 public sealed class AppsState
@@ -23,6 +36,7 @@ public sealed class AppsState
     public double? ClockOffsetSeconds { get; set; }
     public OfficeInstall? Office { get; set; }
     public OneDriveInstall? OneDrive { get; set; }
+    public InstallState? Install { get; set; }
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
 }
 
@@ -57,7 +71,33 @@ public static class AppsTriage
 
     private static string DisplayName(string service) => ServiceDefaults.Find(service)?.DisplayName ?? service;
 
-    private static bool ClockWrong(AppsState s) => s.ClockOffsetSeconds is { } off && Math.Abs(off) > HealthTriage.ClockTolerSeconds;
+    public const string InstallerService = "msiserver";
+    public const long LowSpaceBytes = 2L * 1024 * 1024 * 1024;
+
+    private static bool InstallFocus(AppsState s) => s.Focus == AppsFocus.Install && s.Install is not null;
+
+    private static bool IsFailure(InstallEvent e) => e.EventId == 11708 || !InstallerCodes.IsSuccess(e.Code);
+
+    /// <summary>The most recent failed install, with the status code taken from a matching event when it has none.</summary>
+    public static InstallEvent? LatestFailure(InstallState i)
+    {
+        var failed = i.Events.Where(IsFailure).OrderByDescending(e => e.Time).ToList();
+        if (failed.Count == 0) return null;
+        var first = failed[0];
+        if (first.Code != 0) return first;
+        var coded = failed.FirstOrDefault(e => e.Code != 0 && e.Product.Equals(first.Product, StringComparison.OrdinalIgnoreCase));
+        return coded is null ? first : first with { Code = coded.Code };
+    }
+
+    private static string FailureText(InstallEvent e)
+    {
+        var product = e.Product.Length > 0 ? $"\"{e.Product}\"" : "a program";
+        return e.Code != 0
+            ? $"The most recent installation that failed was {product}: {InstallerCodes.Meaning(e.Code)}."
+            : $"The most recent installation that failed was {product}.";
+    }
+
+    private static bool ClockWrong(AppsState s) => s.Focus != AppsFocus.Install && s.ClockOffsetSeconds is { } off && Math.Abs(off) > HealthTriage.ClockTolerSeconds;
 
     public static IReadOnlyList<Finding> Evaluate(AppsState s)
     {
@@ -80,6 +120,23 @@ public static class AppsTriage
                 f.Add(F(FindingCode.HealthServiceOff,
                     $"The Windows service \"{DisplayName(x.Name)}\" is switched off. Microsoft Office needs it to start and to update.",
                     $"{x.Name} {x.Status}/{x.StartType}"));
+        if (InstallFocus(s))
+        {
+            var i = s.Install!;
+            if (i.Service is { } m && ServiceDefaults.IsFault(InstallerService, m.Status, m.StartType))
+                f.Add(F(FindingCode.InstallerServiceOff,
+                    "The Windows service \"Windows Installer\" is switched off. Programs cannot be installed or removed without it.",
+                    $"{InstallerService} {m.Status}/{m.StartType}"));
+            if (LatestFailure(i) is { } fail)
+            {
+                var low = i.SystemDriveFreeBytes is { } b && b < LowSpaceBytes ? " The system drive is also almost full." : "";
+                f.Add(F(FindingCode.InstallFailures, FailureText(fail) + low,
+                    $"{i.Events.Count(IsFailure)} failed event(s); latest {fail.EventId} {fail.Product} code {fail.Code}"));
+            }
+            if (i.RestartPending)
+                f.Add(F(FindingCode.InstallBlockedByRestart,
+                    "Windows is waiting for a restart. Until then, new programs can fail to install.", "restart pending"));
+        }
         if (ClockWrong(s))
             f.Add(F(FindingCode.HealthClockWrong,
                 "The computer's clock is wrong. A wrong clock causes the Microsoft Store, sign-in and updates to fail.",
@@ -98,6 +155,7 @@ public static class AppsTriage
         if (f.Count > 0) return f;
         var what = s.Focus switch
         {
+            AppsFocus.Install => "installing programs",
             AppsFocus.Store => "the Microsoft Store",
             AppsFocus.Office => "Microsoft Office",
             AppsFocus.OneDrive => "OneDrive",
@@ -105,7 +163,7 @@ public static class AppsTriage
         };
         return new[] { F(FindingCode.LooksNormal,
             $"Windows has not recorded a fault in {what}. AutoFix Scout can still repair it step by step.",
-            $"store packages: {string.Join(", ", s.StorePackages.Select(p => $"{p.Name}:{p.Status}"))}; " +
+            $"{(s.Install is { } ins ? $"installer: {ins.Service?.Status}/{ins.Service?.StartType}, events {ins.Events.Count}, free {ins.SystemDriveFreeBytes}; " : "")}store packages: {string.Join(", ", s.StorePackages.Select(p => $"{p.Name}:{p.Status}"))}; " +
             $"office: {(s.Office is { } o ? $"{o.Platform} {o.Version}" : "none")}; onedrive: {(s.OneDrive is { } d ? (d.Running ? "running" : "not running") : "none")}") };
     }
 
@@ -117,6 +175,8 @@ public static class AppsTriage
         if (ClockWrong(s))
             r.Add(new("sync_clock", "time.resync", 1,
                 "AutoFix Scout can set the clock from Microsoft's internet time server. Windows will ask for your permission.", "system"));
+        if (InstallFocus(s))
+            AddInstallRungs(s, codes, r);
         if (Store(s))
         {
             if (s.StorePackages.Any(p => p.Name == "Microsoft.WindowsStore"))
@@ -165,6 +225,35 @@ public static class AppsTriage
         return r;
     }
 
+    private static void AddInstallRungs(AppsState s, HashSet<FindingCode> codes, List<Rung> r)
+    {
+        var i = s.Install!;
+        if (codes.Contains(FindingCode.InstallerServiceOff))
+            r.Add(new("restore_msiserver", "service.restore_default", 1,
+                "AutoFix Scout can set the \"Windows Installer\" service back to the way Windows normally runs it. Windows will ask for your permission.",
+                InstallerService));
+        if (codes.Contains(FindingCode.InstallBlockedByRestart))
+            r.Add(new("restart_pc_installs", "ui.human_step", 0,
+                "Please save your work, then select \"Start\", then \"Power\", then \"Restart\". After the restart, please try the installation again."));
+        var latest = codes.Contains(FindingCode.InstallFailures) ? LatestFailure(i) : null;
+        var lowSpace = i.SystemDriveFreeBytes is { } b && b < LowSpaceBytes;
+        if (latest is not null && (latest.Code is 2502 or 2503 or 112 || lowSpace))
+            r.Add(new("clear_temp", "storage.clear_user_temp", 1,
+                "AutoFix Scout can delete your temporary files that are older than one day. " +
+                "Installers need free space and a usable temporary folder. Files that are in use are skipped."));
+        if (latest?.Code == 1638)
+            r.Add(new("uninstall_older_version", "ui.open_settings_page", 0,
+                "Another version of the program is already installed. Please find it in the list of \"Installed apps\", select the three dots next to it and then \"Uninstall\". " +
+                "Then run the new installer again.", "apps"));
+        if (latest?.Code is 1619 or 1620)
+            r.Add(new("download_installer_again", "ui.human_step", 0,
+                "The installation file could not be used, which usually means that the download is damaged or incomplete. " +
+                "Please download the installer again from the web site of the program's maker, then run it."));
+        if (latest?.Code == 1618)
+            r.Add(new("wait_other_install", "ui.human_step", 0,
+                "Another installation is running. Please wait a few minutes until it has finished, or restart the computer, then try again."));
+    }
+
     public static string Friendly(string package) => package switch
     {
         "Microsoft.WindowsStore" => "Microsoft Store",
@@ -188,6 +277,7 @@ public static class AppsTriage
             AppsFocus.Store => Store,
             AppsFocus.Office => Office,
             AppsFocus.OneDrive => OneDrive,
+            AppsFocus.Install => "If the program still does not install, please check that the installer came from the maker's own web site and that it suits this version of Windows. The person helping you can read the installer's own log for more detail.",
             _ => Store,
         };
     }

@@ -311,4 +311,8 @@ public enum FindingCode
     // Security: threats found by Microsoft Defender
     SecurityThreatActive,
     SecurityThreatsRemoved,
+    // Programs will not install (Windows Installer)
+    InstallerServiceOff,
+    InstallFailures,
+    InstallBlockedByRestart,
 }
