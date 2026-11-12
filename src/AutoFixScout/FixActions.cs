@@ -25,6 +25,8 @@ public static class FixActions
                         "airplane" => "ms-settings:network-airplanemode",
                         "wifi" => "ms-settings:network-wifi",
                         "camera_app" => "microsoft.windows.camera:",
+                        "printers" => "ms-settings:printers",
+                        "display" => "ms-settings:display",
                         _ => throw new ArgumentException(rung.Arg),
                     };
                     Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
@@ -36,11 +38,18 @@ public static class FixActions
                 case "network.flush_dns":
                     // Flushing the resolver cache doesn't need admin, so no UAC prompt.
                     return await Task.Run(() => RunFixed("ipconfig.exe", "/flushdns"));
+                case "display.extend":
+                    // Fixed argument, no admin. The person can undo it with Windows+P.
+                    return await Task.Run(() => { var r = RunFixed("DisplaySwitch.exe", "/extend"); Thread.Sleep(3000); return r; });
+                case "display.set_brightness":
+                    return await Task.Run(SetBrightness);
                 case "service.restart":
                 case "device.disable_enable":
                 case "device.enable":
                 case "network.reset_dns":
                 case "device.rescan":
+                case "printer.clear_queue":
+                case "printer.set_online":
                     var code =await Task.Run(() => RunElevated(rung.ActionId, rung.Arg!));
                     return (code == 0, code is null ? Declined : $"executor exit code {code}");
                 default:
@@ -68,6 +77,25 @@ public static class FixActions
         v.Mute = false;
         if (v.MasterVolumeLevelScalar < 0.3f) v.MasterVolumeLevelScalar = 0.5f;
         return before;
+    }
+
+    /// <summary>
+    /// display.set_brightness: built-in screen to 70 %, only when it is below DisplayTriage.LowBrightness (no admin;
+    /// WmiMonitorBrightnessMethods). Returns the prior value for the report. Fails honestly where Windows refuses it.
+    /// </summary>
+    private static (bool Ok, string Detail) SetBrightness()
+    {
+        using var read = new System.Management.ManagementObjectSearcher(@"root\wmi", "SELECT CurrentBrightness FROM WmiMonitorBrightness WHERE Active = TRUE");
+        var before = read.Get().Cast<System.Management.ManagementBaseObject>().Select(m => (int?)Convert.ToInt32(m["CurrentBrightness"])).FirstOrDefault();
+        if (before is null) return (false, "no built-in screen brightness control");
+        if (before >= DisplayTriage.LowBrightness) return (true, $"brightness already {before}%, nothing changed");
+        using var q = new System.Management.ManagementObjectSearcher(@"root\wmi", "SELECT * FROM WmiMonitorBrightnessMethods WHERE Active = TRUE");
+        foreach (System.Management.ManagementObject m in q.Get())
+        {
+            m.InvokeMethod("WmiSetBrightness", new object[] { 1u, (byte)70 });
+            return (true, $"before: brightness={before}%, set to 70%");
+        }
+        return (false, "no brightness control found");
     }
 
     /// <summary>audio.play_test_tone: 1.5 s, 440 Hz on the default output.</summary>
