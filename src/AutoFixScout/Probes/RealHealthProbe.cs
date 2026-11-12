@@ -46,6 +46,8 @@ public sealed class RealHealthProbe : IHealthProbe
         Part("Store apps", () => s.BrokenStoreApps = ReadBrokenStoreApps());
         Part("restart flag", () => s.RebootPending = ReadRebootPending());
         Part("drives", () => s.Drives = ReadDrives());
+        Part("device errors", () => s.DeviceProblems = ReadDeviceProblems());
+        Part("user profile", () => ReadProfile(s));
 
         s.ProbeErrors = errors;
         return s;
@@ -128,6 +130,38 @@ public sealed class RealHealthProbe : IHealthProbe
             .OrderByDescending(g => g.Count()).Select(g => g.Key).Take(8).ToList();
     }
 
+
+    // ---- devices and profile ----
+
+    private static IReadOnlyList<DeviceProblem> ReadDeviceProblems()
+    {
+        var list = new List<DeviceProblem>();
+        using var q = new System.Management.ManagementObjectSearcher(
+            "SELECT Name, DeviceID, PNPClass, ConfigManagerErrorCode, Present FROM Win32_PnPEntity WHERE ConfigManagerErrorCode <> 0");
+        foreach (System.Management.ManagementObject d in q.Get())
+            using (d)
+            {
+                var code = Convert.ToInt32(d["ConfigManagerErrorCode"] ?? 0);
+                if (DeviceErrors.IsNoise(code) || (d["Present"] is bool p && !p)) continue;
+                var id = d["DeviceID"] as string ?? "";
+                list.Add(new DeviceProblem((d["Name"] as string ?? "unknown device").Trim(), id, d["PNPClass"] as string ?? "", code));
+            }
+        return list.OrderBy(x => x.DisabledByPerson).ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static void ReadProfile(HealthState s)
+    {
+        var path = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var parts = new List<string>();
+        if (TempProfiles.IsTemporaryPath(path)) parts.Add("profile folder is a TEMP folder");
+        var n = 0;
+        using (var reader = new EventLogReader(new EventLogQuery("Application", PathType.LogName,
+            "*[System[Provider[@Name='Microsoft-Windows-User Profiles Service'] and (EventID=1511 or EventID=1515) and TimeCreated[timediff(@SystemTime) <= 172800000]]]")))
+            while (n < 50 && reader.ReadEvent() is { } e) using (e) n++;
+        if (n > 0) parts.Add($"User Profile Service events 1511/1515 in 2 days: {n}");
+        s.TempProfile = parts.Count > 0;
+        s.TempProfileDetail = string.Join("; ", parts);
+    }
 
     // ---- drives ----
 
