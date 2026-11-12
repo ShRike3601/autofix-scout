@@ -79,7 +79,19 @@ public class CameraTriageTests
         var s = Ok();
         s.AppsUsingCamera = new[] { "Zoom" };
         Assert.Equal(FindingCode.CameraInUse, Code(s));
-        Assert.Contains("Zoom", CameraTriage.Ladder(s, CameraTriage.Evaluate(s))[0].Say);
+        var say = CameraTriage.Ladder(s, CameraTriage.Evaluate(s))[0].Say;
+        Assert.Contains("Zoom is using your camera", say);
+        Assert.Contains("Please close it", say);
+    }
+
+    [Fact]
+    public void InUse_TwoApps_NamesBoth()
+    {
+        var s = Ok();
+        s.AppsUsingCamera = new[] { "Zoom", "Teams" };
+        var say = CameraTriage.Ladder(s, CameraTriage.Evaluate(s))[0].Say;
+        Assert.Contains("Zoom and Teams are using your camera", say);
+        Assert.Contains("Please close them", say);
     }
 
     [Fact]

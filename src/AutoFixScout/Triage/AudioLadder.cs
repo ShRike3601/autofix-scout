@@ -24,15 +24,15 @@ public static class AudioLadder
             var def = state.Endpoints.First(e => e.IsDefault);
             var speaker = state.Endpoints.First(e => !e.IsDefault && e.IsActive && e.KindGuess is "Speakers" or "Headphones");
             rungs.Add(new("wrong_output", "ui.open_settings_page", 0,
-                $"Your sound is going to \"{def.Name}\" instead of your speakers. I'll open Sound settings. " +
-                $"Under \"Output\", please choose \"{speaker.Name}\".", "sound"));
+                $"Your sound is being sent to \"{def.Name}\" instead of your speakers. AutoFix Scout will open the \"Sound\" settings. " +
+                $"Under \"Output\", please select \"{speaker.Name}\".", "sound"));
         }
         if (codes.Contains(FindingCode.Muted) || codes.Contains(FindingCode.VolumeVeryLow))
             rungs.Add(new("unmute", "audio.unmute_and_set_volume", 1,
-                "Your sound was turned off or very low. I'd like to turn it up. You can undo this."));
+                "The sound was muted or set very low. AutoFix Scout can turn the volume back on. You can change it again at any time."));
 
         rungs.Add(new("restart_services", "service.restart", 1,
-            "I'd like to restart the part of Windows that plays sound. Windows will ask for permission.", "AudioEndpointBuilder"));
+            "AutoFix Scout can restart the part of Windows that plays sound. Windows will ask for your permission.", "AudioEndpointBuilder"));
         // An uninstalled or vanished sound device leaves no active output; Windows reinstalls it on a hardware scan.
         if (codes.Contains(FindingCode.NoOutputEndpoint) || codes.Contains(FindingCode.NoActiveOutput))
             rungs.Add(Rescan.Rung("audio", "sound device"));
@@ -40,7 +40,7 @@ public static class AudioLadder
         var broken = state.Devices.FirstOrDefault(d => d.ProblemCode is > 0);
         if (broken != null)
             rungs.Add(new("toggle_device", "device.disable_enable", 1,
-                $"Your sound device \"{broken.Name}\" reports a problem. I'd like to switch it off and on again. Windows will ask for permission.",
+                $"Your sound device \"{broken.Name}\" reports a problem. AutoFix Scout can turn it off and on again. Windows will ask for your permission.",
                 broken.InstanceId));
         // T2, last before escalating (spec 8.1): often the real fix for "it broke after an update".
         var rollback = RollbackTargets(state)
@@ -93,8 +93,8 @@ public static class Rescan
 
     public static Rung Rung(string area, string what) =>
         new("rescan", "device.rescan", 1,
-            $"Windows can't see your {what} right now. I'd like to ask Windows to look for it again, like " +
-            "\"Scan for hardware changes\" in Device Manager. Windows will ask for permission.", area);
+            $"Windows cannot detect your {what} at the moment. AutoFix Scout can ask Windows to search for it again. " +
+            "This is the same as \"Scan for hardware changes\" in \"Device Manager\". Windows will ask for your permission.", area);
 }
 
 /// <summary>Shared T2 rule (spec 7): roll back only if the driver changed recently and an older package that fits is on this PC.</summary>
@@ -102,13 +102,16 @@ public static class DriverRules
 {
     public static readonly TimeSpan RecentWindow = TimeSpan.FromDays(30);
 
+    /// <summary>The safety statement every driver change (T2) makes before the person agrees.</summary>
+    private const string SavePoint =
+        "AutoFix Scout will create a save point first and will restore it automatically if anything goes wrong.";
+
     public static Rung? Rollback(string what, string deviceName, string instanceId, DriverStatus? driver) =>
         driver is not null && driver.CanRollBack(RecentWindow)
             ? new Rung("rollback_driver", "driver.rollback", 2,
-                $"The {what} driver for \"{deviceName}\" was updated on {driver.StagedUtc!.Value.ToLocalTime():d MMMM}, " +
-                $"and that's often when problems start. I'd like to put back the previous version ({driver.PreviousVersion}). " +
-                "I'll make a save point first, and if anything goes wrong I'll put everything back automatically. " +
-                "Windows will ask for permission.", instanceId)
+                $"The {what} driver for \"{deviceName}\" was updated on {driver.StagedUtc!.Value.ToLocalTime():d MMMM}. " +
+                $"Problems often begin after such an update. AutoFix Scout can restore the previous version ({driver.PreviousVersion}). " +
+                SavePoint + " Windows will ask for your permission.", instanceId)
             : null;
 
     /// <summary>
@@ -117,9 +120,8 @@ public static class DriverRules
     public static Rung? WindowsUpdate(string what, string deviceName, string instanceId, int? problemCode) =>
         problemCode is > 0 and not 22
             ? new Rung("windows_update_driver", "driver.install_from_windows_update", 2,
-                $"Your {what} device \"{deviceName}\" still reports a problem. I'd like to ask Windows Update for a driver for it. " +
-                "I'll make a save point first, and if anything goes wrong I'll put everything back automatically. " +
-                "This needs the internet, can take a few minutes, and Windows will ask for permission.", instanceId)
+                $"Your {what} device \"{deviceName}\" still reports a problem. AutoFix Scout can ask Windows Update for a driver for it. " +
+                SavePoint + " This requires an internet connection and can take a few minutes. Windows will ask for your permission.", instanceId)
             : null;
 }
 
