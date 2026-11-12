@@ -271,4 +271,9 @@ public enum FindingCode
     // Devices with a Device Manager warning, temporary profile
     HealthDeviceProblem,
     HealthTempProfile,
+    // Network extras
+    NetNoAddress,
+    NetWeakWifi,
+    NetIpConflict,
+    NetMetered,
 }

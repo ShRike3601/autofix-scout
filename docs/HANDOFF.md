@@ -331,7 +331,7 @@ using worktree agents. Each item: probe + triage + tests + live test + real-UI c
       power plan, sleep settings, hibernate/fast startup, wake timers and devices allowed to wake; guided + safe fixes.
 - [x] R3 Any device with an error (Device Manager warning) outside sound/camera/network: listed in the check-up with
       the Windows error code meaning; rescan; driver from Windows Update only for allowed classes, otherwise guided.
-- [ ] R4 Network extras: no address from the router (169.254.x.x) -> renew the address; weak Wi-Fi signal; IP address
+- [x] R4 Network extras: no address from the router (169.254.x.x) -> renew the address; weak Wi-Fi signal; IP address
       conflict; metered connection blocking updates.
 - [x] R5 Temporary user profile ("my files and desktop are gone"): detect, explain, guided recovery; never touches profiles.
 - [x] R6 Keyboard, mouse and touchpad: touchpad switched off, Sticky/Filter Keys on, input device errors.
@@ -342,3 +342,4 @@ Status 2026-11-13 ~00:45 IST: power area (R2) merged (436 tests); NOT yet in the
 - 2026-11-13: owner confirmed the bench touchpad really is switched off (Fn key) — the input area's "touchpad off" finding is correct on hardware. Admin bench (elevated runner): H1-H6 + clock sync + search index + VC++ install + Update reset + chkdsk scan all PASS, machine restored.
 - 2026-11-13 00:33 long admin bench: VC++ install (signed download), Update reset (old folder kept as SoftwareDistribution.afs-<stamp>), chkdsk /scan, DISM RestoreHealth (9.4 min), SFC (1.7 min; it FOUND and repaired corrupt files on the bench), component cleanup (4 min): all PASS. Update services back to normal.
 - R4 network extras: agent hit the usage limit mid-way; its work is in worktree C:\afs-wt\net-extras (branch net-extras). After the 02:20 reset: finish it (or resume the agent), review, test, merge.
+- Roadmap part 2 complete (R1-R8). UI is being reworked in a separate Claude session (owner, 2026-11-13): do not edit src/AutoFixScout.UI from this session; expect a merge from that work.
