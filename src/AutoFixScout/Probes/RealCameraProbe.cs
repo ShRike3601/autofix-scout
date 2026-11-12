@@ -21,6 +21,8 @@ public sealed class CameraState
     public Tri DesktopAppAccess { get; set; } = Tri.Unknown;
     /// <summary>Apps that started using the camera and haven't stopped (spec 11: a heuristic).</summary>
     public IReadOnlyList<string> AppsUsingCamera { get; set; } = new List<string>();
+    /// <summary>Friendly names of apps with their own choice set to "Deny" (Settings > Privacy > Camera, per app).</summary>
+    public IReadOnlyList<string> DeniedApps { get; set; } = new List<string>();
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
 }
 
@@ -44,6 +46,7 @@ public sealed class RealCameraProbe : ICameraProbe
             state.DeviceAccess = Allowed(hklm);
             state.AppAccess = Allowed(hkcu);
             state.DesktopAppAccess = Allowed(desktop);
+            state.DeniedApps = AppConsent.ReadDenied(hkcu);
             state.AppsUsingCamera = InUse(hkcu, packaged: true).Concat(InUse(desktop, packaged: false)).Distinct().ToList();
         }
         catch (Exception ex) { errors.Add($"Consent store: {ex.Message}"); }

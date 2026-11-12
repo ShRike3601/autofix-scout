@@ -364,7 +364,7 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
 - Q1 admin path verified on hardware (2026-11-13 03:55): dummy HKCU Chrome HomepageLocation removed by the elevated executor (exit 0), bad arg rejected (2), cleaned up.
 
 ## Roadmap (part 4, from 2026-11-13 ~04:00 IST)
-- [ ] P1 Per-app privacy (Microphone and Camera areas): one app (Teams, Zoom, a browser) denied microphone or camera
+- [x] P1 Per-app privacy (Microphone and Camera areas): one app (Teams, Zoom, a browser) denied microphone or camera
       access while the global switch is on (HKCU ConsentStore\<capability>\<app or NonPackaged\path> Value=Deny);
       guided Settings step naming the app; no silent changes to privacy choices.
 - [ ] P2 Blue-screen causes (check-up): read the stop code of recent blue screens (event 1001 BugCheck parameters /
