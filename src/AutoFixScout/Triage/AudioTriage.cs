@@ -276,4 +276,6 @@ public enum FindingCode
     NetWeakWifi,
     NetIpConflict,
     NetMetered,
+    // Big space users on a low or full system drive
+    StorageBigUsers,
 }

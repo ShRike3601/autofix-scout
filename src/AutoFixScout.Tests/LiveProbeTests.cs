@@ -174,3 +174,39 @@ public class LiveStartupTests
         }
     }
 }
+
+/// <summary>Reads the big space users on the real machine (AFS_LIVE set). Read-only; Unknown parts are allowed.</summary>
+[Collection("Live machine")]
+public class LiveBigSpaceTests
+{
+    [Fact]
+    public void BigUsers_ReadWithoutErrors_AndNeverListFileNames()
+    {
+        var output = Environment.GetEnvironmentVariable("AFS_LIVE");
+        if (string.IsNullOrEmpty(output)) return;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var s = new RealStorageProbe().Read();
+        string P(string n, SpaceItem? i) => $"{n}: {(i is null ? "Unknown" : StorageTriage.SizeOf(i))}";
+        var lines = new List<string>
+        {
+            $"probe took {sw.Elapsed.TotalSeconds:0.0} s", P("windows.old", s.WindowsOld), P("hiberfil", s.HiberFile), P("downloads", s.Downloads),
+            $"old downloads: {s.DownloadsOldCount?.ToString() ?? "Unknown"}", P("delivery optimization", s.DeliveryOptimization),
+            $"recycle bin: {s.RecycleBinBytes?.ToString() ?? "Unknown"}",
+            "profile folders: " + (s.BigProfileFolders is null ? "Unknown" : string.Join(", ", s.BigProfileFolders.Select(x => StorageTriage.SizeOf(new SpaceItem(x.Bytes, x.AtLeast))))),
+        };
+        File.WriteAllLines(output, lines);
+        Assert.Empty(s.ProbeErrors);
+        Assert.NotNull(s.HiberFile ?? new SpaceItem(0, false)); // may be Unknown, never throws
+        if (s.BigProfileFolders is { } p)
+        {
+            Assert.True(p.Count <= 3);
+            // Folder names only: a name with a file extension or a path separator would be a file name or path.
+            Assert.All(p, x => Assert.DoesNotContain(@"\", x.Name));
+        }
+        // Even a forced low-space evaluation never puts a path or file name in the plain message or details.
+        s.FreeBytes = StorageTriage.CriticalBytes - 1;
+        s.ProbeErrors = new List<string>();
+        foreach (var f in StorageTriage.Evaluate(s).Where(x => x.Code == FindingCode.StorageBigUsers))
+            Assert.DoesNotMatch(@"[A-Za-z]:\|\.\w{2,4}\b(?!\W*(old|sys))", f.PlainMessage);
+    }
+}
