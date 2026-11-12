@@ -39,6 +39,9 @@ public static class CameraTriage
         if (s.AppsUsingCamera.Count > 0)
             return new[] { F(FindingCode.CameraInUse, $"Another app is using the camera: {string.Join(", ", s.AppsUsingCamera)}.", "Consent store: start time without stop time") };
 
+        if (AppDenied(s) is { } denied)
+            return new[] { F(FindingCode.CameraAppDenied, $"Windows blocks the camera for {AppConsent.NameList(denied)}.", "Per-app choice Deny: " + string.Join(", ", denied)) };
+
         // Fail closed: unread privacy switches mean we can't say it looks normal.
         if (new[] { s.DeviceAccess, s.AppAccess, s.DesktopAppAccess }.Contains(Tri.Unknown))
             return new[] { F(FindingCode.ProbeIncomplete, Incomplete, $"privacy device={s.DeviceAccess} apps={s.AppAccess} desktop={s.DesktopAppAccess}") };
@@ -73,6 +76,11 @@ public static class CameraTriage
                     "AutoFix Scout will open the camera privacy settings. " +
                     $"Please set the following to \"On\": {string.Join(", ", BlockedSwitches(s).Select(b => $"\"{b}\""))}.", "camera"));
                 break;
+            case FindingCode.CameraAppDenied:
+                rungs.Add(new("privacy_app", "ui.open_settings_page", 0,
+                    "AutoFix Scout will open the camera privacy settings. " +
+                    $"Please switch on access for {string.Join(" and ", AppDenied(s)!.Take(AppConsent.MaxNamed).Select(a => $"\"{a}\""))}.", "camera"));
+                break;
             case FindingCode.CameraInUse:
                 var many = s.AppsUsingCamera.Count > 1;
                 rungs.Add(new("close_app", "ui.human_step", 0,
@@ -94,6 +102,10 @@ public static class CameraTriage
         rungs.Add(new("shutter", "ui.human_step", 0, ShutterHint));
         return rungs.DistinctBy(r => r.Id).ToList();
     }
+
+    /// <summary>Apps denied one by one, only while every global switch is on.</summary>
+    private static IReadOnlyList<string>? AppDenied(CameraState s) =>
+        s.DeniedApps.Count > 0 && new[] { s.DeviceAccess, s.AppAccess, s.DesktopAppAccess }.All(t => t == Tri.Yes) ? s.DeniedApps : null;
 
     /// <summary>Names as they appear on the Settings page, so the person can find them.</summary>
     private static List<string> BlockedSwitches(CameraState s) =>

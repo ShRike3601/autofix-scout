@@ -55,6 +55,10 @@ public static class MicrophoneTriage
         else if (s.DefaultLevelPercent is < LowLevelPercent)
             findings.Add(F(FindingCode.MicLevelVeryLow, "The microphone level is set very low.", $"Default input level {s.DefaultLevelPercent}%"));
 
+        if (AppDenied(s) is { } denied)
+            findings.Add(F(FindingCode.MicAppDenied, $"Windows blocks the microphone for {AppConsent.NameList(denied)}.",
+                "Per-app choice Deny: " + string.Join(", ", denied)));
+
         if (findings.Count > 0) return findings;
 
         // Fail closed: an unread privacy switch or input level means it cannot be called normal.
@@ -76,6 +80,10 @@ public static class MicrophoneTriage
             rungs.Add(new("privacy", "ui.open_settings_page", 0,
                 "AutoFix Scout will open the microphone privacy settings. " +
                 $"Please set the following to \"On\": {string.Join(", ", BlockedSwitches(s).Select(b => $"\"{b}\""))}.", "microphone"));
+        if (codes.Contains(FindingCode.MicAppDenied) && AppDenied(s) is { } apps)
+            rungs.Add(new("privacy_app", "ui.open_settings_page", 0,
+                "AutoFix Scout will open the microphone privacy settings. " +
+                $"Please switch on access for {string.Join(" and ", apps.Take(AppConsent.MaxNamed).Select(a => $"\"{a}\""))}.", "microphone"));
         if (codes.Contains(FindingCode.MicWrongDefault) && WrongDefault(s).Better is { } better)
             rungs.Add(new("wrong_input", "ui.open_settings_page", 0,
                 "AutoFix Scout will open the \"Sound\" settings. " +
@@ -128,6 +136,10 @@ public static class MicrophoneTriage
             "please try a different USB port or socket.",
         _ => null,
     };
+
+    /// <summary>Apps denied one by one, only while every global switch is on (otherwise the global finding explains it).</summary>
+    private static IReadOnlyList<string>? AppDenied(MicrophoneState s) =>
+        s.DeniedApps.Count > 0 && new[] { s.DeviceAccess, s.AppAccess, s.DesktopAppAccess }.All(t => t == Tri.Yes) ? s.DeniedApps : null;
 
     /// <summary>Names as they appear on the Settings page, so the person can find them.</summary>
     private static List<string> BlockedSwitches(MicrophoneState s) =>

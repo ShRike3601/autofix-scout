@@ -43,6 +43,7 @@ public sealed class RealMicrophoneProbe : IMicrophoneProbe
             state.DeviceAccess = Allowed(hklm);
             state.AppAccess = Allowed(hkcu);
             state.DesktopAppAccess = Allowed(desktop);
+            state.DeniedApps = AppConsent.ReadDenied(hkcu);
         }
         catch (Exception ex) { errors.Add($"Consent store: {ex.Message}"); }
         return state;

@@ -300,4 +300,7 @@ public enum FindingCode
     // Security: browser policies
     SecurityBrowserPolicy,
     SecurityBrowserPolicyManaged,
+    // Per-app privacy choices (Microphone and Camera)
+    MicAppDenied,
+    CameraAppDenied,
 }
