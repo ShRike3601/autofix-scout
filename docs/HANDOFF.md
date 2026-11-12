@@ -339,3 +339,4 @@ using worktree agents. Each item: probe + triage + tests + live test + real-UI c
 - [ ] R8 Admin bench run (`C:\afs-bench\jobs\01-health-long.ps1`) as soon as the AFS-Bench-Elevated task exists.
 
 Status 2026-11-13 ~00:45 IST: power area (R2) merged (436 tests); NOT yet in the UI/router (add a "Battery, sleep and power" button + router words, TestQuestion from PowerFlow). Input agent (R6) was paused at the 80% stop: continue in worktree C:\afs-wt\input-area (branch input-area; uncommitted work may be there), then merge and wire the UI.
+- 2026-11-13: owner confirmed the bench touchpad really is switched off (Fn key) — the input area's "touchpad off" finding is correct on hardware. Admin bench (elevated runner): H1-H6 + clock sync + search index + VC++ install + Update reset + chkdsk scan all PASS, machine restored.
