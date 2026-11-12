@@ -168,5 +168,13 @@ public enum FindingCode
     CameraError,
     CameraPrivacyOff,
     CameraInUse,
+    // Microphone
+    NoMicrophone,
+    NoActiveMicrophone,
+    MicDeviceError,
+    MicPrivacyOff,
+    MicWrongDefault,
+    MicMuted,
+    MicLevelVeryLow,
     LooksNormal
 }
