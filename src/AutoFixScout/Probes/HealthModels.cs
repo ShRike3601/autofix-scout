@@ -1,3 +1,4 @@
+using AutoFixScout.Triage;
 using AutoFixScout.Repair;
 
 namespace AutoFixScout.Probes;
@@ -82,6 +83,9 @@ public sealed class HealthState
     public IReadOnlyList<DateTime> RestorePoints { get; set; } = new List<DateTime>();
     /// <summary>Graphics driver resets in the last 14 days (Display event 4101, LiveKernelEvent 141 or 117).</summary>
     public int GraphicsResets { get; set; }
+
+    /// <summary>USB disconnects, hub errors and selective suspend (last 3 days); null = could not be read.</summary>
+    public UsbState? Usb { get; set; }
 
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
 }

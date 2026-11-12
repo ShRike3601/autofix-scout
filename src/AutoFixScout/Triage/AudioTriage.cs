@@ -319,4 +319,7 @@ public enum FindingCode
     InstallerServiceOff,
     InstallFailures,
     InstallBlockedByRestart,
+    // USB devices disconnecting (full check-up)
+    HealthUsbDisconnects,
+    HealthUsbErrors,
 }

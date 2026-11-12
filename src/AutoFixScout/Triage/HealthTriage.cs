@@ -127,6 +127,22 @@ public static class HealthTriage
         if (s.GraphicsResets > 0)
             f.Add(F(FindingCode.HealthGraphicsResets, $"The graphics driver has stopped responding and been reset {Times(s.GraphicsResets)} in the last two weeks. This can cause black or flickering screens and closing programs.",
                 $"Display 4101 and LiveKernelEvent 141/117 in 14 days: {s.GraphicsResets}"));
+        if (s.Usb is { } usb)
+        {
+            if (usb.Churn.Count > 0)
+            {
+                var names = usb.Churn.Select(c => c.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                f.Add(F(FindingCode.HealthUsbDisconnects,
+                    $"The USB device \"{names[0]}\" has connected and disconnected {Times(usb.Churn[0].Count)} in the last three days." +
+                    (names.Count > 1 ? $" {names.Count - 1} other USB {(names.Count == 2 ? "device has" : "devices have")} done the same." : "") +
+                    " A loose cable, a weak port or an unpowered hub is a common cause.",
+                    string.Join("; ", usb.Churn.Select(c => $"{c.Name} class={(c.PnpClass.Length > 0 ? c.PnpClass : "unknown")} events={c.Count}"))));
+            }
+            if (usb.HubErrors >= UsbHealth.ErrorThreshold)
+                f.Add(F(FindingCode.HealthUsbErrors,
+                    $"Windows has recorded {usb.HubErrors} errors from the USB ports or hubs in the last three days, which points to a USB device or cable that does not connect reliably.",
+                    $"USB hub and controller errors and warnings in 3 days: {usb.HubErrors}; device events: {usb.PnpEvents}"));
+        }
         // Recent changes are only a lead when something else is wrong; a restart that is waiting is the result of a change, not a problem.
         if (s.RecentChanges.Count > 0 && f.Any(x => x.Code != FindingCode.HealthRestartPending))
             f.Add(F(FindingCode.HealthRecentChanges, RecentChangesSentence(s),
@@ -355,6 +371,8 @@ public static class HealthTriage
                 "If Windows Update offers no display driver, please get the newest graphics driver from the support web site of the computer's maker, or from the web site of NVIDIA, AMD or Intel, depending on the graphics card. " +
                 "Run the installer, then restart the computer. AutoFix Scout does not install drivers from other sources."));
         }
+        if (codes.Contains(FindingCode.HealthUsbDisconnects) || codes.Contains(FindingCode.HealthUsbErrors))
+            AddUsbRungs(s, r);
         if (codes.Contains(FindingCode.HealthRecentChanges))
             AddRecentChangeRungs(s, r);
         if (systemRepair) { r.Add(Dism); r.Add(Sfc); }
@@ -362,6 +380,25 @@ public static class HealthTriage
             r.Add(new("restart_pc", "ui.human_step", 0,
                 "Windows needs a restart to finish installing changes. Please save your work, then select \"Start\", then \"Power\", then \"Restart\". After the restart, please open AutoFix Scout again."));
         return r;
+    }
+
+    /// <summary>Human steps, the selective suspend setting (guided, never changed by AutoFix Scout), a driver update, and a hardware rescan.</summary>
+    private static void AddUsbRungs(HealthState s, List<Rung> r)
+    {
+        r.Add(new("usb_port_cable", "ui.human_step", 0,
+            "Please unplug the USB device, wait ten seconds, and plug it into a different USB port directly on the computer. Avoid USB hubs that have no power supply of their own, " +
+            "and try a different cable, because a damaged or loose cable is a common cause of a device that keeps disconnecting."));
+        if (s.Usb?.SelectiveSuspendOn == true)
+            r.Add(new("usb_selective_suspend_off", "ui.human_step", 0,
+                "USB selective suspend lets Windows switch off a USB port to save power, which can make a device disconnect. To turn it off, open the Windows search, type \"Control Panel\", open \"Hardware and Sound\", \"Power Options\", " +
+                "select \"Change plan settings\" for the plan in use, then \"Change advanced power settings\". Open \"USB settings\", then \"USB selective suspend setting\", and set it to \"Disabled\". Windows may ask for your permission."));
+        r.Add(new("usb_driver_updates", "ui.open_settings_page", 0,
+            "AutoFix Scout will open \"Windows Update\". Please select \"Check for updates\", then \"Advanced options\", then \"Optional updates\", and install any chipset or USB driver offered.",
+            "windowsupdate"));
+        if (!r.Any(x => x.Id == "rescan"))
+            r.Add(new("rescan", "device.rescan", 1,
+                "AutoFix Scout can ask Windows to search for hardware changes again. " +
+                "This is the same as \"Scan for hardware changes\" in \"Device Manager\". Windows will ask for your permission.", "devices"));
     }
 
     /// <summary>Scan for hardware changes (any class, nothing is changed), then guided steps only: no driver of any device is switched or changed.</summary>

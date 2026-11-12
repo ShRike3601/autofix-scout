@@ -44,7 +44,7 @@ public static class PowerFlow
         return k?.GetValue(name) is int i ? i : null;
     }
 
-    private static string Powercfg(string args)
+    internal static string Powercfg(string args)
     {
         var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "powercfg.exe"), args)
         { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
