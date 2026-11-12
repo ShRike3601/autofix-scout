@@ -1,0 +1,83 @@
+using AutoFixScout.Probes;
+using AutoFixScout.Triage;
+using Xunit;
+
+namespace AutoFixScout.Tests;
+
+/// <summary>Reads the real machine. Runs only when AFS_LIVE is set (test bench); writes what it found to AFS_LIVE (a file path).</summary>
+public class LiveProbeTests
+{
+    [Fact]
+    public void HealthProbe_ReadsThisMachine()
+    {
+        var output = Environment.GetEnvironmentVariable("AFS_LIVE");
+        if (string.IsNullOrEmpty(output)) return;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var s = new RealHealthProbe().Read();
+        var f = HealthTriage.Evaluate(s);
+        var lines = new List<string> { $"probe took {sw.Elapsed.TotalSeconds:0.0} s", "errors: " + string.Join(" | ", s.ProbeErrors),
+            $"clock offset {s.ClockOffsetSeconds:0.0}; bluescreens {s.BlueScreens}; shutdowns {s.UnexpectedShutdowns}; disk {s.DiskErrors}; whea {s.HardwareErrors}; updatefail {s.UpdateFailures}",
+            "crashes: " + string.Join("; ", s.Crashes.Select(c => $"{c.App} x{c.Count} {c.Module} {c.ExceptionCode} {c.Cause}")),
+            "hangs: " + string.Join("; ", s.Hangs.Select(h => $"{h.Key} x{h.Value}")),
+            "runtime: " + string.Join("; ", s.RuntimeErrors), "failing services: " + string.Join("; ", s.FailingServices),
+            "services: " + string.Join(", ", s.Services.Select(x => $"{x.Name}:{x.Status}/{x.StartType}")),
+            "store broken: " + string.Join("; ", s.BrokenStoreApps.Select(a => a.FullName + ":" + a.Status)),
+            $"winsock 3rd party: {string.Join("; ", s.ThirdPartyWinsock)}; path missing: {string.Join("; ", s.MissingPathEntries)}; reboot {s.RebootPending}" };
+        lines.AddRange(f.Select(x => $"FINDING {x.Code}: {x.PlainMessage} [{x.TechnicalDetail}]"));
+        lines.AddRange(HealthTriage.Ladder(s, f).Select(r => $"RUNG {r.Id} {r.ActionId}({r.Arg})"));
+        File.WriteAllLines(output, lines);
+        Assert.Empty(s.ProbeErrors);
+    }
+}
+
+/// <summary>Non-admin repairs on the real machine (AFS_LIVE set). Each one creates its fault and always puts things back.</summary>
+public class LiveUserRepairTests
+{
+    private static bool Live => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AFS_LIVE"));
+    private const string IS = @"Software\Microsoft\Windows\CurrentVersion\Internet Settings";
+
+    [Fact]
+    public async Task DeadProxy_IsFoundAndSwitchedOff()
+    {
+        if (!Live) return;
+        using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(IS, true)!;
+        var pe = k.GetValue("ProxyEnable"); var ps = k.GetValue("ProxyServer");
+        try
+        {
+            k.SetValue("ProxyEnable", 1, Microsoft.Win32.RegistryValueKind.DWord);
+            k.SetValue("ProxyServer", "127.0.0.1:9");
+            var s = new RealHealthProbe().Read();
+            var f = HealthTriage.Evaluate(s);
+            Assert.Contains(f, x => x.Code == FindingCode.HealthDeadProxy);
+            var rung = HealthTriage.Ladder(s, f).First(r => r.ActionId == "network.reset_user_proxy");
+            var (ok, _) = await FixActions.RunAsync(rung);
+            Assert.True(ok);
+            Assert.DoesNotContain(HealthTriage.Evaluate(new RealHealthProbe().Read()), x => x.Code == FindingCode.HealthDeadProxy);
+        }
+        finally
+        {
+            k.SetValue("ProxyEnable", pe ?? 0, Microsoft.Win32.RegistryValueKind.DWord);
+            if (ps is string v) k.SetValue("ProxyServer", v); else k.DeleteValue("ProxyServer", false);
+        }
+    }
+
+    [Fact]
+    public async Task StoreApp_ReregistersAndStaysOk()
+    {
+        if (!Live) return;
+        var (code, name) = AutoFixScout.Repair.UserRepairs.RunPowerShell("(Get-AppxPackage Microsoft.WindowsCalculator).PackageFullName");
+        Assert.Equal(0, code);
+        var (ok, detail) = await FixActions.RunAsync(new Rung("t", "apps.reregister", 0, "", name.Trim()));
+        Assert.True(ok, detail);
+        Assert.Contains("status Ok", detail);
+    }
+
+    [Fact]
+    public async Task Explorer_RestartsAndComesBack()
+    {
+        if (!Live) return;
+        var (ok, _) = await FixActions.RunAsync(new Rung("t", "shell.restart_explorer", 0, ""));
+        Assert.True(ok);
+        Assert.NotEmpty(System.Diagnostics.Process.GetProcessesByName("explorer"));
+    }
+}

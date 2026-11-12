@@ -77,10 +77,10 @@ public static class UserRepairs
         if (!IsValidPackageFullName(fullName)) return (false, "rejected package name");
         // The name is passed as a separate argument ($args[0]) to a fixed script.
         const string Script =
-            "$p = Get-AppxPackage | Where-Object { $_.PackageFullName -eq $args[0] }; " +
+            "$n = $args[0]; $p = Get-AppxPackage | Where-Object { $_.PackageFullName -eq $n }; " +
             "if (-not $p) { Write-Output 'not installed'; exit 3 }; " +
             "Add-AppxPackage -DisableDevelopmentMode -Register (Join-Path $p.InstallLocation 'AppxManifest.xml') -ErrorAction Stop; " +
-            "$q = Get-AppxPackage | Where-Object { $_.PackageFullName -eq $args[0] }; Write-Output ('status ' + $q.Status); exit 0";
+            "$q = Get-AppxPackage | Where-Object { $_.PackageFullName -eq $n }; Write-Output ('status ' + $q.Status); exit 0";
         var (code, output) = RunPowerShell(Script, fullName);
         return (code == 0, $"re-register {fullName}: exit {code} {output.Trim()}");
     }

@@ -4,6 +4,7 @@
 // check the machine is healthy, then ALWAYS restore. Writes a Markdown report.
 //
 // Usage (elevated, AFS-TESTBENCH only):  AutoFixScout.TestBench.exe [sound] [network] [camera] [--out <dir>]
+//                                         AutoFixScout.TestBench.exe health [--long] [--only H1-hosts,...] (see HealthBench.cs)
 using System.Diagnostics;
 using System.ServiceProcess;
 using System.Text;
@@ -23,6 +24,7 @@ if (!Environment.MachineName.Equals(BenchHost, StringComparison.OrdinalIgnoreCas
 
 var outIdx = Array.IndexOf(args, "--out");
 var outDir = outIdx >= 0 && outIdx + 1 < args.Length ? args[outIdx + 1] : Path.Combine(AppContext.BaseDirectory, "results");
+if (args.Contains("health")) return await HealthBench.RunAsync(args, outDir);
 var areas = args.Select(a => a.ToLowerInvariant()).Where(a => a is "sound" or "network" or "camera" or "drivers").ToHashSet();
 if (areas.Count == 0) areas = new() { "sound", "network", "camera" };
 // drivers: the T2 save point tests (steps 5-6). Needs a newer INF for Intel Display Audio to stage (see DriverTests).

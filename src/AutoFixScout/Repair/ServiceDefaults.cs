@@ -8,14 +8,14 @@ internal static class ServiceDefaults
 {
     public enum Start { Automatic, Manual }
 
-    public sealed record Default(string Name, string DisplayName, Start Start, bool ShouldRun, string Area);
+    public sealed record Default(string Name, string DisplayName, Start Start, bool ShouldRun, string Area, bool Delayed = false);
 
     public static readonly IReadOnlyList<Default> All = new Default[]
     {
         new("Dhcp", "DHCP Client", Start.Automatic, true, "internet"),
         new("Dnscache", "DNS Client", Start.Automatic, true, "internet"),
         new("nsi", "Network Store Interface Service", Start.Automatic, true, "internet"),
-        new("NlaSvc", "Network Location Awareness", Start.Automatic, true, "internet"),
+        new("NlaSvc", "Network Location Awareness", Start.Manual, false, "internet"),
         new("Wcmsvc", "Windows Connection Manager", Start.Automatic, true, "internet"),
         new("BFE", "Base Filtering Engine", Start.Automatic, true, "internet"),
         new("mpssvc", "Windows Defender Firewall", Start.Automatic, true, "security"),
@@ -30,7 +30,7 @@ internal static class ServiceDefaults
         new("ShellHWDetection", "Shell Hardware Detection", Start.Automatic, true, "devices"),
         new("AudioSrv", "Windows Audio", Start.Automatic, true, "sound"),
         new("AudioEndpointBuilder", "Windows Audio Endpoint Builder", Start.Automatic, true, "sound"),
-        new("WSearch", "Windows Search", Start.Automatic, true, "search"),
+        new("WSearch", "Windows Search", Start.Automatic, true, "search", Delayed: true),
         new("Spooler", "Print Spooler", Start.Automatic, true, "printing"),
         new("W32Time", "Windows Time", Start.Manual, false, "clock"),
         new("wuauserv", "Windows Update", Start.Manual, false, "updates"),

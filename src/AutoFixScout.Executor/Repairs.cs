@@ -158,7 +158,7 @@ public static class Repairs
         if (ServiceDefaults.Find(name) is not { } d) return 2;
         using (var sc = new ServiceController(d.Name))
             Backup($"service-{d.Name}", $"{d.Name} start={sc.StartType} status={sc.Status}\n");
-        var (code, _) = Tool("sc.exe", null, 1, "config", d.Name, "start=", d.Start == ServiceDefaults.Start.Automatic ? "auto" : "demand");
+        var (code, _) = Tool("sc.exe", null, 1, "config", d.Name, "start=", d.Start == ServiceDefaults.Start.Manual ? "demand" : d.Delayed ? "delayed-auto" : "auto");
         if (code != 0) return 1;
         if (d.ShouldRun) StartService(d.Name);
         return 0;

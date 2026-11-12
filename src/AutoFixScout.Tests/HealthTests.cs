@@ -176,6 +176,13 @@ public class HealthTests
     }
 
     [Fact]
+    public void UpdateErrorCodes_ReadAsHex()
+    {
+        Assert.Equal("0x80073d02", RealHealthProbe.HexCode("-2147009278"));
+        Assert.Equal("0x80240016", RealHealthProbe.HexCode("0x80240016"));
+    }
+
+    [Fact]
     public void ProxyList_Parses()
     {
         Assert.Equal(new[] { ("127.0.0.1", 9) }, RealHealthProbe.ParseProxyList("127.0.0.1:9"));

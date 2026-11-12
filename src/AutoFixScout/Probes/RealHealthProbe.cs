@@ -85,13 +85,21 @@ public sealed class RealHealthProbe : IHealthProbe
             .Distinct(StringComparer.OrdinalIgnoreCase).Take(10).ToList();
     }
 
+    private static readonly HashSet<string> TransientUpdateErrors = new() { "0x80240016", "0x8024000b", "0x80073d02", "0x80240022" };
+
+    /// <summary>The event stores the HRESULT as a signed number (-2147009278) or text; returns "0x80073d02".</summary>
+    public static string HexCode(string? value) =>
+        int.TryParse(value, out var n) ? $"0x{unchecked((uint)n):x8}" : (value ?? "").Trim().ToLowerInvariant();
+
     private static void ReadSystemEvents(HealthState s)
     {
         s.BlueScreens = Query("System", "(Provider[@Name='Microsoft-Windows-WER-SystemErrorReporting'] or Provider[@Name='BugCheck']) and EventID=1001").Count();
         s.UnexpectedShutdowns = Query("System", "Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=41").Count();
-        s.DiskErrors = Query("System", "(Provider[@Name='disk'] and (EventID=7 or EventID=51 or EventID=153)) or (Provider[@Name='Ntfs'] and (EventID=55 or EventID=98)) or (Provider[@Name='Microsoft-Windows-Ntfs'] and (EventID=55 or EventID=98))").Count();
+        s.DiskErrors = Query("System", "(Level=1 or Level=2 or Level=3) and ((Provider[@Name='disk'] and (EventID=7 or EventID=51 or EventID=153)) or (Provider[@Name='Ntfs'] and (EventID=55 or EventID=98)) or (Provider[@Name='Microsoft-Windows-Ntfs'] and (EventID=55 or EventID=98)))").Count();
         s.HardwareErrors = Query("System", "Provider[@Name='Microsoft-Windows-WHEA-Logger'] and (Level=1 or Level=2)").Count();
-        s.UpdateFailures = Query("System", "Provider[@Name='Microsoft-Windows-WindowsUpdateClient'] and EventID=20").Count();
+        // Transient codes ("another installation in progress", "cancelled", "app in use") are not failures.
+        s.UpdateFailures = Query("System", "Provider[@Name='Microsoft-Windows-WindowsUpdateClient'] and EventID=20")
+            .Count(e => !TransientUpdateErrors.Contains(HexCode(Prop(e, 0))));
         s.FailingServices = Query("System", "Provider[@Name='Service Control Manager'] and (EventID=7000 or EventID=7009 or EventID=7023 or EventID=7031 or EventID=7034)")
             .Select(e => Prop(e, 0) ?? "").Where(n => n.Length > 0)
             .GroupBy(n => n, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() >= 3)
