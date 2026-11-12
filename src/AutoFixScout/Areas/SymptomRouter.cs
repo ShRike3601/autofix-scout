@@ -29,6 +29,8 @@ public static class SymptomRouter
         ["power"] = new("power", "Battery, sleep and power", "This sounds like a problem with the battery, sleep or power settings."),
         ["input"] = new("input", "Keyboard, mouse or touchpad", "This sounds like a problem with the keyboard, mouse or touchpad."),
         ["scanner"] = new("scanner", "Scanner not working", "This sounds like a problem with the scanner."),
+        ["install"] = new("install", "A program will not install", "This sounds like a problem with installing a program."),
+        ["notifications"] = new("notifications", "Notifications are missing", "This sounds like a problem with notifications."),
         ["health"] = new("health", "Full computer check-up", "AutoFix Scout will check the whole computer for common software problems."),
     };
 
@@ -46,6 +48,8 @@ public static class SymptomRouter
                    new[] { "camera", "webcam", "video call", "cam " }),
         ("network", new[] { "no internet", "not connecting", "can't connect", "cannot connect", "cant connect", "no wifi", "wi-fi not", "wifi not", "pages not loading", "websites not", "dns", "limited connectivity" },
                     new[] { "internet", "wifi", "wi-fi", "network", "online", "connection", "router", "ethernet", "website", "websites", "browser", "offline" }),
+        ("install", new[] { "will not install", "won't install", "wont install", "cannot install", "can't install", "installation failed", "install failed", "installer", "error 1603", "setup failed" }, new[] { "install", "installing", "installer", "setup", ".msi" }),
+        ("notifications", new[] { "no notifications", "notifications not", "not getting notifications", "do not disturb", "focus assist", "notification sound" }, new[] { "notification", "notifications", "alerts" }),
         ("onedrive", new[] { "onedrive", "one drive", "not syncing", "sync pending", "files not uploading" }, new[] { "onedrive", "sync", "syncing" }),
         ("office", new[] { "microsoft office", "ms office", " word ", "excel", "outlook", "powerpoint", "word won", "excel won", "outlook won", "outlook not", "word keeps", "excel keeps", "outlook keeps" },
                    new[] { "office", "word", "excel", "outlook", "powerpoint", "onenote" }),

@@ -315,4 +315,8 @@ public enum FindingCode
     NotificationsOff,
     AppNotificationsOff,
     DoNotDisturbOn,
+    // Programs will not install (Windows Installer)
+    InstallerServiceOff,
+    InstallFailures,
+    InstallBlockedByRestart,
 }

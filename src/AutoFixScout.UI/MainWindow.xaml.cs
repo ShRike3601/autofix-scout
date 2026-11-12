@@ -340,6 +340,8 @@ public partial class MainWindow : Window, IFixHost
             "input" => OnInputClicked,
             "office" => OnOfficeClicked,
             "onedrive" => OnOneDriveClicked,
+            "install" => OnInstallClicked,
+            "notifications" => OnNotificationsClicked,
             "program" => OnProgramClosingClicked,
             "storage" => OnStorageClicked,
             "update" => OnUpdateClicked,
@@ -423,6 +425,7 @@ public partial class MainWindow : Window, IFixHost
     private async void OnStoreClicked(object sender, RoutedEventArgs e) => await RunAppsAsync(AppsFocus.Store);
     private async void OnOfficeClicked(object sender, RoutedEventArgs e) => await RunAppsAsync(AppsFocus.Office);
     private async void OnOneDriveClicked(object sender, RoutedEventArgs e) => await RunAppsAsync(AppsFocus.OneDrive);
+private async void OnInstallClicked(object sender, RoutedEventArgs e) => await RunAppsAsync(AppsFocus.Install);    private async void OnNotificationsClicked(object sender, RoutedEventArgs e) =>        await RunFlowAsync(Areas.ShellFlow.Topic, "notifications", () => Areas.ShellFlow.DiagnoseAsync(notificationFocus: true),            () => AskAsync(Areas.ShellFlow.NotificationTestQuestion));
 
     private async void OnSecurityClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.SecurityFlow.Topic, Areas.SecurityFlow.What, Areas.SecurityFlow.DiagnoseAsync,

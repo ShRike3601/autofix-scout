@@ -383,7 +383,7 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
 - [ ] F1 Wi-Fi keeps dropping (internet check): frequent disconnects (WLAN-AutoConfig 8003/8001 counts), adapter
       power saving ("Allow the computer to turn off this device"), roaming aggressiveness; guided steps; never change
       the network live in tests.
-- [ ] F2 Programs will not install (Store/apps area): Windows Installer service (msiserver) disabled, MsiInstaller
+- [x] F2 Programs will not install (Store/apps area): Windows Installer service (msiserver) disabled, MsiInstaller
       failure events (11708/1033 with error codes explained), pending restart blocking installs, low space; fixes:
       service default, restart guide, clear the user's temp (exists).
 - [x] F3 Notifications missing (Start menu/taskbar area): notifications switched off globally or per app, Do not
@@ -391,3 +391,4 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
       global toggle if it can be done safely.
 - [ ] F4 USB devices disconnecting (check-up): Kernel-PnP / USB hub errors and frequent device add/remove events, USB
       selective suspend on battery; guided power setting step, replug/hub advice.
+- F2/F3 entries: OnInstallClicked (Apps, Install focus) and OnNotificationsClicked (Shell, notification focus) in MainWindow.xaml.cs; search routes 'install' and 'notifications'. Tiles: UI session. Bench note: the full check-up/install focus reports a pending restart, most likely from tonight's SFC repair; a restart clears it.
