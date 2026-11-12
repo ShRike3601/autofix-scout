@@ -462,7 +462,22 @@ public partial class MainWindow : Window, IFixHost
             Process.Start(new ProcessStartInfo("notepad.exe", $"\"{_lastReportPath}\""));
     }
 
-    private void OnSettingsClicked(object sender, RoutedEventArgs e) => Stub("Settings are");
+    /// <summary>History and reports: version, recent checks, and the folder with reports and saved settings.</summary>
+    private async void OnSettingsClicked(object sender, RoutedEventArgs e)
+    {
+        IReadOnlyList<SessionLog.SessionSummary> recent;
+        try { using var db = new SessionLog(SessionLog.DefaultPath); recent = db.Recent(4); }
+        catch (Exception) { recent = Array.Empty<SessionLog.SessionSummary>(); }
+        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "unknown";
+        SetTopic(null);
+        var open = await ShowStepAsync(HistoryText.Build(version, recent), "Open the reports folder", "Close");
+        if (open)
+        {
+            var dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AutoFixScout");
+            System.IO.Directory.CreateDirectory(dir);
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{dir}\""));
+        }
+        ShowHome();
+    }
 
-    private void Stub(string what) => MessageBox.Show(this, $"{what} not available in this version of AutoFix Scout.", AppName);
 }

@@ -144,6 +144,21 @@ public sealed class SessionLog : IDisposable
                 _ => "abandoned",
             }));
 
+
+    public sealed record SessionSummary(DateTime StartedUtc, string Symptom, string? Outcome);
+
+    /// <summary>The most recent sessions, newest first, for the "History" screen.</summary>
+    public IReadOnlyList<SessionSummary> Recent(int count)
+    {
+        using var cmd = new SqliteCommand("SELECT started_at, symptom, outcome FROM session ORDER BY started_at DESC LIMIT $n", _db);
+        cmd.Parameters.AddWithValue("$n", count);
+        using var r = cmd.ExecuteReader();
+        var list = new List<SessionSummary>();
+        while (r.Read())
+            list.Add(new SessionSummary(DateTime.Parse(r.GetString(0), null, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal),
+                r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2)));
+        return list;
+    }
     /// <summary>Spec 15: "delete my data".</summary>
     public void DeleteAll() => Exec("DELETE FROM undo_record; DELETE FROM step_log; DELETE FROM device_snapshot; DELETE FROM session;");
 

@@ -321,3 +321,4 @@ PATH, WinHTTP, Winsock, services, VC++, search index, component cleanup, firewal
 OneDrive reset and WSReset (bench has no OneDrive/Office; WSReset opens the Store window).
 UI note: "Apply fix" on an admin step leaves a UAC prompt that nobody can answer when unattended; it blocks
 screenshots until it times out. Drive admin steps through the TestBench (elevated) instead of the UI.
+- History screen shows the assembly version (1.0.0); pass `-p:Version=<tag version>` to `dotnet publish` in CI so it matches the installer.
