@@ -168,5 +168,17 @@ public enum FindingCode
     CameraError,
     CameraPrivacyOff,
     CameraInUse,
-    LooksNormal
+    LooksNormal,
+    // Printer
+    PrintSpoolerStopped,
+    NoPrinter,
+    DefaultPrinterVirtual,
+    PrinterOffline,
+    PrinterPaused,
+    PrinterError,
+    PrintJobsStuck,
+    // Display
+    DisplayAdapterError,
+    ExternalDisplayNotShown,
+    BrightnessVeryLow,
 }
