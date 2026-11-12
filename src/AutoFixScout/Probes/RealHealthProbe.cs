@@ -45,6 +45,23 @@ public sealed class RealHealthProbe : IHealthProbe
         return s;
     }
 
+    /// <summary>Only the proxy settings and the hosts file, read the same way as in <see cref="Read"/> (used by the security check).</summary>
+    public static HealthState ReadHostsAndProxy()
+    {
+        var s = new HealthState();
+        var errors = new List<string>();
+        void Part(string name, Action read)
+        {
+            try { read(); }
+            catch (Exception ex) { errors.Add($"{name}: {ex.Message}"); }
+        }
+        Part("proxy", () => ReadUserProxy(s));
+        Part("system proxy", () => ReadWinHttpProxy(s));
+        Part("hosts file", () => s.HostsHijacks = HostsFile.Suspicious(File.ReadAllLines(HostsPath)).Select(e => new HostsHijack(e.Host, e.Ip)).ToList());
+        s.ProbeErrors = errors;
+        return s;
+    }
+
     public static string HostsPath => Path.Combine(Environment.SystemDirectory, "drivers", "etc", "hosts");
 
     // ---- event logs ----

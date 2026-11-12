@@ -147,4 +147,38 @@ public static class UserRepairs
             Process.Start(new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe")) { UseShellExecute = true });
         return (true, $"icon/thumbnail cache files removed: {deleted}");
     }
+
+    // ---- Microsoft Defender (works without admin rights; checked on the test bench) ----
+
+    /// <summary>Defender's command-line tool at its fixed location (64-bit Program Files, also from a 32-bit process).</summary>
+    public static string MpCmdRunPath => Path.Combine(
+        Environment.GetEnvironmentVariable("ProgramW6432") ?? Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+        "Windows Defender", "MpCmdRun.exe");
+
+    private static (int Code, string Output) MpCmdRun(int timeoutMinutes, params string[] args)
+    {
+        if (!File.Exists(MpCmdRunPath)) return (-1, "MpCmdRun.exe not found");
+        var psi = new ProcessStartInfo(MpCmdRunPath) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var a in args) psi.ArgumentList.Add(a);
+        using var p = Process.Start(psi)!;
+        var stdout = p.StandardOutput.ReadToEndAsync();
+        var stderr = p.StandardError.ReadToEndAsync();
+        if (!p.WaitForExit(TimeSpan.FromMinutes(timeoutMinutes))) { try { p.Kill(true); } catch { } return (-1, "timed out"); }
+        return (p.ExitCode, (stdout.Result + stderr.Result).Replace("\0", "").Trim());
+    }
+
+    /// <summary>security.update_signatures: MpCmdRun -SignatureUpdate (fixed arguments).</summary>
+    public static (bool Ok, string Detail) UpdateDefenderSignatures()
+    {
+        var (code, output) = MpCmdRun(15, "-SignatureUpdate");
+        return (code == 0, $"MpCmdRun -SignatureUpdate exit {code}: {output}");
+    }
+
+    /// <summary>security.quick_scan: MpCmdRun -Scan -ScanType 1 (quick scan). Exit 2 = threats found; Defender handles them itself.</summary>
+    public static (bool Ok, string Detail) DefenderQuickScan()
+    {
+        var (code, output) = MpCmdRun(60, "-Scan", "-ScanType", "1");
+        var verdict = code switch { 0 => "no threats found", 2 => "threats found and handed to Microsoft Defender", _ => "scan failed" };
+        return (code is 0 or 2, $"MpCmdRun quick scan exit {code} ({verdict}): {output}");
+    }
 }

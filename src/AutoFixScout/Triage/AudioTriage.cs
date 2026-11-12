@@ -235,4 +235,12 @@ public enum FindingCode
     DisplayAdapterError,
     ExternalDisplayNotShown,
     BrightnessVeryLow,
+    // Security and unwanted software
+    SecurityNoAntivirus,
+    SecurityRealTimeOff,
+    SecuritySignaturesOld,
+    SecurityFirewallOff,
+    SecurityUacOff,
+    SecuritySmartScreenOff,
+    SecuritySuspiciousStartup,
 }

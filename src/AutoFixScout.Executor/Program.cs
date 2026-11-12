@@ -59,6 +59,8 @@ public static class Program
                 (_, "runtime.install_vcredist") when Repairs.RuntimeArchitectures.Contains(args[1]) => Repairs.InstallVcRedist(args[1]),
                 (_, "disk.scan") when Repairs.IsSystemDrive(args[1]) => Repairs.DiskScan(args[1]),
                 (_, "storage.cleanup_components") when args[1] == Repairs.System => Repairs.CleanupComponents(),
+                (_, "security.firewall_on") when args[1] == Repairs.System => Repairs.FirewallOn(),
+                (_, "security.uac_on") when args[1] == Repairs.System => Repairs.UacOn(),
                 _ => 2,
             };
         }

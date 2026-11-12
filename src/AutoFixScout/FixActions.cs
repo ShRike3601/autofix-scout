@@ -16,7 +16,7 @@ public static class FixActions
         "service.restart", "device.disable_enable", "device.enable", "network.reset_dns", "device.rescan", "service.set_manual", "printer.clear_queue", "printer.set_online",
         "repair.dism", "repair.sfc", "time.resync", "network.reset_winhttp_proxy", "network.clean_hosts", "service.restore_default",
         "system.repair_path", "network.reset_winsock", "update.reset_components", "search.rebuild_index", "runtime.install_vcredist", "disk.scan",
-        "storage.cleanup_components",
+        "storage.cleanup_components", "security.firewall_on", "security.uac_on",
     };
 
     public static async Task<(bool Ok, string Detail)> RunAsync(Rung rung)
@@ -44,6 +44,8 @@ public static class FixActions
                         "display" => "ms-settings:display",
                         "apps" => "ms-settings:appsfeatures",
                         "bluetooth" => "ms-settings:bluetooth",
+                        "windowsdefender" => "windowsdefender:",
+                        "windowsdefender_appbrowser" => "windowsdefender://appbrowser",
                         _ => throw new ArgumentException(rung.Arg),
                     };
                     Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
@@ -85,6 +87,11 @@ public static class FixActions
                 case "startup.disable":
                     // The person's own Run key or Startup folder only, written like Task Manager does; no admin.
                     return await Task.Run(() => Repair.StartupApps.Disable(rung.Arg ?? ""));
+                case "security.update_signatures":
+                    // MpCmdRun with fixed arguments; Defender allows this without admin rights.
+                    return await Task.Run(Repair.UserRepairs.UpdateDefenderSignatures);
+                case "security.quick_scan":
+                    return await Task.Run(Repair.UserRepairs.DefenderQuickScan);
                 case "storage.empty_recycle_bin":
                     return await Task.Run(Areas.StorageCleanup.EmptyRecycleBin);
                 default:
