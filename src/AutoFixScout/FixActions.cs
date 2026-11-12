@@ -25,6 +25,8 @@ public static class FixActions
                         "airplane" => "ms-settings:network-airplanemode",
                         "wifi" => "ms-settings:network-wifi",
                         "camera_app" => "microsoft.windows.camera:",
+                        "microphone" => "ms-settings:privacy-microphone",
+                        "sound_devices" => "ms-settings:sound-devices",
                         _ => throw new ArgumentException(rung.Arg),
                     };
                     Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
@@ -33,6 +35,8 @@ public static class FixActions
                     return (true, "person was asked to do it");
                 case "audio.unmute_and_set_volume":
                     return (true, Unmute());
+                case "audio.unmute_microphone":
+                    return (true, Unmute(DataFlow.Capture, Role.Communications));
                 case "network.flush_dns":
                     // Flushing the resolver cache doesn't need admin, so no UAC prompt.
                     return await Task.Run(() => RunFixed("ipconfig.exe", "/flushdns"));
@@ -59,14 +63,15 @@ public static class FixActions
     }
 
     /// <summary>Returns the prior state so the report records what to restore (spec 7.1 undo).</summary>
-    private static string Unmute()
+    /// <summary>Unmutes the default output (or, for capture, the default microphone) and lifts a very low level. Non-admin.</summary>
+    private static string Unmute(DataFlow flow = DataFlow.Render, Role role = Role.Multimedia)
     {
         using var en = new MMDeviceEnumerator();
-        using var dev = en.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+        using var dev = en.GetDefaultAudioEndpoint(flow, role);
         var v = dev.AudioEndpointVolume;
-        var before = $"before: muted={v.Mute}, volume={v.MasterVolumeLevelScalar * 100:0}%";
+        var before = $"before: muted={v.Mute}, level={v.MasterVolumeLevelScalar * 100:0}%";
         v.Mute = false;
-        if (v.MasterVolumeLevelScalar < 0.3f) v.MasterVolumeLevelScalar = 0.5f;
+        if (v.MasterVolumeLevelScalar < 0.3f) v.MasterVolumeLevelScalar = flow == DataFlow.Capture ? 0.7f : 0.5f;
         return before;
     }
 
