@@ -45,7 +45,7 @@ Status: **Done** = built, unit-tested and checked on the test laptop (every admi
 | What changed before the problem | programs, updates and drivers installed in the last 7 days | uninstall guidance, System Restore as a last resort (guided) | Planned (Q2) |
 | Graphics driver resets | display driver resets and freezes | driver update guidance | Planned (Q3) |
 | One app has no sound | app muted or at zero in the Volume mixer, audio enhancements | unmute that app, guided | Planned (Q4) |
-| What fills the drive | Windows.old, hibernation file, Downloads, update caches | Storage Sense, component cleanup, guided (personal files never deleted) | Planned (Q5) |
+| What fills the drive | Windows.old, hibernation file, Downloads, update caches | Storage Sense, component cleanup, guided (personal files never deleted) | Done |
 
 ## Safety rules the code enforces
 - The UI never runs elevated; the executor accepts only allowlisted action ids with fixed or validated arguments.

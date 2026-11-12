@@ -357,7 +357,7 @@ No UI edits in this session (another session reworks the UI). New checks go into
       graphics driver finding; guided driver update via Windows Update optional updates / maker's site.
 - [ ] Q4 Sound: one app muted or at zero in the Volume Mixer (per-app session volume), audio enhancements causing
       distortion (guided). Fix: unmute that app's session (non-admin, NAudio session API).
-- [ ] Q5 Big space users (Slow or full computer): Windows.old, hibernation file, Downloads folder size, Delivery
+- [x] Q5 Big space users (Slow or full computer): Windows.old, hibernation file, Downloads folder size, Delivery
       Optimization cache, old Windows Update cleanup; safe cleanups only (Storage Sense / component cleanup), guided
       for personal folders (never delete personal files).
 Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This session works in C:\afs-wt\overnight (branch overnight); agents in C:\afs-wt\<name>.
