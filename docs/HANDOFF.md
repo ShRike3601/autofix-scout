@@ -343,3 +343,21 @@ Status 2026-11-13 ~00:45 IST: power area (R2) merged (436 tests); NOT yet in the
 - 2026-11-13 00:33 long admin bench: VC++ install (signed download), Update reset (old folder kept as SoftwareDistribution.afs-<stamp>), chkdsk /scan, DISM RestoreHealth (9.4 min), SFC (1.7 min; it FOUND and repaired corrupt files on the bench), component cleanup (4 min): all PASS. Update services back to normal.
 - R4 network extras: agent hit the usage limit mid-way; its work is in worktree C:\afs-wt\net-extras (branch net-extras). After the 02:20 reset: finish it (or resume the agent), review, test, merge.
 - Roadmap part 2 complete (R1-R8). UI is being reworked in a separate Claude session (owner, 2026-11-13): do not edit src/AutoFixScout.UI from this session; expect a merge from that work.
+
+## Roadmap (part 3, from 2026-11-13 ~01:30 IST)
+No UI edits in this session (another session reworks the UI). New checks go into existing areas so they are reachable now.
+- [ ] Q1 Browser hijack by policy (Security area): Chrome/Edge/Firefox policies a home PC should not have (forced extensions,
+      forced homepage/search engine, "managed by your organization"), plus browser proxy settings. Fix: remove those policy
+      values with a backup (HKCU without admin, HKLM through the executor with a fixed list of policy names).
+- [ ] Q2 "What changed before the problem started" (check-up): programs, Windows updates and drivers installed in the last
+      7 days (Uninstall registry keys, Win32_QuickFixEngineering, driver install events) shown in the finding detail and
+      a guided "uninstall the recent update/program" step; System Restore as a last-resort guided step when a restore
+      point exists from before the change (never run automatically).
+- [ ] Q3 Graphics driver resets and freezes (check-up): Display event 4101 (TDR) and LiveKernelEvent 141/117 counts ->
+      graphics driver finding; guided driver update via Windows Update optional updates / maker's site.
+- [ ] Q4 Sound: one app muted or at zero in the Volume Mixer (per-app session volume), audio enhancements causing
+      distortion (guided). Fix: unmute that app's session (non-admin, NAudio session API).
+- [ ] Q5 Big space users (Slow or full computer): Windows.old, hibernation file, Downloads folder size, Delivery
+      Optimization cache, old Windows Update cleanup; safe cleanups only (Storage Sense / component cleanup), guided
+      for personal folders (never delete personal files).
+Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This session works in C:\afs-wt\overnight (branch overnight); agents in C:\afs-wt\<name>.
