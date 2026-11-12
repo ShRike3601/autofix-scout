@@ -58,6 +58,7 @@ public static class Program
                 (_, "service.restore_default") when AutoFixScout.Repair.ServiceDefaults.Find(args[1]) is not null => Repairs.RestoreServiceDefault(args[1]),
                 (_, "runtime.install_vcredist") when Repairs.RuntimeArchitectures.Contains(args[1]) => Repairs.InstallVcRedist(args[1]),
                 (_, "disk.scan") when Repairs.IsSystemDrive(args[1]) => Repairs.DiskScan(args[1]),
+                (_, "storage.cleanup_components") when args[1] == Repairs.System => Repairs.CleanupComponents(),
                 _ => 2,
             };
         }

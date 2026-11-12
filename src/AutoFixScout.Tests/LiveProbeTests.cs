@@ -5,6 +5,7 @@ using Xunit;
 namespace AutoFixScout.Tests;
 
 /// <summary>Reads the real machine. Runs only when AFS_LIVE is set (test bench); writes what it found to AFS_LIVE (a file path).</summary>
+[Collection("Live machine")] // one at a time: they change and restore the same settings
 public class LiveProbeTests
 {
     [Fact]
@@ -31,6 +32,7 @@ public class LiveProbeTests
 }
 
 /// <summary>Non-admin repairs on the real machine (AFS_LIVE set). Each one creates its fault and always puts things back.</summary>
+[Collection("Live machine")] // one at a time: they change and restore the same settings
 public class LiveUserRepairTests
 {
     private static bool Live => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AFS_LIVE"));
@@ -83,6 +85,7 @@ public class LiveUserRepairTests
 }
 
 /// <summary>The internet check as the app builds it (network probe + health extras), with a real dead proxy (AFS_LIVE).</summary>
+[Collection("Live machine")] // one at a time: they change and restore the same settings
 public class LiveInternetTests
 {
     [Fact]
@@ -112,6 +115,7 @@ public class LiveInternetTests
     }
 }
 
+[Collection("Live machine")] // one at a time: they change and restore the same settings
 public class LiveShellTests
 {
     [Fact]
@@ -123,5 +127,45 @@ public class LiveShellTests
         Assert.Contains(s.Packages, p => p.Name == "Microsoft.Windows.StartMenuExperienceHost" && p.Status == "Ok");
         var (ok, detail) = await FixActions.RunAsync(new Rung("t", "shell.restart_start_menu", 0, ""));
         Assert.True(ok, detail);
+    }
+}
+
+/// <summary>startup.disable on the real machine (AFS_LIVE set) with a dummy entry that is always removed afterwards.</summary>
+[Collection("Live machine")] // one at a time: they change and restore the same settings
+public class LiveStartupTests
+{
+    private static bool Live => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AFS_LIVE"));
+    private const string Name = "AFS-Test-Entry";
+
+    [Fact]
+    public async Task DummyRunEntry_IsFound_ThenDisabledLikeTaskManager()
+    {
+        if (!Live) return;
+        using var run = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(AutoFixScout.Repair.StartupApps.RunKey, true);
+        Assert.Null(run.GetValue(Name)); // never overwrite a real entry
+        try
+        {
+            run.SetValue(Name, "notepad.exe");
+            var before = new RealStorageProbe().Read();
+            Assert.Contains(before.StartupEntries!, e => e.Name == Name && e.Scope == StartupScope.UserRun && e.Enabled);
+
+            var (ok, detail) = await FixActions.RunAsync(new Rung("t", "startup.disable", 1, "", Name));
+            Assert.True(ok, detail);
+
+            var after = new RealStorageProbe().Read();
+            Assert.Contains(after.StartupEntries!, e => e.Name == Name && !e.Enabled);
+            Assert.Equal(before.StartupAppCount - 1, after.StartupAppCount);
+            using var approved = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(AutoFixScout.Repair.StartupApps.ApprovedKey + "Run");
+            var value = (byte[])approved!.GetValue(Name)!;
+            Assert.Equal(12, value.Length);
+            Assert.Equal(0x03, value[0]);
+            Assert.False(AutoFixScout.Repair.StartupApps.ParseApproved(value).Enabled);
+        }
+        finally
+        {
+            run.DeleteValue(Name, false);
+            using var approved = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(AutoFixScout.Repair.StartupApps.ApprovedKey + "Run", true);
+            approved?.DeleteValue(Name, false);
+        }
     }
 }

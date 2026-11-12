@@ -1,6 +1,5 @@
 using System.Management;
 using System.Runtime.InteropServices;
-using Microsoft.Win32;
 
 namespace AutoFixScout.Probes;
 
@@ -18,7 +17,7 @@ public sealed class RealStorageProbe : IStorageProbe
     public StorageState Read()
     {
         var errors = new List<string>();
-        var s = new StorageState { ProbeErrors = errors };
+        var s = new StorageState { ProbeErrors = errors, WindowsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows) };
         try
         {
             (s.SystemDrive, s.FreeBytes, s.TotalBytes) = ReadSystemDrive();
@@ -34,7 +33,14 @@ public sealed class RealStorageProbe : IStorageProbe
         catch (Exception) { /* unknown */ }
         s.WindowsTempBytes = WindowsTempSize();
         s.RecycleBinBytes = RecycleBinSize();
-        try { s.StartupAppCount = CountStartupApps(); } catch (Exception) { /* unknown */ }
+        try
+        {
+            var entries = Repair.StartupApps.ReadAll();
+            s.StartupEntries = entries;
+            s.StartupAppCount = entries.Count(e => e.Enabled);
+        }
+        catch (Exception) { /* unknown */ }
+        try { s.TopProcesses = ProcessSampler.Sample(TimeSpan.FromSeconds(2), TotalMemory()); } catch (Exception) { /* unknown */ }
         s.Uptime = TimeSpan.FromMilliseconds(Environment.TickCount64);
         s.MemoryLoadPercent = MemoryLoad();
         try { s.ProblemDevices = ReadProblemDevices(); } catch (Exception) { /* unknown */ }
@@ -119,40 +125,15 @@ public sealed class RealStorageProbe : IStorageProbe
         catch (Exception) { return null; }
     }
 
-    private const string Run = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string Approved = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\";
-
-    /// <summary>Run keys (user, machine, 32-bit machine) and Startup folders, minus entries switched off in "Startup apps".</summary>
-    private static int CountStartupApps()
+    private static long? TotalMemory()
     {
-        var n = CountRun(Registry.CurrentUser, Run, "Run")
-              + CountRun(Registry.LocalMachine, Run, "Run")
-              + CountRun(Registry.LocalMachine, @"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Run", "Run32");
-        n += CountFolder(Environment.GetFolderPath(Environment.SpecialFolder.Startup), Registry.CurrentUser);
-        n += CountFolder(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup), Registry.LocalMachine);
-        return n;
+        try
+        {
+            var m = new MEMORYSTATUSEX { dwLength = (uint)Marshal.SizeOf<MEMORYSTATUSEX>() };
+            return GlobalMemoryStatusEx(ref m) ? (long)m.ullTotalPhys : null;
+        }
+        catch (Exception) { return null; }
     }
-
-    private static int CountRun(RegistryKey hive, string path, string approvedName)
-    {
-        using var key = hive.OpenSubKey(path);
-        if (key is null) return 0;
-        using var approved = hive.OpenSubKey(Approved + approvedName);
-        return key.GetValueNames().Count(v => v.Length > 0 && !IsSwitchedOff(approved, v));
-    }
-
-    private static int CountFolder(string dir, RegistryKey hive)
-    {
-        if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return 0;
-        using var approved = hive.OpenSubKey(Approved + "StartupFolder");
-        return Directory.EnumerateFiles(dir)
-            .Select(Path.GetFileName).OfType<string>()
-            .Count(f => !f.Equals("desktop.ini", StringComparison.OrdinalIgnoreCase) && !IsSwitchedOff(approved, f));
-    }
-
-    /// <summary>"Startup apps" stores a switched-off entry with an odd first byte (0x03, 0x01), an enabled one with an even one.</summary>
-    internal static bool IsSwitchedOff(RegistryKey? approved, string name) =>
-        approved?.GetValue(name) is byte[] { Length: > 0 } b && (b[0] & 1) == 1;
 
     private static List<StorageDeviceInfo> ReadProblemDevices()
     {
