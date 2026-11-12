@@ -223,6 +223,9 @@ public enum FindingCode
     BluetoothAudioNotConnected,
     // Start menu, taskbar, search
     ShellPackageDamaged,
+    // Drive health
+    HealthDriveFailing,
+    HealthDriveWarning,
     // Printer
     PrintSpoolerStopped,
     NoPrinter,

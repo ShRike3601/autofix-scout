@@ -34,7 +34,7 @@ Status: **Done** = built, unit-tested and checked on the test laptop (admin repa
 | Word, Excel or Outlook | Click-to-Run Office present | Office Quick Repair (Microsoft-signed tool only), Online Repair guide | Done |
 | OneDrive not syncing | OneDrive installed / running | start OneDrive, reset OneDrive (files kept) | Done |
 | Security, viruses or pop-ups | antivirus missing/off, real-time protection off, old signatures, firewall off, UAC off, SmartScreen off, hosts/proxy hijacks, suspicious startup entries | signature update, quick scan, firewall on, UAC on, Windows Security steps | Done |
-| Drive health | failing or worn drive, read errors, temperature | back-up warning, guided | Planned (R1) |
+| Drive health (in the full check-up) | drive health and failure prediction reported by Windows (wear counters need admin: later) | back up first (Windows Backup), repair-service advice | Done |
 | Battery and power | battery wear, power plan, sleep/wake problems, wake timers | guided and safe fixes | Planned (R2) |
 | Any device with a warning | Device Manager errors in other classes | re-detect, guided driver steps | Planned (R3) |
 | Network extras | no address from the router, weak Wi-Fi, IP conflict, metered connection | renew address, guided | Planned (R4) |

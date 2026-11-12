@@ -162,6 +162,44 @@ public class HealthTests
     }
 
     [Fact]
+    public void FailingDrive_ComesFirst_BackupFirst_PointsAtHardware()
+    {
+        var s = Healthy();
+        s.ClockOffsetSeconds = 900;
+        s.Drives = new[] { new PhysicalDriveInfo("SSD 1", "SSD", "Healthy", new[] { 2, 5 }, false), new PhysicalDriveInfo("HDD", "HDD", "Healthy", new[] { 2 }, false) };
+        var (f, l) = Run(s);
+        Assert.Equal(FindingCode.HealthDriveFailing, f[0].Code);
+        Assert.Contains("\"SSD 1\"", f[0].PlainMessage);
+        Assert.Equal("back_up_files", l[0].Id);
+        Assert.True(HealthTriage.ProbablyHardware(s));
+        Assert.Contains("replace the drive", HealthTriage.NotFixedHint(f));
+    }
+
+    [Theory]
+    [InlineData("Healthy", new[] { 2 }, false, false, false)]
+    [InlineData("Warning", new[] { 2 }, false, false, true)]
+    [InlineData("Healthy", new[] { 3 }, false, false, true)]
+    [InlineData("Unhealthy", new[] { 2 }, false, true, false)]
+    [InlineData("Healthy", new[] { 2 }, true, true, false)]
+    [InlineData("Unknown", new int[0], false, false, false)]
+    public void DriveVerdicts(string health, int[] status, bool predict, bool failing, bool warning)
+    {
+        var d = new PhysicalDriveInfo("d", "SSD", health, status, predict);
+        Assert.Equal((failing, warning), (d.Failing, d.Warning));
+    }
+
+    [Fact]
+    public void DriveWarning_IsNotHardwareYet_ButOffersBackup()
+    {
+        var s = Healthy();
+        s.Drives = new[] { new PhysicalDriveInfo("HDD", "HDD", "Warning", new[] { 2 }, false) };
+        var (f, l) = Run(s);
+        Assert.Equal(FindingCode.HealthDriveWarning, f[0].Code);
+        Assert.Equal("backup", l[0].Arg);
+        Assert.False(HealthTriage.ProbablyHardware(s));
+    }
+
+    [Fact]
     public void SingleCrash_IsNotAFault()
     {
         var s = Healthy();
@@ -290,6 +328,7 @@ public class HealthTests
         s.MissingPathEntries = new[] { @"%SystemRoot%" }; s.TempFolderMissing = true; s.ThirdPartyWinsock = new[] { "x.dll" };
         s.BrokenStoreApps = new[] { new StoreAppInfo("Calc_1", "Calculator", "Modified") };
         s.Crashes = new[] { new CrashInfo("explorer.exe", "ntdll.dll", "c0000374", 3, DateTime.UtcNow), new CrashInfo("App.exe", "nvwgf2umx.dll", "c0000005", 2, DateTime.UtcNow) };
+        s.Drives = new[] { new PhysicalDriveInfo("Disk", "SSD", "Unhealthy", new[] { 6 }, false) };
         s.BlueScreens = 2; s.RuntimeErrors = new[] { "app.exe" }; s.FailingServices = new[] { "Foo" }; s.UpdateFailures = 3; s.RebootPending = Tri.Yes;
         s.Services = s.Services.Select(x => x.Name == "Themes" ? x with { StartType = "Disabled" } : x).ToList();
         var (f, l) = Run(s);

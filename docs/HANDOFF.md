@@ -325,7 +325,7 @@ screenshots until it times out. Drive admin steps through the TestBench (elevate
 ## Roadmap (overnight part 2, from 2026-11-13 00:00 IST; owner asleep, heartbeat every 20 min)
 Rules: stop at 80% of each 5-hour window, resume after the reset (02:20 IST, then 07:20). One item at a time unless
 using worktree agents. Each item: probe + triage + tests + live test + real-UI check + HANDOFF/CAPABILITIES update.
-- [ ] R1 Drive health: MSFT_PhysicalDisk HealthStatus / Get-StorageReliabilityCounter (wear, read errors, temperature)
+- [x] R1 Drive health: MSFT_PhysicalDisk HealthStatus / Get-StorageReliabilityCounter (wear, read errors, temperature)
       in the full check-up; "back up now" finding; never repairs hardware.
 - [ ] R2 Battery and power ("battery drains / will not sleep / will not wake"): battery wear (design vs full charge),
       power plan, sleep settings, hibernate/fast startup, wake timers and devices allowed to wake; guided + safe fixes.

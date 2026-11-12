@@ -27,6 +27,8 @@ public class LiveProbeTests
         lines.AddRange(f.Select(x => $"FINDING {x.Code}: {x.PlainMessage} [{x.TechnicalDetail}]"));
         lines.AddRange(HealthTriage.Ladder(s, f).Select(r => $"RUNG {r.Id} {r.ActionId}({r.Arg})"));
         File.WriteAllLines(output, lines);
+        Assert.NotEmpty(s.Drives);
+        Assert.All(s.Drives, d => Assert.False(d.Failing || d.Warning));
         Assert.Empty(s.ProbeErrors);
     }
 }

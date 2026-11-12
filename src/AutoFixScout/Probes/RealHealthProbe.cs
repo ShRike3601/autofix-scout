@@ -40,6 +40,7 @@ public sealed class RealHealthProbe : IHealthProbe
         Part("services", () => s.Services = ServiceDefaults.All.Select(d => ReadService(d.Name)).ToList());
         Part("Store apps", () => s.BrokenStoreApps = ReadBrokenStoreApps());
         Part("restart flag", () => s.RebootPending = ReadRebootPending());
+        Part("drives", () => s.Drives = ReadDrives());
 
         s.ProbeErrors = errors;
         return s;
@@ -122,6 +123,34 @@ public sealed class RealHealthProbe : IHealthProbe
             .OrderByDescending(g => g.Count()).Select(g => g.Key).Take(8).ToList();
     }
 
+
+    // ---- drives ----
+
+    /// <summary>Windows Storage health per physical drive, plus Win32_DiskDrive "Pred Fail" (the drive's own failure prediction).</summary>
+    private static IReadOnlyList<PhysicalDriveInfo> ReadDrives()
+    {
+        var predict = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using (var q = new System.Management.ManagementObjectSearcher("SELECT Model, Status FROM Win32_DiskDrive"))
+            foreach (System.Management.ManagementObject d in q.Get())
+                using (d)
+                    if (string.Equals(d["Status"] as string, "Pred Fail", StringComparison.OrdinalIgnoreCase)) predict.Add((d["Model"] as string ?? "").Trim());
+
+        var list = new List<PhysicalDriveInfo>();
+        using var s = new System.Management.ManagementObjectSearcher(@"root\Microsoft\Windows\Storage",
+            "SELECT FriendlyName, MediaType, HealthStatus, OperationalStatus FROM MSFT_PhysicalDisk");
+        foreach (System.Management.ManagementObject d in s.Get())
+            using (d)
+            {
+                var name = (d["FriendlyName"] as string ?? "drive").Trim();
+                list.Add(new PhysicalDriveInfo(name, MediaName(d["MediaType"]), HealthName(d["HealthStatus"]),
+                    (d["OperationalStatus"] as ushort[] ?? Array.Empty<ushort>()).Select(x => (int)x).ToList(), predict.Contains(name)));
+            }
+        return list;
+    }
+
+    public static string HealthName(object? v) => Convert.ToInt32(v ?? 5) switch { 0 => "Healthy", 1 => "Warning", 2 => "Unhealthy", _ => "Unknown" };
+
+    private static string MediaName(object? v) => Convert.ToInt32(v ?? 0) switch { 3 => "HDD", 4 => "SSD", 5 => "SCM", _ => "Unspecified" };
     // ---- clock ----
 
     /// <summary>Compares the clock with the Date header of Microsoft's connectivity test (plain HTTP, so a wrong clock cannot break the check itself).</summary>

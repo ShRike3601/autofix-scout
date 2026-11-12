@@ -57,6 +57,8 @@ public sealed class HealthState
     public IReadOnlyList<UpdateServiceInfo> Services { get; set; } = new List<UpdateServiceInfo>();
     public IReadOnlyList<StoreAppInfo> BrokenStoreApps { get; set; } = new List<StoreAppInfo>();
     public Tri RebootPending { get; set; } = Tri.Unknown;
+    /// <summary>Physical drives (HDD/SSD) with Windows' health verdict.</summary>
+    public IReadOnlyList<PhysicalDriveInfo> Drives { get; set; } = new List<PhysicalDriveInfo>();
     /// <summary>The program the person said is the one with the problem (from "A program keeps closing"); null = not asked.</summary>
     public string? ChosenApp { get; set; }
 
@@ -65,5 +67,14 @@ public sealed class HealthState
 
 /// <summary>A hosts-file line that sends a well-known site elsewhere (or blocks a security site).</summary>
 public sealed record HostsHijack(string Host, string Ip);
+
+/// <summary>A physical drive as Windows Storage reports it. Health: Healthy, Warning, Unhealthy, Unknown.</summary>
+public sealed record PhysicalDriveInfo(string Name, string MediaType, string Health, IReadOnlyList<int> OperationalStatus, bool PredictFailure)
+{
+    /// <summary>Unhealthy, "predictive failure" (5), "error" (6), "non-recoverable error" (7) or Windows' own failure prediction.</summary>
+    public bool Failing => Health == "Unhealthy" || PredictFailure || OperationalStatus.Any(s => s is 5 or 6 or 7);
+    /// <summary>"Warning" health or "degraded" (3) or "stressed" (4).</summary>
+    public bool Warning => !Failing && (Health == "Warning" || OperationalStatus.Any(s => s is 3 or 4));
+}
 
 public interface IHealthProbe { HealthState Read(); }

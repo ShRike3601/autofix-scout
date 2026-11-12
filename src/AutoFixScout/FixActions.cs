@@ -43,6 +43,7 @@ public static class FixActions
                         "printers" => "ms-settings:printers",
                         "display" => "ms-settings:display",
                         "apps" => "ms-settings:appsfeatures",
+                        "backup" => "ms-settings:backup",
                         "bluetooth" => "ms-settings:bluetooth",
                         "windowsdefender" => "windowsdefender:",
                         "windowsdefender_appbrowser" => "windowsdefender://appbrowser",

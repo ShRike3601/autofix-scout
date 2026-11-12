@@ -46,6 +46,13 @@ public static class HealthTriage
     {
         var f = new List<Finding>();
 
+        var failing = s.Drives.Where(d => d.Failing).ToList();
+        if (failing.Count > 0)
+            f.Add(F(FindingCode.HealthDriveFailing, $"Windows reports that the drive \"{failing[0].Name}\" may fail soon. Please copy your important files to another place now.",
+                string.Join("; ", failing.Select(d => $"{d.Name} ({d.MediaType}) health={d.Health} status={string.Join(",", d.OperationalStatus)} predictFail={d.PredictFailure}"))));
+        else if (s.Drives.FirstOrDefault(d => d.Warning) is { } warn)
+            f.Add(F(FindingCode.HealthDriveWarning, $"Windows reports a warning for the drive \"{warn.Name}\". It is a good idea to back up your important files.",
+                $"{warn.Name} ({warn.MediaType}) health={warn.Health} status={string.Join(",", warn.OperationalStatus)}"));
         if (s.HardwareErrors > 0)
             f.Add(F(FindingCode.HealthHardwareErrors, "Windows has recorded errors reported by the computer's hardware (processor or memory). Software repairs cannot correct these.",
                 $"WHEA errors (error level) in 14 days: {s.HardwareErrors}"));
@@ -139,6 +146,10 @@ public static class HealthTriage
         if (codes.Contains(FindingCode.ProbeIncomplete)) return r;
         var systemRepair = codes.Contains(FindingCode.LooksNormal);
 
+        if (codes.Contains(FindingCode.HealthDriveFailing) || codes.Contains(FindingCode.HealthDriveWarning))
+            r.Add(new("back_up_files", "ui.open_settings_page", 0,
+                "Please copy your important files (documents, photos) to a USB drive or to OneDrive before anything else. " +
+                "AutoFix Scout will open the \"Windows Backup\" settings, which can do this for you.", "backup"));
         if (codes.Contains(FindingCode.HealthClockWrong))
             r.Add(Admin("sync_clock", "time.resync", "AutoFix Scout can set the clock from Microsoft's internet time server."));
         if (codes.Contains(FindingCode.HealthDeadProxy))
@@ -230,11 +241,13 @@ public static class HealthTriage
     };
 
     /// <summary>Hardware and disk errors are the only findings that point at hardware.</summary>
-    public static bool ProbablyHardware(HealthState s) => s.HardwareErrors > 0 || s.DiskErrors >= 5;
+    public static bool ProbablyHardware(HealthState s) => s.HardwareErrors > 0 || s.DiskErrors >= 5 || s.Drives.Any(d => d.Failing);
 
     public static string? NotFixedHint(IReadOnlyList<Finding> after)
     {
         var codes = after.Select(x => x.Code).ToHashSet();
+        if (codes.Contains(FindingCode.HealthDriveFailing))
+            return "Windows still reports that a drive may fail. Please back up your files, and ask a repair service to replace the drive.";
         if (codes.Contains(FindingCode.HealthHardwareErrors) || codes.Contains(FindingCode.HealthDiskErrors))
             return "Windows has recorded hardware or drive errors. Please back up your files, and ask a repair service to test the computer's memory and drive.";
         if (codes.Contains(FindingCode.HealthRestartPending))
