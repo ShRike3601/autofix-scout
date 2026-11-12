@@ -46,6 +46,11 @@ Status: **Done** = built, unit-tested and checked on the test laptop (every admi
 | Graphics driver resets | display driver resets and freezes | driver update guidance | Done |
 | One app has no sound | app muted or at zero in the Volume mixer, audio enhancements | unmute that app, guided | Done |
 | What fills the drive | Windows.old, hibernation file, Downloads, update caches | Storage Sense, component cleanup, guided (personal files never deleted) | Done |
+| One app cannot use the microphone or camera | per-app privacy switch off for Teams, Zoom, a browser... | guided Settings step naming the app | Planned (P1) |
+| Blue-screen causes | stop codes explained (memory, driver, storage, graphics) | memory test (guided), driver steps, disk scan | Planned (P2) |
+| Virtual memory | page file missing or too small | let Windows manage the page file (admin, restart) | Planned (P3) |
+| Threats found by Microsoft Defender | recent detections, active or removed | Protection history, full scan, Defender Offline (guided) | Planned (P4) |
+| Scanner | image acquisition service off, scanner errors | restore service, re-detect, guided | Planned (P5) |
 
 ## Safety rules the code enforces
 - The UI never runs elevated; the executor accepts only allowlisted action ids with fixed or validated arguments.
