@@ -336,7 +336,9 @@ using worktree agents. Each item: probe + triage + tests + live test + real-UI c
 - [x] R5 Temporary user profile ("my files and desktop are gone"): detect, explain, guided recovery; never touches profiles.
 - [x] R6 Keyboard, mouse and touchpad: touchpad switched off, Sticky/Filter Keys on, input device errors.
 - [x] R7 Clock settings (automatic time; time zone auto-update off is normal, not flagged): automatic time / time zone off or wrong.
-- [ ] R8 Admin bench run (`C:\afs-bench\jobs\01-health-long.ps1`) as soon as the AFS-Bench-Elevated task exists.
+- [x] R8 Admin bench run (`C:\afs-bench\jobs\01-health-long.ps1`) as soon as the AFS-Bench-Elevated task exists.
 
 Status 2026-11-13 ~00:45 IST: power area (R2) merged (436 tests); NOT yet in the UI/router (add a "Battery, sleep and power" button + router words, TestQuestion from PowerFlow). Input agent (R6) was paused at the 80% stop: continue in worktree C:\afs-wt\input-area (branch input-area; uncommitted work may be there), then merge and wire the UI.
 - 2026-11-13: owner confirmed the bench touchpad really is switched off (Fn key) — the input area's "touchpad off" finding is correct on hardware. Admin bench (elevated runner): H1-H6 + clock sync + search index + VC++ install + Update reset + chkdsk scan all PASS, machine restored.
+- 2026-11-13 00:33 long admin bench: VC++ install (signed download), Update reset (old folder kept as SoftwareDistribution.afs-<stamp>), chkdsk /scan, DISM RestoreHealth (9.4 min), SFC (1.7 min; it FOUND and repaired corrupt files on the bench), component cleanup (4 min): all PASS. Update services back to normal.
+- R4 network extras: agent hit the usage limit mid-way; its work is in worktree C:\afs-wt\net-extras (branch net-extras). After the 02:20 reset: finish it (or resume the agent), review, test, merge.

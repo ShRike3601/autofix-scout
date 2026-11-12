@@ -4,7 +4,7 @@ Every check is read-only first. Every fix is offered one at a time, least risky 
 followed by a real test. Admin fixes go through the elevated executor, which accepts only fixed actions and validated
 arguments. System changes are backed up first; a restore point is attempted before system-wide repairs.
 
-Status: **Done** = built, unit-tested and checked on the test laptop (admin repairs: unit-tested; hardware run pending);
+Status: **Done** = built, unit-tested and checked on the test laptop (every admin repair also ran on the laptop through the elevated test runner);
 **Planned** = on the overnight roadmap (docs/HANDOFF.md).
 
 ## Ways in
