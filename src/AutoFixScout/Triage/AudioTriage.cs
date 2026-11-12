@@ -322,4 +322,6 @@ public enum FindingCode
     // USB devices disconnecting (full check-up)
     HealthUsbDisconnects,
     HealthUsbErrors,
+    // Wi-Fi keeps dropping
+    NetWifiDrops,
 }

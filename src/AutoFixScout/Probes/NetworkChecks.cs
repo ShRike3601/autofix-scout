@@ -47,6 +47,42 @@ public static class NetworkChecks
 
     // ---- reads ----
 
+    /// <summary>Counts the WLAN-AutoConfig events 8003 and 8001 of the last 3 days. Only ids, reason codes and reason text are read.</summary>
+    public static WifiDropStats ReadWifiDrops()
+    {
+        var events = new List<(int, int, string?)>();
+        try
+        {
+            using var reader = new EventLogReader(new EventLogQuery("Microsoft-Windows-WLAN-AutoConfig/Operational", PathType.LogName, WifiDrops.Query));
+            for (var ev = reader.ReadEvent(); ev != null; ev = reader.ReadEvent())
+                using (ev) events.Add(WifiDrops.ParseEvent(ev.ToXml()));
+        }
+        catch (EventLogNotFoundException) { }
+        var transitions = 0;
+        try
+        {
+            var q = $"*[System[((Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=42) or (Provider[@Name='Microsoft-Windows-Kernel-General'] and EventID=13)) and TimeCreated[timediff(@SystemTime) <= {(long)TimeSpan.FromDays(WifiDrops.Days).TotalMilliseconds}]]]";
+            using var r = new EventLogReader(new EventLogQuery("System", PathType.LogName, q));
+            for (var ev = r.ReadEvent(); ev != null; ev = r.ReadEvent()) using (ev) transitions++;
+        }
+        catch (EventLogException) { }
+        return WifiDrops.Count(events) with { SleepsAndShutdowns = transitions };
+    }
+
+    /// <summary>Whether Windows may turn the adapter with this connection GUID off to save power (class key PnPCapabilities). Unknown when no key matches.</summary>
+    public static Tri ReadWifiPowerSaving(string adapterGuid)
+    {
+        using var cls = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}");
+        if (cls is null) return Tri.Unknown;
+        foreach (var name in cls.GetSubKeyNames().Where(n => n.Length == 4 && n.All(char.IsDigit)))
+        {
+            using var k = cls.OpenSubKey(name);
+            if (k?.GetValue("NetCfgInstanceId") is string id && string.Equals(id, adapterGuid, StringComparison.OrdinalIgnoreCase))
+                return WifiDrops.MayTurnOffToSavePower(k.GetValue("PnPCapabilities"));
+        }
+        return Tri.Unknown;
+    }
+
     /// <summary>Address state of the adapter with this connection GUID (Win32_NetworkAdapter.GUID).</summary>
     public static Tri ReadAddressObtained(string adapterGuid)
     {

@@ -28,6 +28,10 @@ public sealed class NetworkState
     public bool IpConflictRecent { get; set; }
     /// <summary>Yes when Windows treats the current connection as metered (Windows Update and OneDrive may pause).</summary>
     public Tri Metered { get; set; } = Tri.Unknown;
+    /// <summary>Wi-Fi connect and disconnect counts of the last 3 days (WLAN-AutoConfig 8001 and 8003); null when not read. Reasons are categories only.</summary>
+    public WifiDropStats? WifiDrops { get; set; }
+    /// <summary>Yes when Windows may turn the Wi-Fi adapter off to save power (PnPCapabilities); Unknown when not read.</summary>
+    public Tri WifiPowerSavingMayTurnOff { get; set; } = Tri.Unknown;
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
     /// <summary>Failures of the extra checks above. Kept apart so they never replace the main result with "could not complete".</summary>
     public IReadOnlyList<string> ExtraProbeErrors { get; set; } = new List<string>();
