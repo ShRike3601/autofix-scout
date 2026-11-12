@@ -168,5 +168,19 @@ public enum FindingCode
     CameraError,
     CameraPrivacyOff,
     CameraInUse,
-    LooksNormal
+    LooksNormal,
+    // storage
+    StorageDeviceError,
+    SystemDriveCritical,
+    SystemDriveLow,
+    LargeTempFiles,
+    HighMemoryPressure,
+    ManyStartupApps,
+    LongUptime,
+    // update
+    UpdateServiceDisabled,
+    UpdateServiceStopped,
+    UpdateRebootPending,
+    UpdateLowDiskSpace,
+    UpdatesOutOfDate,
 }
