@@ -310,3 +310,14 @@ Then:
 Bluetooth area [done], then run the admin health bench as soon
 as `schtasks /query /tn AFS-Bench-Elevated` works: job file running
 `tools\AutoFixScout.TestBench\bin\Debug\net8.0-windows\AutoFixScout.TestBench.exe health --long --out C:\afs-bench\out`.
+
+### Status 2026-11-12, ~22:20 IST (PR 11, CI green, 419 tests)
+Done and checked in the real UI on the bench: full check-up, "A program keeps closing" (picker), symptom search
+box, Bluetooth, Start menu/taskbar/search, Microsoft Store/Office/OneDrive, Security, slow computer (startup apps,
+busy programs, component cleanup), microphone, Windows Update, printer, display, internet check with proxy/hosts/
+clock/Winsock. Live (`AFS_LIVE`) tests pass for every non-admin repair.
+Not run on hardware yet (need the elevated runner): every executor repair (DISM, SFC, chkdsk, Update reset, hosts,
+PATH, WinHTTP, Winsock, services, VC++, search index, component cleanup, firewall/UAC on, Office Quick Repair),
+OneDrive reset and WSReset (bench has no OneDrive/Office; WSReset opens the Store window).
+UI note: "Apply fix" on an admin step leaves a UAC prompt that nobody can answer when unattended; it blocks
+screenshots until it times out. Drive admin steps through the TestBench (elevated) instead of the UI.
