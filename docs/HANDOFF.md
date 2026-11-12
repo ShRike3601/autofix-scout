@@ -355,7 +355,7 @@ No UI edits in this session (another session reworks the UI). New checks go into
       point exists from before the change (never run automatically).
 - [ ] Q3 Graphics driver resets and freezes (check-up): Display event 4101 (TDR) and LiveKernelEvent 141/117 counts ->
       graphics driver finding; guided driver update via Windows Update optional updates / maker's site.
-- [ ] Q4 Sound: one app muted or at zero in the Volume Mixer (per-app session volume), audio enhancements causing
+- [x] Q4 Sound: one app muted or at zero in the Volume Mixer (per-app session volume), audio enhancements causing
       distortion (guided). Fix: unmute that app's session (non-admin, NAudio session API).
 - [x] Q5 Big space users (Slow or full computer): Windows.old, hibernation file, Downloads folder size, Delivery
       Optimization cache, old Windows Update cleanup; safe cleanups only (Storage Sense / component cleanup), guided

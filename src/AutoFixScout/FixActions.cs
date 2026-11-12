@@ -30,6 +30,7 @@ public static class FixActions
                     var uri = rung.Arg switch
                     {
                         "sound" => "ms-settings:sound",
+                        "volume_mixer" => "ms-settings:apps-volume",
                         "camera" => "ms-settings:privacy-webcam",
                         "airplane" => "ms-settings:network-airplanemode",
                         "wifi" => "ms-settings:network-wifi",
@@ -61,6 +62,8 @@ public static class FixActions
                     return (true, "person was asked to do it");
                 case "audio.unmute_and_set_volume":
                     return (true, Unmute());
+                case "audio.unmute_app":
+                    return await Task.Run(() => AppSound.Unmute(rung.Arg));
                 case "audio.unmute_microphone":
                     return (true, Unmute(DataFlow.Capture, Role.Communications));
                 case "network.flush_dns":

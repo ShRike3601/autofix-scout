@@ -22,6 +22,12 @@ public sealed record AudioDeviceInfo(
     AutoFixScout.Drivers.DriverStatus? Driver = null
 );
 
+/// <summary>One app in the Volume mixer: process name, optional display name, session volume and mute, and whether it is playing.</summary>
+public sealed record AudioSessionInfo(string Process, string? DisplayName, int VolumePercent, bool Muted, bool Active)
+{
+    public string Label => DisplayName ?? Process;
+}
+
 public sealed class AudioState
 {
     public IReadOnlyList<ServiceInfo> Services { get; set; } = new List<ServiceInfo>();
@@ -30,6 +36,9 @@ public sealed class AudioState
     public Tri DefaultMuted { get; set; } = Tri.Unknown;
     public int? DefaultVolumePercent { get; set; }
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
+    public IReadOnlyList<AudioSessionInfo> Sessions { get; set; } = new List<AudioSessionInfo>();
+    /// <summary>Why the sessions could not be read; does not block the check (the device-level findings stand on their own).</summary>
+    public string? SessionError { get; set; }
 }
 
 public interface IAudioProbe { AudioState Read(); }

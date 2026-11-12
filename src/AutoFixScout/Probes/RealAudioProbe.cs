@@ -47,6 +47,8 @@ public sealed class RealAudioProbe : IAudioProbe
             defaultId = def.ID;
             state.DefaultMuted = def.AudioEndpointVolume.Mute ? Tri.Yes : Tri.No;
             state.DefaultVolumePercent = (int)Math.Round(def.AudioEndpointVolume.MasterVolumeLevelScalar * 100);
+            try { state.Sessions = AppSound.ReadSessions(def); }
+            catch (Exception ex) { state.SessionError = ex.Message; }
         }
 
         // NotPresent is excluded: Windows keeps every endpoint ever seen, which would flood the list.

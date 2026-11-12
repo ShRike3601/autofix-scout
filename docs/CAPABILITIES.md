@@ -44,7 +44,7 @@ Status: **Done** = built, unit-tested and checked on the test laptop (every admi
 | Browser taken over by policies ("managed by your organization") | forced extensions, homepage, search engine, browser proxy | remove the policy values (backed up) | Planned (Q1) |
 | What changed before the problem | programs, updates and drivers installed in the last 7 days | uninstall guidance, System Restore as a last resort (guided) | Planned (Q2) |
 | Graphics driver resets | display driver resets and freezes | driver update guidance | Planned (Q3) |
-| One app has no sound | app muted or at zero in the Volume mixer, audio enhancements | unmute that app, guided | Planned (Q4) |
+| One app has no sound | app muted or at zero in the Volume mixer, audio enhancements | unmute that app, guided | Done |
 | What fills the drive | Windows.old, hibernation file, Downloads, update caches | Storage Sense, component cleanup, guided (personal files never deleted) | Done |
 
 ## Safety rules the code enforces
