@@ -19,7 +19,7 @@ public static class Program
     public static readonly HashSet<string> ManualStartServices = new(StringComparer.OrdinalIgnoreCase) { "wuauserv", "BITS", "CryptSvc" };
 
     /// <summary>Same as Triage.Rescan.Areas (a test keeps them equal).</summary>
-    public static readonly string[] RescanAreas = { "audio", "camera", "network", "bluetooth" };
+    public static readonly string[] RescanAreas = { "audio", "camera", "network", "bluetooth", "input" };
 
     // Sound, camera, network and Bluetooth adapters only (spec 3). Display and storage drivers are never touched: a bad one can stop Windows starting.
     private static readonly string[] ToggleableClasses = { "MEDIA", "Camera", "Image", "Net", "Bluetooth" };

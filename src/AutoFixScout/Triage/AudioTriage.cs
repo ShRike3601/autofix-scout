@@ -252,4 +252,13 @@ public enum FindingCode
     SecurityUacOff,
     SecuritySmartScreenOff,
     SecuritySuspiciousStartup,
+    // Keyboard, mouse and touchpad
+    NoKeyboardFound,
+    InputDeviceDisabled,
+    InputDeviceError,
+    TouchpadOff,
+    StickyKeysOn,
+    FilterKeysOn,
+    ToggleKeysOn,
+    MouseKeysOn,
 }

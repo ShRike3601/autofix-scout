@@ -46,6 +46,9 @@ public static class FixActions
                         "backup" => "ms-settings:backup",
                         "dateandtime" => "ms-settings:dateandtime",
                         "bluetooth" => "ms-settings:bluetooth",
+                        "touchpad" => "ms-settings:devices-touchpad",
+                        "keyboard_access" => "ms-settings:easeofaccess-keyboard",
+                        "mouse" => "ms-settings:mousetouchpad",
                         "windowsdefender" => "windowsdefender:",
                         "windowsdefender_appbrowser" => "windowsdefender://appbrowser",
                         _ => throw new ArgumentException(rung.Arg),
@@ -101,6 +104,10 @@ public static class FixActions
                     return await Task.Run(Repair.UserRepairs.UpdateDefenderSignatures);
                 case "security.quick_scan":
                     return await Task.Run(Repair.UserRepairs.DefenderQuickScan);
+                case "input.touchpad_on":
+                    return await Task.Run(Repair.InputRepairs.TouchpadOn);
+                case "input.accessibility_keys_off":
+                    return await Task.Run(Repair.InputRepairs.AccessibilityKeysOff);
                 case "storage.empty_recycle_bin":
                     return await Task.Run(Areas.StorageCleanup.EmptyRecycleBin);
                 default:
