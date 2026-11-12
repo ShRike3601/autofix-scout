@@ -102,6 +102,9 @@ public class WritingStyleTests
         var weak = Online(Tri.Yes, Tri.Yes, Tri.Yes);
         weak.WifiSignalPercent = 30;
         yield return weak;
+        var drops = Online(Tri.Yes, Tri.Yes, Tri.Yes);
+        drops.WifiDrops = new WifiDropStats(9, 12, 1, 3, 4, 1); drops.WifiPowerSavingMayTurnOff = Tri.Yes;
+        yield return drops;
     }
 
     /// <summary>Every finding message, rung sentence and "not fixed" hint the triage classes produce for the states above.</summary>

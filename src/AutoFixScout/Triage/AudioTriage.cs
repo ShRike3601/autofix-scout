@@ -319,4 +319,6 @@ public enum FindingCode
     InstallerServiceOff,
     InstallFailures,
     InstallBlockedByRestart,
+    // Wi-Fi keeps dropping
+    NetWifiDrops,
 }
