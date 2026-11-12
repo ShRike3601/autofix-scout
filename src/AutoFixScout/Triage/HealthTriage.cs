@@ -255,4 +255,49 @@ public static class HealthTriage
     public static bool Resolved(IReadOnlyList<Finding> before, IReadOnlyList<Finding> after) =>
         !after.Any(a => a.Code == FindingCode.ProbeIncomplete) &&
         !before.Select(b => b.Code).Intersect(Rechecked).Intersect(after.Select(a => a.Code)).Any();
+
+    // ---- internet: the software causes behind "connected, but web sites do not work" ----
+
+    private static readonly FindingCode[] NetworkCodes =
+    {
+        FindingCode.HealthClockWrong, FindingCode.HealthDeadProxy, FindingCode.HealthDeadSystemProxy,
+        FindingCode.HealthHostsHijacked, FindingCode.HealthWinsockAddOn,
+    };
+
+    private static readonly string[] NetworkActions =
+    {
+        "time.resync", "network.reset_user_proxy", "network.reset_winhttp_proxy", "network.clean_hosts", "network.reset_winsock",
+    };
+
+    private static bool IsInternetService(string name) => ServiceDefaults.Find(name)?.Area == "internet";
+
+    /// <summary>Only the health findings and steps that can stop web sites and apps from connecting.</summary>
+    public static (IReadOnlyList<Finding> Findings, IReadOnlyList<Rung> Ladder) NetworkExtras(HealthState s)
+    {
+        var all = Evaluate(s);
+        var findings = all.Where(x => NetworkCodes.Contains(x.Code)).ToList();
+        var services = ServiceFaults(s).Where(x => IsInternetService(x.Name)).ToList();
+        if (services.Count > 0)
+            findings.Add(F(FindingCode.HealthServiceOff,
+                $"A part of Windows that internet connections need is switched off or stopped: {Names(services.Select(x => ServiceName(x.Name)))}.",
+                string.Join(", ", services.Select(x => $"{x.Name}:{x.Status}/{x.StartType}"))));
+        var ladder = Ladder(s, findings).Where(r =>
+            NetworkActions.Contains(r.ActionId) || r.Id == "restart_after_reset" ||
+            (r.ActionId == "service.restore_default" && IsInternetService(r.Arg ?? ""))).ToList();
+        return (findings, ladder);
+    }
+
+    /// <summary>
+    /// Adds the health findings to the internet check, first: they are concrete causes with harmless fixes, and a dead
+    /// proxy also makes the connection test itself fail, so "the internet is not responding" can be its symptom.
+    /// </summary>
+    public static Diagnosis CombineNetwork(Diagnosis network, HealthState health)
+    {
+        var (f, l) = NetworkExtras(health);
+        if (f.Count == 0) return network;
+        var rest = network.Findings.Where(x => x.Code != FindingCode.LooksNormal);
+        var findings = f.Concat(rest).ToList();
+        var ladder = l.Concat(network.Ladder).ToList();
+        return network with { Findings = findings, Ladder = ladder.DistinctBy(r => r.Id).ToList() };
+    }
 }

@@ -133,6 +133,35 @@ public class HealthTests
     }
 
     [Fact]
+    public void InternetLooksFine_ButProxyDead_ProxyComesFirst()
+    {
+        var s = Healthy();
+        s.UserProxyEnabled = true; s.UserProxyServer = "127.0.0.1:9"; s.UserProxyReachable = Tri.No;
+        s.Services = s.Services.Select(x => x.Name is "Themes" or "Dnscache" ? x with { StartType = "Disabled" } : x).ToList();
+        s.Crashes = new[] { new CrashInfo("Game.exe", "game.dll", "c0000005", 5, DateTime.UtcNow) };
+        var net = new Diagnosis(new object(), new[] { new Finding(FindingCode.LooksNormal, "ok", "") },
+            new[] { new Rung("flush_dns", "network.flush_dns", 0, "") }, false);
+        var d = HealthTriage.CombineNetwork(net, s);
+        Assert.Equal(FindingCode.HealthDeadProxy, d.Findings[0].Code);
+        Assert.DoesNotContain(d.Findings, f => f.Code is FindingCode.LooksNormal or FindingCode.HealthProgramCrashing);
+        Assert.Contains("DNS Client", d.Findings.First(f => f.Code == FindingCode.HealthServiceOff).PlainMessage);
+        Assert.DoesNotContain("Themes", d.Findings.First(f => f.Code == FindingCode.HealthServiceOff).PlainMessage);
+        Assert.Equal(new[] { "network.reset_user_proxy", "service.restore_default", "network.flush_dns" }, d.Ladder.Select(r => r.ActionId));
+        Assert.Equal("Dnscache", d.Ladder[1].Arg);
+    }
+
+    [Fact]
+    public void HealthCauses_ComeBeforeTheInternetFinding_AndHealthyExtrasChangeNothing()
+    {
+        var net = new Diagnosis(new object(), new[] { new Finding(FindingCode.ProbeIncomplete, "x", "") }, Array.Empty<Rung>(), false);
+        Assert.Same(net, HealthTriage.CombineNetwork(net, Healthy()));
+        var s = Healthy(); s.ClockOffsetSeconds = 4000;
+        var d = HealthTriage.CombineNetwork(net, s);
+        Assert.Equal(FindingCode.HealthClockWrong, d.Findings[0].Code);
+        Assert.Equal(FindingCode.ProbeIncomplete, d.Findings[1].Code);
+    }
+
+    [Fact]
     public void SingleCrash_IsNotAFault()
     {
         var s = Healthy();

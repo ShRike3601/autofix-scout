@@ -220,7 +220,10 @@ public partial class MainWindow : Window, IFixHost
     {
         var s = await Task.Run(_networkProbe.ReadAsync);
         var f = NetworkTriage.Evaluate(s);
-        return new Diagnosis(s, f, NetworkTriage.Ladder(s, f), NetworkTriage.ProbablyHardware(s), NetworkTriage.NotFixedHint(f));
+        var network = new Diagnosis(s, f, NetworkTriage.Ladder(s, f), NetworkTriage.ProbablyHardware(s), NetworkTriage.NotFixedHint(f));
+        // Proxy, hosts file, clock and network add-ons: the software causes when the connection itself looks fine.
+        try { return HealthTriage.CombineNetwork(network, await Task.Run(new RealHealthProbe().Read)); }
+        catch (Exception) { return network; }
     }
 
     /// <summary>Real test: the same connectivity check Windows uses. Retries because Wi-Fi takes a few seconds to come up.</summary>
@@ -230,7 +233,8 @@ public partial class MainWindow : Window, IFixHost
         for (var attempt = 0; attempt < 4; attempt++)
         {
             ShowBusy("Testing the internet connection");
-            if ((await Task.Run(_networkProbe.ReadAsync)).InternetReachable == Tri.Yes) return true;
+            if ((await Task.Run(_networkProbe.ReadAsync)).InternetReachable == Tri.Yes)
+                return !_before.Any(x => x.Code.ToString().StartsWith("Health")) || await Areas.HealthFlow.AutoTestAsync(_before);
             await Task.Delay(TimeSpan.FromSeconds(5));
         }
         return false;

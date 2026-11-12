@@ -81,3 +81,33 @@ public class LiveUserRepairTests
         Assert.NotEmpty(System.Diagnostics.Process.GetProcessesByName("explorer"));
     }
 }
+
+/// <summary>The internet check as the app builds it (network probe + health extras), with a real dead proxy (AFS_LIVE).</summary>
+public class LiveInternetTests
+{
+    [Fact]
+    public async Task DeadProxy_IsTheFirstFindingAndFix_InTheInternetCheck()
+    {
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AFS_LIVE"))) return;
+        using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Internet Settings", true)!;
+        var pe = k.GetValue("ProxyEnable"); var ps = k.GetValue("ProxyServer");
+        try
+        {
+            k.SetValue("ProxyEnable", 1, Microsoft.Win32.RegistryValueKind.DWord);
+            k.SetValue("ProxyServer", "127.0.0.1:9");
+            var n = await new RealNetworkProbe().ReadAsync();
+            var nf = NetworkTriage.Evaluate(n);
+            var d = HealthTriage.CombineNetwork(new Diagnosis(n, nf, NetworkTriage.Ladder(n, nf), false), new RealHealthProbe().Read());
+            Assert.Equal(FindingCode.HealthDeadProxy, d.Findings[0].Code);
+            Assert.Equal("network.reset_user_proxy", d.Ladder[0].ActionId);
+            var (ok, _) = await FixActions.RunAsync(d.Ladder[0]);
+            Assert.True(ok);
+            Assert.True(await AutoFixScout.Areas.HealthFlow.AutoTestAsync(d.Findings));
+        }
+        finally
+        {
+            k.SetValue("ProxyEnable", pe ?? 0, Microsoft.Win32.RegistryValueKind.DWord);
+            if (ps is string v) k.SetValue("ProxyServer", v); else k.DeleteValue("ProxyServer", false);
+        }
+    }
+}
