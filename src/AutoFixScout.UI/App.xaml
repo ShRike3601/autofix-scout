@@ -8,6 +8,7 @@
                 <!-- [0] = palette, swapped at runtime by ThemeManager to follow the system theme. -->
                 <ResourceDictionary Source="Theme/Light.xaml"/>
                 <ResourceDictionary Source="Theme/Styles.xaml"/>
+                <ResourceDictionary Source="Theme/Art.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

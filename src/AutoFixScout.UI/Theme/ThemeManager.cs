@@ -101,18 +101,28 @@ public static class ThemeManager
         var hi = SystemColors.HighlightBrush;
         var hiText = SystemColors.HighlightTextBrush;
         foreach (var k in new[] { "WindowBackgroundBrush", "CardBrush", "CardPressedBrush", "ButtonBrush", "ButtonPressedBrush",
+                     "SurfaceBrush", "HeroBackgroundBrush", "AccentSoftBrush", "StepPendingFillBrush", "LogoBrush",
                      "SoundTileBrush", "CameraTileBrush", "NetworkTileBrush", "NeutralTileBrush", "SuccessTileBrush",
-                     "InfoTileBrush", "CautionTileBrush", "ProblemTileBrush", "SubtlePressedBrush", "FocusInnerBrush" })
+                     "InfoTileBrush", "CautionTileBrush", "ProblemTileBrush", "SubtlePressedBrush", "FocusInnerBrush",
+                     "OnStatusBrush", "ArtHighlightBrush", "SoundArt2Brush", "CameraArt2Brush", "NetworkArt2Brush" })
             d[k] = window;
         foreach (var k in new[] { "TextPrimaryBrush", "TextSecondaryBrush", "CardBorderBrush", "DividerBrush", "ButtonBorderBrush",
                      "FocusOuterBrush", "SoundGlyphBrush", "CameraGlyphBrush", "NetworkGlyphBrush", "NeutralGlyphBrush",
+                     "HeroTextBrush", "HeroSubtextBrush",
+                     "HeroLineBrush", "HeroBorderBrush", "StepTrackBrush", "LogoGlyphBrush", "LogoAccentBrush",
                      "SuccessBrush", "InfoBrush", "CautionBrush", "ProblemBrush", "RingTrackBrush" })
             d[k] = text;
-        foreach (var k in new[] { "AccentBrush", "AccentHoverBrush", "AccentPressedBrush", "CardHoverBrush", "ButtonHoverBrush", "SubtleHoverBrush" })
+        // Hover keeps the window colour behind text (so text stays readable) and shows the highlight as an outline.
+        foreach (var k in new[] { "CardHoverBrush", "ButtonHoverBrush", "SubtleHoverBrush" })
+            d[k] = window;
+        foreach (var k in new[] { "AccentBrush", "AccentHoverBrush", "AccentPressedBrush", "AccentFillBrush", "CardHoverBorderBrush" })
             d[k] = hi;
+        foreach (var k in new[] { "HeroGlow1Brush", "HeroGlow2Brush", "HeroGlow3Brush" })
+            d[k] = Brushes.Transparent;
         d["OnAccentBrush"] = hiText;
         d["ShadowColor"] = Colors.Transparent;
         d["ShadowOpacity"] = 0.0;
+        d["ShadowHoverOpacity"] = 0.0;
         return d;
     }
 

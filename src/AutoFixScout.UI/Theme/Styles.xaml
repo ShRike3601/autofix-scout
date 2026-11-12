@@ -13,22 +13,66 @@
     <FontFamily x:Key="TextFont">Segoe UI Variable Text, Segoe UI</FontFamily>
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
-    <system:Double x:Key="TitleSize">34</system:Double>
-    <system:Double x:Key="MessageSize">24</system:Double>
-    <system:Double x:Key="CardTitleSize">22</system:Double>
-    <system:Double x:Key="ButtonTextSize">19</system:Double>
+    <!-- Type scale: display / title / subtitle / body / caption. -->
+    <system:Double x:Key="DisplaySize">32</system:Double>
+    <system:Double x:Key="TitleSize">26</system:Double>
+    <system:Double x:Key="CardTitleSize">21</system:Double>
+    <system:Double x:Key="BodySize">18</system:Double>
+    <system:Double x:Key="ButtonTextSize">18</system:Double>
     <system:Double x:Key="CaptionSize">15</system:Double>
+    <system:Double x:Key="OverlineSize">13</system:Double>
 
-    <CornerRadius x:Key="CardRadius">10</CornerRadius>
-    <CornerRadius x:Key="ControlRadius">8</CornerRadius>
+    <!-- Spacing scale (4 / 8 / 12 / 16 / 24 / 32): used as margins below. -->
+    <Thickness x:Key="StackGapS">0,0,0,8</Thickness>
+    <Thickness x:Key="StackGapM">0,0,0,16</Thickness>
+    <Thickness x:Key="StackGapL">0,0,0,24</Thickness>
+
+    <CornerRadius x:Key="CardRadius">14</CornerRadius>
+    <CornerRadius x:Key="ControlRadius">10</CornerRadius>
+
+    <!-- Text styles. -->
+    <Style x:Key="DisplayText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource DisplayFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource DisplaySize}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="LineHeight" Value="40"/>
+    </Style>
+    <Style x:Key="TitleText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource DisplayFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource TitleSize}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="LineHeight" Value="34"/>
+    </Style>
+    <Style x:Key="BodyText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource TextFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySize}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="LineHeight" Value="27"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    </Style>
+    <Style x:Key="CaptionText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource TextFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource CaptionSize}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    </Style>
+    <Style x:Key="OverlineText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource TextFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource OverlineSize}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    </Style>
 
     <!-- Keyboard focus: two-ring outline that is visible on any background. -->
     <Style x:Key="FocusRing">
         <Setter Property="Control.Template">
             <Setter.Value>
                 <ControlTemplate>
-                    <Border Margin="-4" CornerRadius="12" BorderThickness="2" BorderBrush="{DynamicResource FocusOuterBrush}">
-                        <Border CornerRadius="10" BorderThickness="1" BorderBrush="{DynamicResource FocusInnerBrush}"/>
+                    <Border Margin="-4" CornerRadius="16" BorderThickness="2" BorderBrush="{DynamicResource FocusOuterBrush}">
+                        <Border CornerRadius="14" BorderThickness="1" BorderBrush="{DynamicResource FocusInnerBrush}"/>
                     </Border>
                 </ControlTemplate>
             </Setter.Value>
@@ -54,24 +98,34 @@
         <Setter Property="ui:Motion.Press" Value="True"/>
     </Style>
 
-    <!-- Home cards: large, friendly, lift slightly on hover. -->
+    <!-- Home cards: elevated, lift on hover, dip on press. -->
     <Style x:Key="CardButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
         <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding" Value="18,16"/>
-        <Setter Property="Margin" Value="0,0,0,12"/>
-        <Setter Property="MinHeight" Value="88"/>
+        <Setter Property="Padding" Value="16,14,20,14"/>
+        <Setter Property="Margin" Value="0,0,0,14"/>
+        <Setter Property="MinHeight" Value="96"/>
         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-        <Setter Property="ui:Motion.HoverScale" Value="1.012"/>
+        <Setter Property="ui:Motion.HoverScale" Value="1.008"/>
+        <Setter Property="ui:Motion.HoverLift" Value="3"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Grid>
-                        <Border x:Name="Shadow" CornerRadius="{StaticResource CardRadius}" Background="{DynamicResource WindowBackgroundBrush}" Opacity="0">
+                        <!-- Resting elevation. -->
+                        <Border CornerRadius="{StaticResource CardRadius}" Background="{DynamicResource WindowBackgroundBrush}" Margin="2,4,2,0">
                             <Border.Effect>
-                                <DropShadowEffect BlurRadius="18" ShadowDepth="3" Direction="270"
+                                <DropShadowEffect BlurRadius="14" ShadowDepth="2" Direction="270"
                                                   Color="{DynamicResource ShadowColor}" Opacity="{DynamicResource ShadowOpacity}"/>
+                            </Border.Effect>
+                        </Border>
+                        <!-- Raised elevation, shown on hover. -->
+                        <Border x:Name="Shadow" CornerRadius="{StaticResource CardRadius}" Background="{DynamicResource WindowBackgroundBrush}"
+                                Margin="4,8,4,0" Opacity="0">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="28" ShadowDepth="8" Direction="270"
+                                                  Color="{DynamicResource ShadowColor}" Opacity="{DynamicResource ShadowHoverOpacity}"/>
                             </Border.Effect>
                         </Border>
                         <Border x:Name="Chrome" CornerRadius="{StaticResource CardRadius}"
@@ -85,7 +139,7 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource CardHoverBrush}"/>
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource CardHoverBorderBrush}"/>
                             <Setter TargetName="Shadow" Property="Opacity" Value="1"/>
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
@@ -93,7 +147,7 @@
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource CardPressedBrush}"/>
-                            <Setter TargetName="Shadow" Property="Opacity" Value="0.4"/>
+                            <Setter TargetName="Shadow" Property="Opacity" Value="0.3"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -101,39 +155,48 @@
         </Setter>
     </Style>
 
-    <!-- Main answer on a step screen. -->
+    <!-- Primary answer on a step screen: filled accent with a soft glow. -->
     <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
-        <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource AccentFillBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="FontSize" Value="{StaticResource ButtonTextSize}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Padding" Value="24,0"/>
-        <Setter Property="MinHeight" Value="58"/>
+        <Setter Property="MinHeight" Value="56"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Chrome" CornerRadius="{StaticResource ControlRadius}"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
-                        <ContentPresenter Margin="{TemplateBinding Padding}" RecognizesAccessKey="False"
-                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}">
-                            <ContentPresenter.Resources>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="TextWrapping" Value="Wrap"/>
-                                    <Setter Property="TextAlignment" Value="Center"/>
-                                </Style>
-                            </ContentPresenter.Resources>
-                        </ContentPresenter>
-                    </Border>
+                    <Grid>
+                        <Border x:Name="Glow" CornerRadius="{StaticResource ControlRadius}" Background="{DynamicResource AccentBrush}" Margin="6,6,6,0" Opacity="0.55">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="16" ShadowDepth="3" Direction="270"
+                                                  Color="{DynamicResource ShadowColor}" Opacity="{DynamicResource ShadowHoverOpacity}"/>
+                            </Border.Effect>
+                        </Border>
+                        <Border x:Name="Chrome" CornerRadius="{StaticResource ControlRadius}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter Margin="{TemplateBinding Padding}" RecognizesAccessKey="False"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}">
+                                <ContentPresenter.Resources>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                        <Setter Property="TextAlignment" Value="Center"/>
+                                    </Style>
+                                </ContentPresenter.Resources>
+                            </ContentPresenter>
+                        </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource AccentPressedBrush}"/>
+                            <Setter TargetName="Glow" Property="Opacity" Value="0.2"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -141,11 +204,16 @@
         </Setter>
     </Style>
 
-    <!-- Second answer ("No", "Not now"): same size, quieter. -->
-    <Style x:Key="StandardButton" TargetType="Button" BasedOn="{StaticResource AccentButton}">
+    <!-- Secondary answer ("No", "Not now"): same size, quieter. -->
+    <Style x:Key="StandardButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
         <Setter Property="Background" Value="{DynamicResource ButtonBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="FontSize" Value="{StaticResource ButtonTextSize}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Padding" Value="24,0"/>
+        <Setter Property="MinHeight" Value="56"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -166,6 +234,7 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource ButtonHoverBrush}"/>
+                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource CardHoverBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource ButtonPressedBrush}"/>
@@ -183,6 +252,7 @@
         <Setter Property="BorderBrush" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="FontSize" Value="{StaticResource CaptionSize}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Padding" Value="12,9"/>
         <Setter Property="MinHeight" Value="42"/>
         <Setter Property="Template">
