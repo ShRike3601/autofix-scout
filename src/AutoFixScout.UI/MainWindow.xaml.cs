@@ -299,6 +299,44 @@ public partial class MainWindow : Window, IFixHost
         return settled;
     }
 
+
+    // ---- describe the problem ----
+
+    private void OnSymptomTextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e) =>
+        SymptomHint.Visibility = SymptomBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    private void OnSymptomKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != System.Windows.Input.Key.Enter) return;
+        e.Handled = true;
+        OnSymptomSearch(sender, e);
+    }
+
+    /// <summary>Suggests the best check for the description, then starts it if the person agrees.</summary>
+    private async void OnSymptomSearch(object sender, RoutedEventArgs e)
+    {
+        var text = SymptomBox.Text.Trim();
+        if (text.Length == 0) { SymptomBox.Focus(); return; }
+        var route = Areas.SymptomRouter.Best(text);
+        SetTopic(null);
+        var start = await ShowStepAsync($"{route.Explanation} AutoFix Scout recommends the check \"{route.Title}\".", "Start this check", "Back");
+        SymptomBox.Text = "";
+        if (!start) { ShowHome(); return; }
+        Action<object, RoutedEventArgs> run = route.Area switch
+        {
+            "sound" => OnSoundClicked,
+            "camera" => OnCameraClicked,
+            "network" => OnNetworkClicked,
+            "microphone" => OnMicrophoneClicked,
+            "program" => OnProgramClosingClicked,
+            "storage" => OnStorageClicked,
+            "update" => OnUpdateClicked,
+            "printer" => OnPrinterClicked,
+            "display" => OnDisplayClicked,
+            _ => OnHealthClicked,
+        };
+        run(sender, e);
+    }
     // ---- more areas (home screen "Something else") ----
 
     private void OnOtherClicked(object sender, RoutedEventArgs e)

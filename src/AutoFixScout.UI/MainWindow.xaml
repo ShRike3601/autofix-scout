@@ -73,6 +73,24 @@
 
                 <!-- Home: three symptoms + something else (spec 4.1) -->
                 <StackPanel x:Name="HomePanel" VerticalAlignment="Top" KeyboardNavigation.DirectionalNavigation="Contained">
+                    <!-- Describe the problem in your own words: routes to the best check (SymptomRouter). -->
+                    <Border CornerRadius="12" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1"
+                            Padding="16,6,6,6" Margin="0,0,0,16">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE721;" FontSize="16" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock x:Name="SymptomHint" Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" FontSize="16"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" Text="Describe the problem in your own words"/>
+                            <TextBox x:Name="SymptomBox" Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center" FontSize="16" Background="Transparent"
+                                     BorderThickness="0" Foreground="{DynamicResource TextPrimaryBrush}" CaretBrush="{DynamicResource TextPrimaryBrush}"
+                                     AutomationProperties.Name="Describe the problem" TextChanged="OnSymptomTextChanged" KeyDown="OnSymptomKeyDown"/>
+                            <Button Grid.Column="2" Style="{StaticResource AccentButton}" Content="Find a fix" Padding="18,8" MinWidth="0" Click="OnSymptomSearch"/>
+                        </Grid>
+                    </Border>
                     <Border x:Name="SoundCardHost">
                         <Button Style="{StaticResource CardButton}" Click="OnSoundClicked"
                                 AutomationProperties.Name="Sound is not working" AutomationProperties.HelpText="Speakers, headphones and volume">
