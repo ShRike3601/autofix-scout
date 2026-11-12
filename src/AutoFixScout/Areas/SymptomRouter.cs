@@ -22,6 +22,9 @@ public static class SymptomRouter
         ["printer"] = new("printer", "Printer not working", "This sounds like a problem with printing."),
         ["display"] = new("display", "Screen or display problem", "This sounds like a problem with the screen or display."),
         ["shell"] = new("shell", "Start menu, taskbar or search not working", "This sounds like a problem with the Start menu, the taskbar or search."),
+        ["store"] = new("store", "Microsoft Store or app installs", "This sounds like a problem with the Microsoft Store or with installing apps."),
+        ["office"] = new("office", "Word, Excel or Outlook problems", "This sounds like a problem with Microsoft Office."),
+        ["onedrive"] = new("onedrive", "OneDrive not syncing", "This sounds like a problem with OneDrive."),
         ["health"] = new("health", "Full computer check-up", "AutoFix Scout will check the whole computer for common software problems."),
     };
 
@@ -39,6 +42,11 @@ public static class SymptomRouter
                    new[] { "camera", "webcam", "video call", "cam " }),
         ("network", new[] { "no internet", "not connecting", "can't connect", "cannot connect", "cant connect", "no wifi", "wi-fi not", "wifi not", "pages not loading", "websites not", "dns", "limited connectivity" },
                     new[] { "internet", "wifi", "wi-fi", "network", "online", "connection", "router", "ethernet", "website", "websites", "browser", "offline" }),
+        ("onedrive", new[] { "onedrive", "one drive", "not syncing", "sync pending", "files not uploading" }, new[] { "onedrive", "sync", "syncing" }),
+        ("office", new[] { "microsoft office", "ms office", " word ", "excel", "outlook", "powerpoint", "word won", "excel won", "outlook won", "outlook not", "word keeps", "excel keeps", "outlook keeps" },
+                   new[] { "office", "word", "excel", "outlook", "powerpoint", "onenote" }),
+        ("store", new[] { "microsoft store", "windows store", "app store", "store won", "store not", "cannot install apps", "can't install apps", "apps not downloading", "download pending" },
+                  new[] { "store", "install", "installing", "download", "downloading" }),
         ("shell", new[] { "start menu", "start button", "taskbar", "search not", "search bar", "search box", "windows key", "notification", "action center", "system tray" },
                   new[] { "start", "taskbar", "search", "icons", "desktop icons" }),
         ("health", new[] { "blue screen", "bsod", "clock is wrong", "wrong time", "certificate", "virus", "pop-ups", "popups", "redirect" },

@@ -96,7 +96,7 @@ public partial class MainWindow : Window, IFixHost
     {
         SetTopic(topic);
         Journey(Stage.Check);
-        var sessionId = StartSession(topic switch { "sound" => "audio", "health" or "shell" => "other", _ => topic });
+        var sessionId = StartSession(topic switch { "sound" => "audio", "health" or "shell" or "apps" => "other", _ => topic });
         try
         {
             ShowBusy("Checking your computer", scan: true);
@@ -334,6 +334,9 @@ public partial class MainWindow : Window, IFixHost
             "microphone" => OnMicrophoneClicked,
             "bluetooth" => OnBluetoothClicked,
             "shell" => OnShellClicked,
+            "store" => OnStoreClicked,
+            "office" => OnOfficeClicked,
+            "onedrive" => OnOneDriveClicked,
             "program" => OnProgramClosingClicked,
             "storage" => OnStorageClicked,
             "update" => OnUpdateClicked,
@@ -408,6 +411,14 @@ public partial class MainWindow : Window, IFixHost
     private async void OnShellClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.ShellFlow.Topic, Areas.ShellFlow.What, Areas.ShellFlow.DiagnoseAsync,
             () => AskAsync(Areas.ShellFlow.TestQuestion));
+
+    private async Task RunAppsAsync(AppsFocus focus) =>
+        await RunFlowAsync(Areas.AppsFlow.Topic, Areas.AppsFlow.What, () => Areas.AppsFlow.DiagnoseAsync(focus),
+            () => AskAsync(Areas.AppsFlow.TestQuestionFor(focus)));
+
+    private async void OnStoreClicked(object sender, RoutedEventArgs e) => await RunAppsAsync(AppsFocus.Store);
+    private async void OnOfficeClicked(object sender, RoutedEventArgs e) => await RunAppsAsync(AppsFocus.Office);
+    private async void OnOneDriveClicked(object sender, RoutedEventArgs e) => await RunAppsAsync(AppsFocus.OneDrive);
 
     private async void OnMicrophoneClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.MicrophoneFlow.Topic, Areas.MicrophoneFlow.What, Areas.MicrophoneFlow.DiagnoseAsync, async () =>

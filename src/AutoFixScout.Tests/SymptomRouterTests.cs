@@ -22,6 +22,9 @@ public class SymptomRouterTests
     [InlineData("I keep getting a blue screen", "health")]
     [InlineData("the start menu does not open", "shell")]
     [InlineData("taskbar is frozen and search does not work", "shell")]
+    [InlineData("microsoft store will not open", "store")]
+    [InlineData("outlook keeps crashing when I open it", "office")]
+    [InlineData("onedrive is not syncing my files", "onedrive")]
     [InlineData("something is wrong", "health")]
     [InlineData("", "health")]
     public void RoutesToTheRightCheck(string text, string area) => Assert.Equal(area, SymptomRouter.Best(text).Area);

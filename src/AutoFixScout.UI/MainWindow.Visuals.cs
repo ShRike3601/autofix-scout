@@ -112,6 +112,7 @@ public partial class MainWindow
             "microphone" => "Microphone",
             "bluetooth" => "Bluetooth",
             "shell" => "Start menu, taskbar and search",
+            "apps" => "Apps and the Microsoft Store",
             "storage" => "Slow or full computer",
             "update" => "Windows Update",
             "printer" => "Printer",
