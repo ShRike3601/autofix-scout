@@ -25,6 +25,10 @@ public static class FixActions
                         "airplane" => "ms-settings:network-airplanemode",
                         "wifi" => "ms-settings:network-wifi",
                         "camera_app" => "microsoft.windows.camera:",
+                        "storagesense" => "ms-settings:storagesense",
+                        "startupapps" => "ms-settings:startupapps",
+                        "windowsupdate" => "ms-settings:windowsupdate",
+                        "troubleshoot" => "ms-settings:troubleshoot",
                         _ => throw new ArgumentException(rung.Arg),
                     };
                     Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
@@ -40,7 +44,15 @@ public static class FixActions
                 case "device.disable_enable":
                 case "device.enable":
                 case "network.reset_dns":
+                case "storage.clear_user_temp":
+                    // The person's own temp folder only, files older than a day; no admin needed.
+                    var (freed, deleted, skipped) = await Task.Run(() =>
+                        Areas.StorageCleanup.ClearTemp(Path.GetTempPath(), DateTime.UtcNow.AddHours(-24)));
+                    return (true, $"temporary files removed: {deleted} ({freed / 1048576} MB), skipped (in use): {skipped}");
+                case "storage.empty_recycle_bin":
+                    return await Task.Run(Areas.StorageCleanup.EmptyRecycleBin);
                 case "device.rescan":
+                case "service.set_manual":
                     var code =await Task.Run(() => RunElevated(rung.ActionId, rung.Arg!));
                     return (code == 0, code is null ? Declined : $"executor exit code {code}");
                 default:
