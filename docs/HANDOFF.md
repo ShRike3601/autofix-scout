@@ -299,11 +299,11 @@ Goal: move from simple switches (mute, airplane mode) to real software repair: "
 4. "A program keeps closing" flow: crashed apps from the event log -> cause by faulting module
    (runtime, .NET, graphics driver, system file, the app itself) -> matching rungs.
 5. Symptom search on the home screen: free text -> area or health check.
-6. Wire all areas into the home screen ("Other problems" opens the list).
+6. [done, checked in the real UI] Wire all areas into the home screen ("Other problems" opens the list).
 7. TestBench: fault injection for each new repair, run unattended through the elevated runner.
 8. Docs, writing-style tests, CI green, PR from `overnight`.
 
-Next (in order): 4 (program crash flow uses HealthTriage crash findings; add `HealthFlow` in Areas/), 6 (home
-screen "Other problems" -> list of areas incl. health), 5 (symptom search), then run the admin health bench as soon
+Next (in order): HealthFlow + home wiring are done (PR 11). Then: per-program crash picker (ask "Is <app> the program?"),
+symptom search (5), Bluetooth area, then run the admin health bench as soon
 as `schtasks /query /tn AFS-Bench-Elevated` works: job file running
 `tools\AutoFixScout.TestBench\bin\Debug\net8.0-windows\AutoFixScout.TestBench.exe health --long --out C:\afs-bench\out`.
