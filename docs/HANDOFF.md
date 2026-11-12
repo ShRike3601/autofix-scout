@@ -287,11 +287,11 @@ would cut off the session), never change the clock.
 Goal: move from simple switches (mute, airplane mode) to real software repair: "deep fix engine".
 
 1. [done] Merge PR 8 (storage/update), 9 (microphone), 10 (printer/display WIP) into `overnight`.
-2. Health area ("Something else is wrong"): `HealthProbe` reads event logs (app crashes + faulting module,
+2. [done, calibrated on the bench] Health area ("Something else is wrong"): `HealthProbe` reads event logs (app crashes + faulting module,
    blue screens, unexpected shutdowns, disk/NTFS/WHEA errors, missing runtimes (SideBySide), failing
    services), clock offset, proxy (WinINet, WinHTTP), hosts-file hijacks, Winsock LSPs, system PATH, TEMP,
    critical services disabled, broken Store apps, pending restart.
-3. Repair actions (allowlisted, validated, backups first): sfc, DISM RestoreHealth, time resync, reset
+3. [code done; user-level ones passed live (proxy, Store app, Explorer); admin ones wait for the runner: `TestBench.exe health --long`] Repair actions (allowlisted, validated, backups first): sfc, DISM RestoreHealth, time resync, reset
    WinHTTP proxy, reset user proxy (non-admin), clean hosts (backup), Windows Update component reset
    (rename, not delete), restore service default start type, repair system PATH, rebuild search index,
    re-register broken Store app (non-admin), restart Explorer, rebuild icon cache, install VC++ runtime
@@ -302,3 +302,8 @@ Goal: move from simple switches (mute, airplane mode) to real software repair: "
 6. Wire all areas into the home screen ("Other problems" opens the list).
 7. TestBench: fault injection for each new repair, run unattended through the elevated runner.
 8. Docs, writing-style tests, CI green, PR from `overnight`.
+
+Next (in order): 4 (program crash flow uses HealthTriage crash findings; add `HealthFlow` in Areas/), 6 (home
+screen "Other problems" -> list of areas incl. health), 5 (symptom search), then run the admin health bench as soon
+as `schtasks /query /tn AFS-Bench-Elevated` works: job file running
+`tools\AutoFixScout.TestBench\bin\Debug\net8.0-windows\AutoFixScout.TestBench.exe health --long --out C:\afs-bench\out`.
