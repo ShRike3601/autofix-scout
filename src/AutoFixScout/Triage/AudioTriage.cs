@@ -300,4 +300,7 @@ public enum FindingCode
     // Security: browser policies
     SecurityBrowserPolicy,
     SecurityBrowserPolicyManaged,
+    // Security: threats found by Microsoft Defender
+    SecurityThreatActive,
+    SecurityThreatsRemoved,
 }
