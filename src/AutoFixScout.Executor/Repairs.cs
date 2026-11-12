@@ -151,6 +151,27 @@ public static class Repairs
     }
 
     // ---- security ----
+    /// <summary>
+    /// security.remove_browser_policies: removes the flagged browser policy values under HKLM and HKCU (the list is computed here,
+    /// from <see cref="BrowserPolicies"/>; nothing is taken as input). The values are saved first. A computer that belongs
+    /// to a domain or Azure AD is managed by an organization, so nothing is removed there (3). 3 = nothing flagged.
+    /// </summary>
+    public static int RemoveBrowserPolicies()
+    {
+        if (BrowserPolicies.IsManagedPc()) return 3;
+        // HKCU\Software\Policies is read-only for the person's normal (non-elevated) process, so both hives are cleaned here.
+        // The executor runs elevated as the same user, so CurrentUser is the person's own hive.
+        using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+        using var hkcu = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Registry64);
+        var machine = BrowserPolicies.Scan(hklm, BrowserPolicies.HiveMachine);
+        var user = BrowserPolicies.Scan(hkcu, BrowserPolicies.HiveUser);
+        if (machine.Count + user.Count == 0) return 3;
+        Backup("browser-policies", BrowserPolicies.BackupText(hklm, machine) + BrowserPolicies.BackupText(hkcu, user));
+        BrowserPolicies.Remove(hklm, machine);
+        BrowserPolicies.Remove(hkcu, user);
+        return BrowserPolicies.Scan(hklm, BrowserPolicies.HiveMachine).Count + BrowserPolicies.Scan(hkcu, BrowserPolicies.HiveUser).Count == 0 ? 0 : 1;
+    }
+
 
     private const string FirewallPolicy = @"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy";
 

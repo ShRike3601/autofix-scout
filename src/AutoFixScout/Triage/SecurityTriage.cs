@@ -54,6 +54,11 @@ public sealed class SecurityState
     public HealthState Network { get; set; } = new();
     public IReadOnlyList<SuspiciousStartup> SuspiciousStartups { get; set; } = new List<SuspiciousStartup>();
 
+    /// <summary>Hijack-type browser policies found under HKLM and HKCU (read only).</summary>
+    internal IReadOnlyList<BrowserPolicies.Flag> BrowserPolicyFlags { get; set; } = new List<BrowserPolicies.Flag>();
+    /// <summary>The computer belongs to a domain or Azure AD: browser policies are then expected, and are not removed.</summary>
+    public bool ManagedPc { get; set; }
+
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
 }
 
@@ -154,6 +159,19 @@ public static class SecurityTriage
                 $"A program that starts with Windows runs from a temporary or shared folder and has a random-looking name: {Names(s.SuspiciousStartups)}. It may be unwanted software.",
                 string.Join("; ", s.SuspiciousStartups.Select(e => $"{e.Location} {e.Name} -> {e.File}"))));
 
+        if (s.BrowserPolicyFlags.Count > 0)
+        {
+            var browsers = string.Join(", ", s.BrowserPolicyFlags.Select(x => x.Browser).Distinct());
+            if (s.ManagedPc)
+                f.Add(F(FindingCode.SecurityBrowserPolicyManaged,
+                    $"This computer is managed by an organization, and the settings of {browsers} include rules set by that organization. This is normal on a work or school computer, so AutoFix Scout leaves them unchanged.",
+                    BrowserPolicies.Summary(s.BrowserPolicyFlags)));
+            else
+                f.Add(F(FindingCode.SecurityBrowserPolicy,
+                    $"A program has taken control of browser settings in {browsers}, such as the home page, the search engine, the proxy server or added extensions. The browser may show \"Managed by your organization\".",
+                    BrowserPolicies.Summary(s.BrowserPolicyFlags)));
+        }
+
         if (f.Count > 0) return f;
         return new[] { F(FindingCode.LooksNormal,
             s.ProbeErrors.Count > 0
@@ -228,6 +246,16 @@ public static class SecurityTriage
                 $"AutoFix Scout will open \"Startup apps\". If you do not recognize {Names(s.SuspiciousStartups)}, please switch it off. Nothing is deleted, and you can switch it on again at any time.",
                 "startupapps"));
 
+        if (codes.Contains(FindingCode.SecurityBrowserPolicy))
+        {
+            // One admin step for both hives: Windows lets a normal process only read HKCU\Software\Policies.
+            r.Add(Admin("remove_browser_policies", "security.remove_browser_policies",
+                "AutoFix Scout can remove the browser rules that a program added (home page, search engine, proxy server and extensions). The previous values are saved first."));
+            r.Add(new("check_browser_policy", "ui.human_step", 0,
+                "Please close all browser windows and open the browser again. Then type chrome://policy (Chrome), edge://policy (Edge) or about:policies (Firefox) in the address bar and check that no rule is listed. " +
+                "If a rule is still listed, select \"Reload policies\" on that page."));
+        }
+
         if (defender)
             r.Add(new("quick_scan", "security.quick_scan", 0,
                 "AutoFix Scout can ask Microsoft Defender to run a quick scan for unwanted software. This takes a few minutes, and you can keep working."));
@@ -249,6 +277,8 @@ public static class SecurityTriage
         var codes = after.Select(x => x.Code).ToHashSet();
         if (codes.Contains(FindingCode.SecurityUacOff))
             return "User Account Control is turned back on only after a restart. Please restart the computer and run the check again.";
+        if (codes.Contains(FindingCode.SecurityBrowserPolicy))
+            return "Browser rules that come back after they were removed are put back by a program on this computer. A scan for unwanted software is the next step, and the person helping you can check the installed programs for ones you do not recognize.";
         if (codes.Contains(FindingCode.SecurityRealTimeOff) || codes.Contains(FindingCode.SecuritySmartScreenOff))
             return "If a protection setting cannot be turned on, or turns itself off again, it may be managed by an organization or changed by unwanted software. " +
                    "The person helping you can run \"Microsoft Defender Offline scan\" from \"Windows Security\", \"Virus & threat protection\", \"Scan options\".";
@@ -261,6 +291,7 @@ public static class SecurityTriage
     {
         FindingCode.SecurityNoAntivirus, FindingCode.SecurityRealTimeOff, FindingCode.SecuritySignaturesOld, FindingCode.SecurityFirewallOff,
         FindingCode.SecuritySmartScreenOff, FindingCode.HealthHostsHijacked, FindingCode.HealthDeadProxy, FindingCode.HealthDeadSystemProxy,
+        FindingCode.SecurityBrowserPolicy,
     };
 
     public static bool Resolved(IReadOnlyList<Finding> before, IReadOnlyList<Finding> after) =>

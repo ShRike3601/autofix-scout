@@ -346,7 +346,7 @@ Status 2026-11-13 ~00:45 IST: power area (R2) merged (436 tests); NOT yet in the
 
 ## Roadmap (part 3, from 2026-11-13 ~01:30 IST)
 No UI edits in this session (another session reworks the UI). New checks go into existing areas so they are reachable now.
-- [ ] Q1 Browser hijack by policy (Security area): Chrome/Edge/Firefox policies a home PC should not have (forced extensions,
+- [x] Q1 Browser hijack by policy (Security area): Chrome/Edge/Firefox policies a home PC should not have (forced extensions,
       forced homepage/search engine, "managed by your organization"), plus browser proxy settings. Fix: remove those policy
       values with a backup (HKCU without admin, HKLM through the executor with a fixed list of policy names).
 - [x] Q2 "What changed before the problem started" (check-up): programs, Windows updates and drivers installed in the last
@@ -361,3 +361,4 @@ No UI edits in this session (another session reworks the UI). New checks go into
       Optimization cache, old Windows Update cleanup; safe cleanups only (Storage Sense / component cleanup), guided
       for personal folders (never delete personal files).
 Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This session works in C:\afs-wt\overnight (branch overnight); agents in C:\afs-wt\<name>.
+- Q1 note: the executor's admin path for browser policies (HKLM+HKCU) is unit-tested only; run it through the elevated bench with a dummy HKCU Chrome HomepageLocation next.

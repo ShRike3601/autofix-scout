@@ -297,4 +297,7 @@ public enum FindingCode
     // Recent changes and graphics driver resets
     HealthRecentChanges,
     HealthGraphicsResets,
+    // Security: browser policies
+    SecurityBrowserPolicy,
+    SecurityBrowserPolicyManaged,
 }

@@ -1,6 +1,7 @@
 using System.Management;
 using System.ServiceProcess;
 using AutoFixScout.Probes;
+using AutoFixScout.Repair;
 using AutoFixScout.Triage;
 using Microsoft.Win32;
 
@@ -78,6 +79,15 @@ public static class SecurityFlow
             errors.AddRange(s.Network.ProbeErrors);
         });
         Part("startup programs", () => s.SuspiciousStartups = ReadSuspiciousStartups());
+        Part("browser policies", () =>
+        {
+            var flags = new List<BrowserPolicies.Flag>();
+            flags.AddRange(BrowserPolicies.Scan(Registry.CurrentUser, BrowserPolicies.HiveUser));
+            using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+                flags.AddRange(BrowserPolicies.Scan(hklm, BrowserPolicies.HiveMachine));
+            s.BrowserPolicyFlags = flags;
+            s.ManagedPc = flags.Count > 0 && BrowserPolicies.IsManagedPc();
+        });
         s.ProbeErrors = errors;
         return s;
     }
