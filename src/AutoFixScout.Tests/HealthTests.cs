@@ -352,4 +352,81 @@ public class HealthTests
         Assert.All(l, r => Assert.True(r.Tier <= 1));
         Assert.True(HealthTriage.ProbablyHardware(s));
     }
+
+    private static RecentChange Change(RecentChangeKind k, string name, int daysAgo) => new(k, name, DateTime.UtcNow.AddDays(-daysAgo));
+
+    [Fact]
+    public void RecentChanges_AloneAreNotAFinding()
+    {
+        var s = Healthy();
+        s.RecentChanges = new[] { Change(RecentChangeKind.Program, "Sample Tool", 1) };
+        Assert.Equal(FindingCode.LooksNormal, Run(s).F[0].Code);
+        s.RebootPending = Tri.Yes; // a pending restart is the result of a change, not a second problem
+        Assert.DoesNotContain(Run(s).F, x => x.Code == FindingCode.HealthRecentChanges);
+    }
+
+    [Fact]
+    public void RecentChanges_AreListedWhenAnotherProblemExists()
+    {
+        var s = Healthy();
+        s.BlueScreens = 1;
+        s.RecentChanges = new[] { Change(RecentChangeKind.Program, "Sample Tool", 1), Change(RecentChangeKind.Update, "Sample Update KB1", 2) };
+        s.RestorePointsKnown = Tri.Unknown;
+        var (f, l) = Run(s);
+        var c = f.Single(x => x.Code == FindingCode.HealthRecentChanges);
+        Assert.Contains("programs or updates were installed shortly before the problems started", c.PlainMessage);
+        Assert.Contains("Sample Tool", c.TechnicalDetail);
+        Assert.Contains(l, r => r.Id == "uninstall_recent_program" && r.Arg == "apps");
+        Assert.Contains(l, r => r.Id == "uninstall_recent_update" && r.Arg == "updatehistory");
+        Assert.Contains(l, r => r.Id == "system_restore" && r.ActionId == "ui.human_step" && r.Say.Contains("rstrui.exe"));
+    }
+
+    [Fact]
+    public void RestorePoint_OnlyOfferedWhenUnknownOrOlderThanTheFirstChange()
+    {
+        var s = Healthy();
+        s.BlueScreens = 1;
+        s.RecentChanges = new[] { Change(RecentChangeKind.Driver, "SampleDriver", 3) };
+        s.RestorePointsKnown = Tri.Yes;
+        s.RestorePoints = new[] { DateTime.UtcNow.AddDays(-1) };
+        Assert.DoesNotContain(Run(s).L, r => r.Id == "system_restore");
+        s.RestorePoints = new[] { DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(-10) };
+        Assert.Contains(Run(s).L, r => r.Id == "system_restore");
+        Assert.DoesNotContain(Run(s).L, r => r.Id is "uninstall_recent_program" or "uninstall_recent_update");
+    }
+
+    [Fact]
+    public void GraphicsResets_GiveDriverStepsAndAreHardwareOnlyWhenVeryFrequent()
+    {
+        var s = Healthy();
+        s.GraphicsResets = 3;
+        var (f, l) = Run(s);
+        Assert.Equal(FindingCode.HealthGraphicsResets, f[0].Code);
+        Assert.Contains("3 times", f[0].PlainMessage);
+        Assert.Contains(l, r => r.Id == "graphics_reset_updates" && r.Arg == "windowsupdate");
+        Assert.Contains(l, r => r.Id == "graphics_reset_maker" && r.ActionId == "ui.human_step" && r.Say.Contains("NVIDIA"));
+        Assert.False(HealthTriage.ProbablyHardware(s));
+        s.GraphicsResets = 20;
+        Assert.True(HealthTriage.ProbablyHardware(s));
+    }
+
+    [Theory]
+    [InlineData("20261109", true)]
+    [InlineData("2026-11-09", false)]
+    [InlineData("", false)]
+    [InlineData("20261399", false)]
+    public void InstallDates_AreParsed(string v, bool ok) => Assert.Equal(ok, RealHealthProbe.ParseInstallDate(v).HasValue);
+
+    [Fact]
+    public void RecentChangeAndGraphicsText_FollowTheWritingGuide()
+    {
+        var s = Healthy();
+        s.BlueScreens = 1; s.GraphicsResets = 25;
+        s.RecentChanges = new[] { Change(RecentChangeKind.Program, "Sample Tool", 1), Change(RecentChangeKind.Update, "Sample Update", 2), Change(RecentChangeKind.Driver, "SampleDriver", 2) };
+        var (f, l) = Run(s);
+        foreach (var t in f.Select(x => x.PlainMessage).Concat(l.Select(r => r.Say)))
+            Assert.DoesNotMatch(@"n't|'d |'ll |\bI\b|\bwe\b|!|\bit's\b|\bthat's\b", t);
+        Assert.Equal(l.Count, l.Select(r => r.Id).Distinct().Count());
+        Assert.All(l, r => Assert.True(r.Tier <= 1));
+    }
 }

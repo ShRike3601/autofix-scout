@@ -276,4 +276,7 @@ public enum FindingCode
     NetWeakWifi,
     NetIpConflict,
     NetMetered,
+    // Recent changes and graphics driver resets
+    HealthRecentChanges,
+    HealthGraphicsResets,
 }

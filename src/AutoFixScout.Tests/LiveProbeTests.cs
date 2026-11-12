@@ -26,12 +26,14 @@ public class LiveProbeTests
             $"winsock 3rd party: {string.Join("; ", s.ThirdPartyWinsock)}; path missing: {string.Join("; ", s.MissingPathEntries)}; reboot {s.RebootPending}" };
         lines.AddRange(f.Select(x => $"FINDING {x.Code}: {x.PlainMessage} [{x.TechnicalDetail}]"));
         lines.AddRange(HealthTriage.Ladder(s, f).Select(r => $"RUNG {r.Id} {r.ActionId}({r.Arg})"));
+        lines.Add($"recent changes: {s.RecentChanges.Count} (programs {s.RecentChanges.Count(c => c.Kind == RecentChangeKind.Program)}, updates {s.RecentChanges.Count(c => c.Kind == RecentChangeKind.Update)}, drivers {s.RecentChanges.Count(c => c.Kind == RecentChangeKind.Driver)}); restore points {s.RestorePointsKnown}/{s.RestorePoints.Count}; graphics resets {s.GraphicsResets}");
         lines.Add("devices: " + string.Join("; ", s.DeviceProblems.Select(d => $"{d.PnpClass} code={d.Code}")) + "; temp profile: " + s.TempProfile);
         File.WriteAllLines(output, lines);
         Assert.DoesNotContain(s.ProbeErrors, e => e.StartsWith("device errors") || e.StartsWith("user profile"));
         Assert.NotNull(s.DeviceProblems);
         Assert.NotEmpty(s.Drives);
         Assert.All(s.Drives, d => Assert.False(d.Failing || d.Warning));
+        Assert.DoesNotContain(s.ProbeErrors, e => e.StartsWith("recent changes") || e.StartsWith("restore points") || e.StartsWith("graphics resets"));
         Assert.Empty(s.ProbeErrors);
     }
 }
@@ -128,6 +130,7 @@ public class LiveShellTests
     {
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AFS_LIVE"))) return;
         var s = AutoFixScout.Areas.ShellFlow.Read();
+        Assert.DoesNotContain(s.ProbeErrors, e => e.StartsWith("recent changes") || e.StartsWith("restore points") || e.StartsWith("graphics resets"));
         Assert.Empty(s.ProbeErrors);
         Assert.Contains(s.Packages, p => p.Name == "Microsoft.Windows.StartMenuExperienceHost" && p.Status == "Ok");
         var (ok, detail) = await FixActions.RunAsync(new Rung("t", "shell.restart_start_menu", 0, ""));

@@ -69,6 +69,14 @@ public sealed class HealthState
     /// <summary>The program the person said is the one with the problem (from "A program keeps closing"); null = not asked.</summary>
     public string? ChosenApp { get; set; }
 
+    /// <summary>Programs, Windows updates and drivers installed in the last 7 days, newest first.</summary>
+    public IReadOnlyList<RecentChange> RecentChanges { get; set; } = new List<RecentChange>();
+    /// <summary>Dates (UTC) of System Restore points. Unknown = not readable without administrator rights.</summary>
+    public Tri RestorePointsKnown { get; set; } = Tri.Unknown;
+    public IReadOnlyList<DateTime> RestorePoints { get; set; } = new List<DateTime>();
+    /// <summary>Graphics driver resets in the last 14 days (Display event 4101, LiveKernelEvent 141 or 117).</summary>
+    public int GraphicsResets { get; set; }
+
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
 }
 
@@ -85,3 +93,8 @@ public sealed record PhysicalDriveInfo(string Name, string MediaType, string Hea
 }
 
 public interface IHealthProbe { HealthState Read(); }
+
+public enum RecentChangeKind { Program, Update, Driver }
+
+/// <summary>Something installed in the last week. WhenUtc is the install date (programs record the day only).</summary>
+public sealed record RecentChange(RecentChangeKind Kind, string Name, DateTime WhenUtc);
