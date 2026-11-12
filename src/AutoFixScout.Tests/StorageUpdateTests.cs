@@ -14,6 +14,7 @@ public class StorageUpdateTests
     {
         FreeBytes = freeGb * GB, TotalBytes = totalGb * GB, ReclaimableTempBytes = 3 * GB, RecycleBinBytes = 1 * GB,
         StartupAppCount = 4, Uptime = TimeSpan.FromDays(1), MemoryLoadPercent = 40, ProblemDevices = Array.Empty<StorageDeviceInfo>(),
+        TopProcesses = Array.Empty<ProcessUsage>(),
     };
 
     [Fact]

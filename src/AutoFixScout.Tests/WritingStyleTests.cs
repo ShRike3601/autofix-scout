@@ -118,6 +118,13 @@ public class WritingStyleTests
             texts.AddRange(NetworkTriage.Ladder(s, f).Select(r => r.Say));
             if (NetworkTriage.NotFixedHint(f) is { } hint) texts.Add(hint);
         }
+        foreach (var s in SlowComputerTests.StyleStates())
+        {
+            var f = StorageTriage.Evaluate(s);
+            texts.AddRange(f.Select(x => x.PlainMessage));
+            texts.AddRange(StorageTriage.Ladder(s, f).Select(r => r.Say));
+            if (StorageTriage.NotFixedHint(f) is { } hint) texts.Add(hint);
+        }
         texts.Add(Rescan.Rung("audio", "sound device").Say);
         texts.Add(DriverRules.Rollback("sound", "Realtek Audio", "X", Recent())!.Say);
         texts.Add(DriverRules.WindowsUpdate("sound", "Realtek Audio", "X", 10)!.Say);
@@ -147,10 +154,11 @@ public class WritingStyleTests
     public void AdminRungsSayWindowsWillAskForPermission()
     {
         var adminActions = new[] { "service.restart", "device.disable_enable", "device.enable", "network.reset_dns", "device.rescan",
-            "driver.rollback", "driver.install_from_windows_update" };
+            "driver.rollback", "driver.install_from_windows_update", "storage.cleanup_components" };
         var rungs = AudioStates().SelectMany(s => AudioLadder.For(s, AudioTriage.Evaluate(s)))
             .Concat(CameraStates().SelectMany(s => CameraTriage.Ladder(s, CameraTriage.Evaluate(s))))
             .Concat(NetworkStates().SelectMany(s => NetworkTriage.Ladder(s, NetworkTriage.Evaluate(s))))
+            .Concat(SlowComputerTests.StyleStates().SelectMany(s => StorageTriage.Ladder(s, StorageTriage.Evaluate(s))))
             .Where(r => adminActions.Contains(r.ActionId)).ToList();
         Assert.NotEmpty(rungs);
         Assert.All(rungs, r => Assert.Contains("Windows will ask for your permission", r.Say));

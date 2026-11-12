@@ -81,3 +81,42 @@ public class LiveUserRepairTests
         Assert.NotEmpty(System.Diagnostics.Process.GetProcessesByName("explorer"));
     }
 }
+
+/// <summary>startup.disable on the real machine (AFS_LIVE set) with a dummy entry that is always removed afterwards.</summary>
+public class LiveStartupTests
+{
+    private static bool Live => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AFS_LIVE"));
+    private const string Name = "AFS-Test-Entry";
+
+    [Fact]
+    public async Task DummyRunEntry_IsFound_ThenDisabledLikeTaskManager()
+    {
+        if (!Live) return;
+        using var run = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(AutoFixScout.Repair.StartupApps.RunKey, true);
+        Assert.Null(run.GetValue(Name)); // never overwrite a real entry
+        try
+        {
+            run.SetValue(Name, "notepad.exe");
+            var before = new RealStorageProbe().Read();
+            Assert.Contains(before.StartupEntries!, e => e.Name == Name && e.Scope == StartupScope.UserRun && e.Enabled);
+
+            var (ok, detail) = await FixActions.RunAsync(new Rung("t", "startup.disable", 1, "", Name));
+            Assert.True(ok, detail);
+
+            var after = new RealStorageProbe().Read();
+            Assert.Contains(after.StartupEntries!, e => e.Name == Name && !e.Enabled);
+            Assert.Equal(before.StartupAppCount - 1, after.StartupAppCount);
+            using var approved = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(AutoFixScout.Repair.StartupApps.ApprovedKey + "Run");
+            var value = (byte[])approved!.GetValue(Name)!;
+            Assert.Equal(12, value.Length);
+            Assert.Equal(0x03, value[0]);
+            Assert.False(AutoFixScout.Repair.StartupApps.ParseApproved(value).Enabled);
+        }
+        finally
+        {
+            run.DeleteValue(Name, false);
+            using var approved = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(AutoFixScout.Repair.StartupApps.ApprovedKey + "Run", true);
+            approved?.DeleteValue(Name, false);
+        }
+    }
+}

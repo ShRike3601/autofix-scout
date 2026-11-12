@@ -1,4 +1,5 @@
 using System.Globalization;
+using AutoFixScout.Repair;
 
 namespace AutoFixScout.Triage;
 
@@ -20,6 +21,35 @@ public static class StorageTriage
     public const int ManyStartupApps = 12;
     public const int HighMemoryPercent = 90;
     public static readonly TimeSpan LongUptime = TimeSpan.FromDays(7);
+    /// <summary>One program (not part of Windows) above this share of all processor cores, or of installed memory, is a finding.</summary>
+    public const double HeavyCpuPercent = 40, HeavyMemoryPercent = 25;
+
+    private static string Pct(double v) => v.ToString("0", CultureInfo.InvariantCulture);
+
+    /// <summary>The busiest program above the processor threshold, if any.</summary>
+    public static ProcessUsage? HeavyCpu(StorageState s) =>
+        s.TopProcesses?.Where(p => p.CpuPercent > HeavyCpuPercent).MaxBy(p => p.CpuPercent);
+
+    /// <summary>The largest program above the memory threshold, unless it is already the processor finding.</summary>
+    public static ProcessUsage? HeavyMemory(StorageState s)
+    {
+        var cpu = HeavyCpu(s);
+        return s.TopProcesses?.Where(p => p.MemoryPercent > HeavyMemoryPercent && !ReferenceEquals(p, cpu)).MaxBy(p => p.MemoryPercent);
+    }
+
+    /// <summary>The person's own startup entries that may be offered (see <see cref="StartupApps.Offerable"/>).</summary>
+    public static IReadOnlyList<StartupEntry> StartupOffers(StorageState s) =>
+        s.StartupEntries is { } e ? StartupApps.Offerable(e, s.WindowsDirectory) : Array.Empty<StartupEntry>();
+
+    private static string StartupDetail(StorageState s)
+    {
+        var offer = StartupOffers(s);
+        var machine = s.StartupEntries is { } e ? StartupApps.MachineWide(e, s.WindowsDirectory) : Array.Empty<StartupEntry>();
+        return $"{s.StartupAppCount} enabled Run/Startup entries; can be switched off without admin: " +
+               (offer.Count > 0 ? string.Join(", ", offer.Select(x => x.Name)) : "none") +
+               "; machine-wide (switching off needs admin, not offered): " +
+               (machine.Count > 0 ? string.Join(", ", machine.Select(x => $"{x.Name} ({x.Scope})")) : "none");
+    }
 
     private const string Incomplete = "AutoFix Scout could not complete the storage check.";
 
@@ -62,6 +92,13 @@ public static class StorageTriage
         else if (space == SpaceLevel.Low)
             f.Add(F(FindingCode.SystemDriveLow, "The drive Windows is installed on is nearly full.", spaceDetail));
 
+        if (HeavyCpu(s) is { } cpu)
+            f.Add(F(FindingCode.HeavyProcessCpu, $"The program \"{cpu.Name}\" is using {Pct(cpu.CpuPercent)}% of the processor at the moment.",
+                $"{cpu.Path} cpu {cpu.CpuPercent.ToString(CultureInfo.InvariantCulture)}% of all cores, memory {Size(cpu.WorkingSetBytes)}"));
+        if (HeavyMemory(s) is { } mem)
+            f.Add(F(FindingCode.HeavyProcessMemory, $"The program \"{mem.Name}\" is using {Pct(mem.MemoryPercent)}% of the memory in this computer.",
+                $"{mem.Path} working set {Size(mem.WorkingSetBytes)} ({mem.MemoryPercent.ToString(CultureInfo.InvariantCulture)}%), cpu {mem.CpuPercent.ToString(CultureInfo.InvariantCulture)}%"));
+
         var reclaim = (s.ReclaimableTempBytes ?? 0) + (s.RecycleBinBytes ?? 0);
         if (reclaim >= LargeTempBytes)
             f.Add(F(FindingCode.LargeTempFiles, $"Old temporary files and the Recycle Bin are taking up {Size(reclaim)} of space.",
@@ -70,7 +107,12 @@ public static class StorageTriage
         if (s.MemoryLoadPercent >= HighMemoryPercent)
             f.Add(F(FindingCode.HighMemoryPressure, "Almost all of the memory in this computer is in use at the moment.", $"memory load {s.MemoryLoadPercent}%"));
         if (s.StartupAppCount >= ManyStartupApps)
-            f.Add(F(FindingCode.ManyStartupApps, $"{s.StartupAppCount} apps start automatically when you sign in to Windows.", $"{s.StartupAppCount} enabled Run/Startup entries"));
+            f.Add(F(FindingCode.ManyStartupApps, $"{s.StartupAppCount} apps start automatically when you sign in to Windows.", StartupDetail(s)));
+        else if (StartupOffers(s) is { Count: > 0 } offer)
+            f.Add(F(FindingCode.StartupAppsOptional, offer.Count == 1
+                    ? $"The app \"{StartupApps.DisplayName(offer[0])}\" starts automatically when you sign in to Windows, which can slow the computer down."
+                    : $"{offer.Count} apps that are not part of Windows start automatically when you sign in, which can slow the computer down.",
+                StartupDetail(s)));
         if (s.Uptime > LongUptime)
             f.Add(F(FindingCode.LongUptime, $"The computer has not been restarted for {(int)s.Uptime.Value.TotalDays} days.", $"uptime {s.Uptime.Value.TotalHours:0} h"));
 
@@ -80,7 +122,7 @@ public static class StorageTriage
         var unread = new (string Name, object? Value)[]
         {
             ("free space", s.FreeBytes), ("temp", s.ReclaimableTempBytes), ("recycle bin", s.RecycleBinBytes),
-            ("startup apps", s.StartupAppCount), ("uptime", s.Uptime), ("memory", s.MemoryLoadPercent), ("storage devices", s.ProblemDevices),
+            ("startup apps", s.StartupAppCount), ("programs", s.TopProcesses), ("uptime", s.Uptime), ("memory", s.MemoryLoadPercent), ("storage devices", s.ProblemDevices),
         }.Where(x => x.Value is null).Select(x => x.Name).ToList();
         if (unread.Count > 0)
             return new[] { F(FindingCode.ProbeIncomplete, Incomplete, "not read: " + string.Join(", ", unread)) };
@@ -95,6 +137,13 @@ public static class StorageTriage
         var rungs = new List<Rung>();
         if (codes.Contains(FindingCode.ProbeIncomplete)) return rungs;
 
+        // A busy program is the quickest cause to remove, but only the person may close it: unsaved work would be lost.
+        foreach (var (p, id, what) in new[] { (HeavyCpu(s), "close_busy_program", "processor"), (HeavyMemory(s), "close_large_program", "memory") })
+            if (p is not null)
+                rungs.Add(new(id, "ui.human_step", 0,
+                    $"The program \"{p.Name}\" is using a large part of the {what} in this computer. " +
+                    $"Please save your work in \"{p.Name}\", then close it. AutoFix Scout never closes programs itself, so that no work is lost."));
+
         var junk = codes.Contains(FindingCode.SystemDriveCritical) || codes.Contains(FindingCode.SystemDriveLow)
                    || codes.Contains(FindingCode.LargeTempFiles);
         if (junk && s.ReclaimableTempBytes >= WorthCleaning)
@@ -106,8 +155,23 @@ public static class StorageTriage
                 $"The Recycle Bin holds {Size(s.RecycleBinBytes!.Value)} of deleted files. AutoFix Scout can empty it. " +
                 "This cannot be undone: the files in the Recycle Bin will be deleted permanently. " +
                 "Please continue only if you do not need any of them."));
+        if (codes.Contains(FindingCode.SystemDriveCritical) || codes.Contains(FindingCode.SystemDriveLow))
+            rungs.Add(new("cleanup_components", "storage.cleanup_components", 1,
+                "AutoFix Scout can ask Windows to remove old versions of Windows components that newer updates have replaced. " +
+                "This can take 10 to 30 minutes and cannot be undone. Your files and apps are not affected. " +
+                "Windows will ask for your permission.", "system"));
         if (junk)
             rungs.Add(new("storage_settings", "ui.open_settings_page", 0, StorageSenseSay, "storagesense"));
+
+        var offers = StartupOffers(s);
+        for (var i = 0; i < offers.Count; i++)
+        {
+            var name = StartupApps.DisplayName(offers[i]);
+            rungs.Add(new($"startup_off_{i + 1}", "startup.disable", 1,
+                $"\"{name}\" starts automatically every time you sign in to Windows. AutoFix Scout can stop it from starting automatically. " +
+                "The app is not removed, and you can turn it on again in \"Startup apps\" at any time. " +
+                "The change takes effect the next time you sign in.", offers[i].Name));
+        }
 
         if (codes.Contains(FindingCode.ManyStartupApps) || codes.Contains(FindingCode.HighMemoryPressure)
             || codes.Contains(FindingCode.LongUptime) || codes.Contains(FindingCode.LooksNormal))
@@ -136,7 +200,11 @@ public static class StorageTriage
         if (codes.Contains(FindingCode.SystemDriveCritical) || codes.Contains(FindingCode.SystemDriveLow))
             return "The drive Windows is installed on is still nearly full. Moving photos, videos or other large files to an external " +
                    "drive or to cloud storage frees space. The person helping you can advise which files to move.";
-        if (codes.Contains(FindingCode.LooksNormal) || codes.Contains(FindingCode.ManyStartupApps) || codes.Contains(FindingCode.HighMemoryPressure))
+        if (codes.Contains(FindingCode.HeavyProcessCpu) || codes.Contains(FindingCode.HeavyProcessMemory))
+            return "A program is still using a large part of the processor or memory. If closing it did not help, restarting the computer " +
+                   "usually stops it. If it happens again, the person helping you can check whether the program needs an update.";
+        if (codes.Contains(FindingCode.LooksNormal) || codes.Contains(FindingCode.ManyStartupApps) || codes.Contains(FindingCode.HighMemoryPressure)
+            || codes.Contains(FindingCode.StartupAppsOptional))
             return "If the computer is still slow, it may have too little memory for the apps in use, or its drive may be getting old. " +
                    "The person helping you can check this.";
         return null;

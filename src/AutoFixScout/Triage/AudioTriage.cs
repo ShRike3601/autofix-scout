@@ -177,6 +177,9 @@ public enum FindingCode
     HighMemoryPressure,
     ManyStartupApps,
     LongUptime,
+    HeavyProcessCpu,
+    HeavyProcessMemory,
+    StartupAppsOptional,
     // update
     UpdateServiceDisabled,
     UpdateServiceStopped,

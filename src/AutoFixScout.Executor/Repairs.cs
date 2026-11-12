@@ -76,6 +76,13 @@ public static class Repairs
         return code is 0 or 1 ? 0 : 1;
     }
 
+    /// <summary>
+    /// Removes superseded versions of Windows components from the component store (WinSxS), as the "Windows Update
+    /// Cleanup" in Disk Cleanup does. No /ResetBase. 3010 = done, restart suggested.
+    /// </summary>
+    public static int CleanupComponents() =>
+        Tool("dism.exe", null, 90, "/Online", "/Cleanup-Image", "/StartComponentCleanup").Code is 0 or 3010 ? 0 : 1;
+
     public static bool IsSystemDrive(string letter) =>
         letter.Length == 1 && char.ToUpperInvariant(letter[0]) == char.ToUpperInvariant(Environment.SystemDirectory[0]);
 
