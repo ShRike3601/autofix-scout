@@ -134,6 +134,12 @@ public class WritingStyleTests
             texts.AddRange(StorageTriage.Ladder(s, f).Select(r => r.Say));
             if (StorageTriage.NotFixedHint(f) is { } hint) texts.Add(hint);
         }
+        foreach (var s in ScannerTests.Styled())
+        {
+            var f = PrinterTriage.Evaluate(s);
+            texts.AddRange(f.Select(x => x.PlainMessage));
+            texts.AddRange(PrinterTriage.Ladder(s, f).Select(r => r.Say));
+        }
         texts.Add(Rescan.Rung("audio", "sound device").Say);
         texts.Add(DriverRules.Rollback("sound", "Realtek Audio", "X", Recent())!.Say);
         texts.Add(DriverRules.WindowsUpdate("sound", "Realtek Audio", "X", 10)!.Say);

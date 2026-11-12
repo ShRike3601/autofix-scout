@@ -300,4 +300,7 @@ public enum FindingCode
     // Security: browser policies
     SecurityBrowserPolicy,
     SecurityBrowserPolicyManaged,
+    // Scanners (Printer area)
+    ScannerServiceOff,
+    ScannerDeviceError,
 }

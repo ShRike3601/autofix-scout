@@ -13,6 +13,7 @@ public sealed class RealPrinterProbe : IPrinterProbe
     {
         var errors = new List<string>();
         var state = new PrinterState { ProbeErrors = errors };
+        ReadScanners(state);
         try
         {
             using var sc = new ServiceController("Spooler");
@@ -27,6 +28,46 @@ public sealed class RealPrinterProbe : IPrinterProbe
         try { state.Jobs = ReadJobs(); }
         catch (Exception ex) { errors.Add($"Win32_PrintJob: {ex.Message}"); }
         return state;
+    }
+
+    /// <summary>Scanner part: WIA and Shell Hardware Detection services, and scanner devices. Errors stay in ScannerErrors.</summary>
+    private static void ReadScanners(PrinterState state)
+    {
+        var errors = new List<string>();
+        state.ScannerErrors = errors;
+        try { state.WiaService = ReadService("stisvc"); state.ShellHardwareService = ReadService("ShellHWDetection"); }
+        catch (Exception ex) { errors.Add($"services: {ex.Message}"); }
+        if (state.WiaService?.Status == "Unknown") errors.Add("stisvc: could not be read");
+        if (state.ShellHardwareService?.Status == "Unknown") errors.Add("ShellHWDetection: could not be read");
+        try { state.Scanners = ReadScannerDevices(); }
+        catch (Exception ex) { errors.Add($"Win32_PnPEntity: {ex.Message}"); }
+    }
+
+    private static UpdateServiceInfo ReadService(string name)
+    {
+        try
+        {
+            using var sc = new ServiceController(name);
+            return new UpdateServiceInfo(name, sc.Status == ServiceControllerStatus.Running ? "Running" : sc.Status == ServiceControllerStatus.Stopped ? "Stopped" : sc.Status.ToString(), sc.StartType.ToString());
+        }
+        catch (InvalidOperationException) { return new UpdateServiceInfo(name, "NotFound", "NotFound"); }
+        catch (Exception) { return new UpdateServiceInfo(name, "Unknown", "Unknown"); }
+    }
+
+    /// <summary>Still-image devices that are not cameras: webcams use the usbvideo driver or have "camera" or "webcam" in the name.</summary>
+    private static List<ScannerDevice> ReadScannerDevices()
+    {
+        var list = new List<ScannerDevice>();
+        using var q = new ManagementObjectSearcher(
+            "SELECT Name, DeviceID, PNPClass, Service, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE PNPClass = 'Image' OR PNPClass = 'WIA' OR PNPClass = 'ScannerDevice'");
+        foreach (var d in q.Get())
+        {
+            var name = d["Name"] as string ?? "";
+            var id = d["DeviceID"] as string ?? "";
+            if (name.Length == 0 || PrinterRules.IsCamera(name, d["Service"] as string)) continue;
+            list.Add(new ScannerDevice(name, id, d["ConfigManagerErrorCode"] is null ? 0 : Convert.ToInt32(d["ConfigManagerErrorCode"])));
+        }
+        return list;
     }
 
     private static List<PrinterInfo> ReadPrinters()

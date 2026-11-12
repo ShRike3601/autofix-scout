@@ -42,6 +42,7 @@ public static class FixActions
                         "microphone" => "ms-settings:privacy-microphone",
                         "sound_devices" => "ms-settings:sound-devices",
                         "printers" => "ms-settings:printers",
+                        "scanners" => "ms-settings:printers",
                         "display" => "ms-settings:display",
                         "apps" => "ms-settings:appsfeatures",
                         "updatehistory" => "ms-settings:windowsupdate-history",
