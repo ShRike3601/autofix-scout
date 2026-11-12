@@ -11,7 +11,7 @@ public static class PowerFlow
 {
     public const string Topic = "power";
     public const string What = "Battery, sleep and power";
-    public const string TestQuestion = "Does the battery and the sleep behaviour work the way you expect now?";
+    public const string TestQuestion = "Do the battery and sleep now work the way you expect?";
 
     public static Task<Diagnosis> DiagnoseAsync() => Task.Run(() =>
     {

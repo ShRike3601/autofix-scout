@@ -334,7 +334,7 @@ using worktree agents. Each item: probe + triage + tests + live test + real-UI c
 - [ ] R4 Network extras: no address from the router (169.254.x.x) -> renew the address; weak Wi-Fi signal; IP address
       conflict; metered connection blocking updates.
 - [ ] R5 Temporary user profile ("my files and desktop are gone"): detect, explain, guided recovery; never touches profiles.
-- [ ] R6 Keyboard, mouse and touchpad: touchpad switched off, Sticky/Filter Keys on, input device errors.
+- [x] R6 Keyboard, mouse and touchpad: touchpad switched off, Sticky/Filter Keys on, input device errors.
 - [x] R7 Clock settings (automatic time; time zone auto-update off is normal, not flagged): automatic time / time zone off or wrong.
 - [ ] R8 Admin bench run (`C:\afs-bench\jobs\01-health-long.ps1`) as soon as the AFS-Bench-Elevated task exists.
 

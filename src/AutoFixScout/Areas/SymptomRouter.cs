@@ -26,6 +26,8 @@ public static class SymptomRouter
         ["office"] = new("office", "Word, Excel or Outlook problems", "This sounds like a problem with Microsoft Office."),
         ["onedrive"] = new("onedrive", "OneDrive not syncing", "This sounds like a problem with OneDrive."),
         ["security"] = new("security", "Security, viruses or pop-ups", "This sounds like a security problem or unwanted software."),
+        ["power"] = new("power", "Battery, sleep and power", "This sounds like a problem with the battery, sleep or power settings."),
+        ["input"] = new("input", "Keyboard, mouse or touchpad", "This sounds like a problem with the keyboard, mouse or touchpad."),
         ["health"] = new("health", "Full computer check-up", "AutoFix Scout will check the whole computer for common software problems."),
     };
 
@@ -48,6 +50,10 @@ public static class SymptomRouter
                    new[] { "office", "word", "excel", "outlook", "powerpoint", "onenote" }),
         ("store", new[] { "microsoft store", "windows store", "app store", "store won", "store not", "cannot install apps", "can't install apps", "apps not downloading", "download pending" },
                   new[] { "store", "install", "installing", "download", "downloading" }),
+        ("power", new[] { "battery drains", "battery dies", "battery life", "battery not charging", "won't sleep", "wont sleep", "will not sleep", "wakes up by itself", "turns on by itself", "won't shut down", "fast startup" },
+                  new[] { "battery", "charging", "sleep", "hibernate", "power", "shut down", "shutdown" }),
+        ("input", new[] { "touchpad not", "trackpad not", "keyboard not", "mouse not", "keys not working", "sticky keys", "filter keys", "typing wrong", "cursor not moving", "mouse pointer" },
+                  new[] { "keyboard", "touchpad", "trackpad", "mouse", "cursor", "typing", "keys" }),
         ("shell", new[] { "start menu", "start button", "taskbar", "search not", "search bar", "search box", "windows key", "notification", "action center", "system tray" },
                   new[] { "start", "taskbar", "search", "icons", "desktop icons" }),
         ("security", new[] { "virus", "malware", "pop-ups", "popups", "pop up", "hacked", "antivirus", "firewall", "defender", "ransomware", "redirect", "hijack", "adware" },

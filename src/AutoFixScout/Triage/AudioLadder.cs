@@ -89,7 +89,7 @@ public static class AudioLadder
 /// </summary>
 public static class Rescan
 {
-    public static readonly string[] Areas = { "audio", "camera", "network", "bluetooth" };
+    public static readonly string[] Areas = { "audio", "camera", "network", "bluetooth", "input" };
 
     public static Rung Rung(string area, string what) =>
         new("rescan", "device.rescan", 1,

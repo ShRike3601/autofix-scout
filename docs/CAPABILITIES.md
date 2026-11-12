@@ -35,11 +35,11 @@ Status: **Done** = built, unit-tested and checked on the test laptop (admin repa
 | OneDrive not syncing | OneDrive installed / running | start OneDrive, reset OneDrive (files kept) | Done |
 | Security, viruses or pop-ups | antivirus missing/off, real-time protection off, old signatures, firewall off, UAC off, SmartScreen off, hosts/proxy hijacks, suspicious startup entries | signature update, quick scan, firewall on, UAC on, Windows Security steps | Done |
 | Drive health (in the full check-up) | drive health and failure prediction reported by Windows (wear counters need admin: later) | back up first (Windows Backup), repair-service advice | Done |
-| Battery and power | battery wear, power plan, sleep/wake problems, wake timers | guided and safe fixes | Planned (R2) |
+| Battery, sleep and power | battery wear, sleep never on battery, PC waking by itself (wake sources), high-performance plan on battery, Fast Startup | Balanced plan, power and battery saver settings, guided wake and Fast Startup steps | Done |
 | Any device with a warning | Device Manager errors in other classes | re-detect, guided driver steps | Planned (R3) |
 | Network extras | no address from the router, weak Wi-Fi, IP conflict, metered connection | renew address, guided | Planned (R4) |
 | Temporary user profile | "my desktop and files are gone" | explanation and guided recovery | Planned (R5) |
-| Keyboard, mouse, touchpad | touchpad off, Sticky/Filter Keys, input device errors | switch back on, guided | Planned (R6) |
+| Keyboard, mouse, touchpad | touchpad switched off, Sticky/Filter/Toggle/Mouse Keys on, missing or failing input devices | touchpad on, accessibility keys off (backed up), re-detect devices, guided steps | Done |
 | Clock settings (in the full check-up) | wrong clock with "Set time automatically" off | Date and time settings step, then clock sync | Done |
 
 ## Safety rules the code enforces

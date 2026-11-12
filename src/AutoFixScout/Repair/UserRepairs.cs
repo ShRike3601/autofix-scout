@@ -14,7 +14,7 @@ public static class UserRepairs
     public static string BackupDir => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AutoFixScout", "backups");
 
-    private static string Backup(string name, string content)
+    internal static string Backup(string name, string content)
     {
         Directory.CreateDirectory(BackupDir);
         var path = Path.Combine(BackupDir, $"{name}-{DateTime.Now:yyyyMMdd-HHmmss}.txt");

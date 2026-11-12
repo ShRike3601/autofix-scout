@@ -114,6 +114,8 @@ public partial class MainWindow
             "shell" => "Start menu, taskbar and search",
             "apps" => "Apps and the Microsoft Store",
             "security" => "Security",
+            "power" => "Battery, sleep and power",
+            "input" => "Keyboard, mouse and touchpad",
             "storage" => "Slow or full computer",
             "update" => "Windows Update",
             "printer" => "Printer",

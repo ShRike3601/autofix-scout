@@ -172,6 +172,8 @@
                             <Button Style="{StaticResource SubtleButton}" Content="Word, Excel or Outlook" Tag="&#xE8A5;" FontSize="16" Padding="14,10" Margin="0,0,8,8" Click="OnOfficeClicked"/>
                             <Button Style="{StaticResource SubtleButton}" Content="OneDrive not syncing" Tag="&#xE753;" FontSize="16" Padding="14,10" Margin="0,0,8,8" Click="OnOneDriveClicked"/>
                             <Button Style="{StaticResource SubtleButton}" Content="Security, viruses or pop-ups" Tag="&#xE72E;" FontSize="16" Padding="14,10" Margin="0,0,8,8" Click="OnSecurityClicked"/>
+                            <Button Style="{StaticResource SubtleButton}" Content="Battery, sleep and power" Tag="&#xE83F;" FontSize="16" Padding="14,10" Margin="0,0,8,8" Click="OnPowerClicked"/>
+                            <Button Style="{StaticResource SubtleButton}" Content="Keyboard, mouse or touchpad" Tag="&#xE765;" FontSize="16" Padding="14,10" Margin="0,0,8,8" Click="OnInputClicked"/>
                             <Button Style="{StaticResource SubtleButton}" Content="Bluetooth not working" Tag="&#xE702;" FontSize="16" Padding="14,10" Margin="0,0,8,8" Click="OnBluetoothClicked"/>
                             <Button Style="{StaticResource SubtleButton}" Content="Microphone not working" Tag="&#xE720;" FontSize="16" Padding="14,10" Margin="0,0,8,8" Click="OnMicrophoneClicked"/>
                             <Button Style="{StaticResource SubtleButton}" Content="Slow or full computer" Tag="&#xEDA2;" FontSize="16" Padding="14,10" Margin="0,0,8,8" Click="OnStorageClicked"/>

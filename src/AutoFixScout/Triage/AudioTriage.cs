@@ -259,4 +259,13 @@ public enum FindingCode
     PowerWakesOften,
     PowerFastStartupOn,
     PowerPlanHighOnBattery,
+    // Keyboard, mouse and touchpad
+    NoKeyboardFound,
+    InputDeviceDisabled,
+    InputDeviceError,
+    TouchpadOff,
+    StickyKeysOn,
+    FilterKeysOn,
+    ToggleKeysOn,
+    MouseKeysOn,
 }
