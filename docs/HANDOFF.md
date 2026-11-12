@@ -349,11 +349,11 @@ No UI edits in this session (another session reworks the UI). New checks go into
 - [ ] Q1 Browser hijack by policy (Security area): Chrome/Edge/Firefox policies a home PC should not have (forced extensions,
       forced homepage/search engine, "managed by your organization"), plus browser proxy settings. Fix: remove those policy
       values with a backup (HKCU without admin, HKLM through the executor with a fixed list of policy names).
-- [ ] Q2 "What changed before the problem started" (check-up): programs, Windows updates and drivers installed in the last
+- [x] Q2 "What changed before the problem started" (check-up): programs, Windows updates and drivers installed in the last
       7 days (Uninstall registry keys, Win32_QuickFixEngineering, driver install events) shown in the finding detail and
       a guided "uninstall the recent update/program" step; System Restore as a last-resort guided step when a restore
       point exists from before the change (never run automatically).
-- [ ] Q3 Graphics driver resets and freezes (check-up): Display event 4101 (TDR) and LiveKernelEvent 141/117 counts ->
+- [x] Q3 Graphics driver resets and freezes (check-up): Display event 4101 (TDR) and LiveKernelEvent 141/117 counts ->
       graphics driver finding; guided driver update via Windows Update optional updates / maker's site.
 - [x] Q4 Sound: one app muted or at zero in the Volume Mixer (per-app session volume), audio enhancements causing
       distortion (guided). Fix: unmute that app's session (non-admin, NAudio session API).

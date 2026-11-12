@@ -48,11 +48,11 @@ public class AppSoundTests
     }
 
     [Fact]
-    public void NewCodes_AreAppendedAtTheEnd()
+    public void NewCodes_AreAppendedAfterTheOlderOnes()
     {
-        var codes = Enum.GetValues<FindingCode>();
-        Assert.Equal(FindingCode.AppSoundVeryLow, codes[^1]);
-        Assert.Equal(FindingCode.AppSoundMuted, codes[^2]);
+        // Appended, never inserted: older codes keep their numbers.
+        Assert.True(FindingCode.AppSoundMuted > FindingCode.ShellPackageDamaged);
+        Assert.Equal((int)FindingCode.AppSoundMuted + 1, (int)FindingCode.AppSoundVeryLow);
     }
 
     [Fact]

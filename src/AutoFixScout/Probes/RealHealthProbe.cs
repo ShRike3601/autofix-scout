@@ -48,6 +48,9 @@ public sealed class RealHealthProbe : IHealthProbe
         Part("drives", () => s.Drives = ReadDrives());
         Part("device errors", () => s.DeviceProblems = ReadDeviceProblems());
         Part("user profile", () => ReadProfile(s));
+        Part("recent changes", () => ReadRecentChanges(s));
+        Part("restore points", () => ReadRestorePoints(s));
+        Part("graphics resets", () => ReadGraphicsResets(s));
 
         s.ProbeErrors = errors;
         return s;
@@ -131,6 +134,92 @@ public sealed class RealHealthProbe : IHealthProbe
     }
 
 
+
+    // ---- recent changes and graphics resets ----
+
+    public static readonly TimeSpan ChangeWindow = TimeSpan.FromDays(7);
+
+    private static IEnumerable<EventRecord> QueryWindow(string log, string filter, TimeSpan window, int max = 500)
+    {
+        var since = $"TimeCreated[timediff(@SystemTime) <= {(long)window.TotalMilliseconds}]";
+        using var reader = new EventLogReader(new EventLogQuery(log, PathType.LogName, $"*[System[{filter} and {since}]]"));
+        for (var i = 0; i < max && reader.ReadEvent() is { } e; i++)
+            using (e) yield return e;
+    }
+
+    private static void ReadRecentChanges(HealthState s)
+    {
+        var list = new List<RecentChange>();
+        var cutoff = DateTime.UtcNow - ChangeWindow;
+        // Programs: the Uninstall keys (machine, 32-bit on 64-bit Windows, current user).
+        const string Uninstall = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+        foreach (var (hive, view) in new[] { (RegistryHive.LocalMachine, RegistryView.Registry64), (RegistryHive.LocalMachine, RegistryView.Registry32), (RegistryHive.CurrentUser, RegistryView.Default) })
+        {
+            using var root = RegistryKey.OpenBaseKey(hive, view);
+            using var k = root.OpenSubKey(Uninstall);
+            if (k is null) continue;
+            foreach (var name in k.GetSubKeyNames())
+            {
+                using var e = k.OpenSubKey(name);
+                if (e is null) continue;
+                if (e.GetValue("DisplayName") is not string display || string.IsNullOrWhiteSpace(display)) continue;
+                if (e.GetValue("SystemComponent") is int sc && sc == 1) continue;
+                if (ParseInstallDate(e.GetValue("InstallDate")?.ToString()) is { } when && when >= cutoff.Date)
+                    list.Add(new RecentChange(RecentChangeKind.Program, display.Trim(), when));
+            }
+        }
+        // Windows updates: "Installation Successful" (event 19). Antivirus signature updates happen daily and are left out.
+        foreach (var e in QueryWindow("System", "Provider[@Name='Microsoft-Windows-WindowsUpdateClient'] and EventID=19", ChangeWindow))
+        {
+            var title = (Prop(e, 0) ?? "").Trim();
+            if (title.Length == 0 || title.Contains("Security Intelligence", StringComparison.OrdinalIgnoreCase) || System.Text.RegularExpressions.Regex.IsMatch(title, "^[0-9A-Z]{12}-")) continue; // Store app updates are left out as well
+            list.Add(new RecentChange(RecentChangeKind.Update, title, e.TimeCreated?.ToUniversalTime() ?? DateTime.UtcNow));
+        }
+        // Drivers: UserPnp 20001 (driver installed) and 20003 (driver service added); readable without admin rights.
+        foreach (var e in QueryWindow("System", "Provider[@Name='Microsoft-Windows-UserPnp'] and (EventID=20001 or EventID=20003)", ChangeWindow))
+        {
+            var name = (Prop(e, 0) ?? "").Trim();
+            if (name.Length > 0) list.Add(new RecentChange(RecentChangeKind.Driver, name, e.TimeCreated?.ToUniversalTime() ?? DateTime.UtcNow));
+        }
+        s.RecentChanges = list.GroupBy(c => (c.Kind, c.Name.ToLowerInvariant())).Select(g => g.OrderByDescending(c => c.WhenUtc).First())
+            .OrderByDescending(c => c.WhenUtc).Take(40).ToList();
+    }
+
+    /// <summary>"yyyymmdd" as written by installers; null for anything else.</summary>
+    public static DateTime? ParseInstallDate(string? v) =>
+        v is { Length: 8 } && DateTime.TryParseExact(v, "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var d) ? d : null;
+
+    /// <summary>System Restore points through WMI (root\default). Needs administrator rights on most machines: then the answer stays Unknown.</summary>
+    private static void ReadRestorePoints(HealthState s)
+    {
+        try
+        {
+            var dates = new List<DateTime>();
+            using var q = new System.Management.ManagementObjectSearcher(@"root\default", "SELECT CreationTime FROM SystemRestore");
+            foreach (System.Management.ManagementObject o in q.Get())
+                using (o)
+                    if (o["CreationTime"] is string t) dates.Add(System.Management.ManagementDateTimeConverter.ToDateTime(t).ToUniversalTime());
+            s.RestorePoints = dates.OrderByDescending(d => d).ToList();
+            s.RestorePointsKnown = Tri.Yes;
+        }
+        catch (Exception) { s.RestorePointsKnown = Tri.Unknown; }
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex LiveKernelCode =
+        new(@"\bP1\s*:\s*(141|117)\b", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static void ReadGraphicsResets(HealthState s)
+    {
+        var n = Query("System", "Provider[@Name='Display'] and EventID=4101").Count();
+        foreach (var e in Query("Application", "Provider[@Name='Windows Error Reporting'] and EventID=1001"))
+        {
+            string text;
+            try { text = e.FormatDescription() ?? ""; } catch (Exception) { text = ""; }
+            if (text.Length == 0) text = string.Join(" ", e.Properties.Select(p => p.Value?.ToString() ?? ""));
+            if (text.Contains("LiveKernelEvent", StringComparison.OrdinalIgnoreCase) && LiveKernelCode.IsMatch(text)) n++;
+        }
+        s.GraphicsResets = n;
+    }
     // ---- devices and profile ----
 
     private static IReadOnlyList<DeviceProblem> ReadDeviceProblems()

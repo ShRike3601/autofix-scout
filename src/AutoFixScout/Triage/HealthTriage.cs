@@ -121,12 +121,48 @@ public static class HealthTriage
                 $"WindowsUpdateClient event 20: {s.UpdateFailures}"));
         if (s.RebootPending == Tri.Yes)
             f.Add(F(FindingCode.HealthRestartPending, "Windows is waiting for a restart to finish installing changes.", "RebootRequired/RebootPending key present"));
+        if (s.GraphicsResets > 0)
+            f.Add(F(FindingCode.HealthGraphicsResets, $"The graphics driver has stopped responding and been reset {Times(s.GraphicsResets)} in the last two weeks. This can cause black or flickering screens and closing programs.",
+                $"Display 4101 and LiveKernelEvent 141/117 in 14 days: {s.GraphicsResets}"));
+        // Recent changes are only a lead when something else is wrong; a restart that is waiting is the result of a change, not a problem.
+        if (s.RecentChanges.Count > 0 && f.Any(x => x.Code != FindingCode.HealthRestartPending))
+            f.Add(F(FindingCode.HealthRecentChanges, RecentChangesSentence(s),
+                string.Join("; ", s.RecentChanges.Take(15).Select(c => $"{c.Kind} \"{c.Name}\" {c.WhenUtc:yyyy-MM-dd}"))));
 
         if (f.Count > 0) return f;
         if (s.ProbeErrors.Count > 0)
             return new[] { F(FindingCode.ProbeIncomplete, "AutoFix Scout could not complete the check.", string.Join("; ", s.ProbeErrors)) };
         return new[] { F(FindingCode.LooksNormal, "No common software problems were found. AutoFix Scout can still check the Windows system files for damage.",
             $"crashes={s.Crashes.Sum(c => c.Count)}, clock offset={s.ClockOffsetSeconds:0} s") };
+    }
+
+    private static string RecentChangesSentence(HealthState s)
+    {
+        var kinds = s.RecentChanges.Select(c => c.Kind).Distinct().ToList();
+        var what = kinds.Contains(RecentChangeKind.Program) || kinds.Contains(RecentChangeKind.Update)
+            ? (kinds.Contains(RecentChangeKind.Program) && kinds.Contains(RecentChangeKind.Update) ? "programs or updates" : kinds.Contains(RecentChangeKind.Program) ? "programs" : "updates")
+            : "drivers";
+        return $"Some {what} were installed shortly before the problems started. They may be the cause.";
+    }
+
+    private static bool HasKind(HealthState s, RecentChangeKind k) => s.RecentChanges.Any(c => c.Kind == k);
+
+    private static void AddRecentChangeRungs(HealthState s, List<Rung> r)
+    {
+        if (s.RecentChanges.Where(c => c.Kind == RecentChangeKind.Program).OrderByDescending(c => c.WhenUtc).FirstOrDefault() is { } prog)
+            r.Add(new("uninstall_recent_program", "ui.open_settings_page", 0,
+                $"AutoFix Scout will open \"Installed apps\". The program \"{prog.Name}\" was installed recently. If you do not need it, select the three dots next to it, and select \"Uninstall\". Then restart the computer and check whether the problem remains.",
+                "apps"));
+        if (HasKind(s, RecentChangeKind.Update))
+            r.Add(new("uninstall_recent_update", "ui.open_settings_page", 0,
+                "AutoFix Scout will open \"Update history\". Please scroll down to \"Uninstall updates\", and remove the most recent update. Then restart the computer and check whether the problem remains. Windows may install the update again later.",
+                "updatehistory"));
+        var first = s.RecentChanges.Min(c => c.WhenUtc);
+        var olderPoint = s.RestorePointsKnown == Tri.Yes && s.RestorePoints.Any(p => p < first);
+        if (s.RestorePointsKnown == Tri.Unknown || olderPoint)
+            r.Add(new("system_restore", "ui.human_step", 0,
+                "As a last resort, System Restore can return Windows to an earlier time. Please press the Windows key and R together, type \"rstrui.exe\", and select \"OK\". " +
+                "Choose a restore point from before the problems started, and follow the steps. Your documents and photos are not removed, but programs installed after that time are. AutoFix Scout does not start System Restore."));
     }
 
     private static string Times(int n) => n == 1 ? "once" : n == 2 ? "twice" : $"{n} times";
@@ -252,6 +288,17 @@ public static class HealthTriage
             systemRepair = true;
         if (codes.Contains(FindingCode.HealthDiskErrors))
             r.Add(Admin("scan_disk", "disk.scan", "AutoFix Scout can ask Windows to scan the drive for file system errors while you keep working.", "C"));
+        if (codes.Contains(FindingCode.HealthGraphicsResets))
+        {
+            r.Add(new("graphics_reset_updates", "ui.open_settings_page", 0,
+                "AutoFix Scout will open \"Windows Update\". Please select \"Check for updates\", then \"Advanced options\", then \"Optional updates\", then \"Driver updates\", and install any display driver offered.",
+                "windowsupdate"));
+            r.Add(new("graphics_reset_maker", "ui.human_step", 0,
+                "If Windows Update offers no display driver, please get the newest graphics driver from the support web site of the computer's maker, or from the web site of NVIDIA, AMD or Intel, depending on the graphics card. " +
+                "Run the installer, then restart the computer. AutoFix Scout does not install drivers from other sources."));
+        }
+        if (codes.Contains(FindingCode.HealthRecentChanges))
+            AddRecentChangeRungs(s, r);
         if (systemRepair) { r.Add(Dism); r.Add(Sfc); }
         if (codes.Contains(FindingCode.HealthRestartPending))
             r.Add(new("restart_pc", "ui.human_step", 0,
@@ -288,7 +335,7 @@ public static class HealthTriage
     };
 
     /// <summary>Hardware and disk errors are the only findings that point at hardware.</summary>
-    public static bool ProbablyHardware(HealthState s) => s.HardwareErrors > 0 || s.DiskErrors >= 5 || s.Drives.Any(d => d.Failing);
+    public static bool ProbablyHardware(HealthState s) => s.HardwareErrors > 0 || s.DiskErrors >= 5 || s.GraphicsResets >= 20 || s.Drives.Any(d => d.Failing);
 
     public static string? NotFixedHint(IReadOnlyList<Finding> after)
     {

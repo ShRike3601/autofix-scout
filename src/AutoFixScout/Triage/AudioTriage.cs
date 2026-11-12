@@ -294,4 +294,7 @@ public enum FindingCode
     // Per-app sound (Volume mixer)
     AppSoundMuted,
     AppSoundVeryLow,
+    // Recent changes and graphics driver resets
+    HealthRecentChanges,
+    HealthGraphicsResets,
 }
