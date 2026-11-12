@@ -39,6 +39,8 @@ public static class SecurityFlow
         Part("firewall products", () => s.Firewalls = ReadProducts("FirewallProduct"));
         if (SecurityTriage.DefenderInCharge(s))
             ReadDefender(s); // denied or missing only leaves these details unknown
+        if (SecurityTriage.DefenderInCharge(s))
+            ReadThreats(s); // a failed read leaves the history Unknown and never blocks other findings
         Part("firewall", () =>
         {
             var profiles = new Dictionary<string, Tri>();
@@ -120,6 +122,56 @@ public static class SecurityFlow
             s.DefenderNote = "MSFT_MpComputerStatus: no instance";
         }
         catch (Exception ex) { s.DefenderNote = "MSFT_MpComputerStatus: " + ex.Message; }
+    }
+
+    private const string DefenderNs = @"root\Microsoft\Windows\Defender";
+    private const string DefenderLog = "Microsoft-Windows-Windows Defender/Operational";
+
+    /// <summary>Threat history of the last 30 days: WMI first, the operational event log when WMI is denied. Names and counts only, no paths.</summary>
+    public static void ReadThreats(SecurityState s)
+    {
+        var now = DateTime.UtcNow;
+        try
+        {
+            var det = new List<DetectionRow>();
+            using (var q = new ManagementObjectSearcher(DefenderNs, "SELECT ThreatID, InitialDetectionTime, ActionSuccess, CurrentThreatExecutionStatusID, Resources FROM MSFT_MpThreatDetection"))
+                foreach (var m in q.Get().Cast<ManagementBaseObject>())
+                    using (m)
+                    {
+                        var when = m["InitialDetectionTime"] as string;
+                        if (m["ThreatID"] is null || string.IsNullOrEmpty(when)) continue;
+                        det.Add(new DetectionRow(Convert.ToString(m["ThreatID"])!, ManagementDateTimeConverter.ToDateTime(when).ToUniversalTime(),
+                            m["ActionSuccess"] as bool?, m["CurrentThreatExecutionStatusID"] is { } es ? Convert.ToInt32(es) : null,
+                            m["Resources"] is Array res ? res.Length : 0));
+                    }
+            var thr = new List<ThreatRow>();
+            using (var q = new ManagementObjectSearcher(DefenderNs, "SELECT ThreatID, ThreatName, SeverityID, IsActive FROM MSFT_MpThreat"))
+                foreach (var m in q.Get().Cast<ManagementBaseObject>())
+                    using (m)
+                        if (m["ThreatID"] is not null)
+                            thr.Add(new ThreatRow(Convert.ToString(m["ThreatID"])!, m["ThreatName"] as string ?? "", m["SeverityID"] is { } sv ? Convert.ToInt32(sv) : null, m["IsActive"] as bool?));
+            s.Threats = ThreatHistory.FromWmi(det, thr, now);
+            s.ThreatSource = "wmi";
+            return;
+        }
+        catch (Exception ex) { s.ThreatNote = "MSFT_MpThreatDetection: " + ex.Message; }
+        try
+        {
+            var rows = new List<DefenderEventRow>();
+            var query = new System.Diagnostics.Eventing.Reader.EventLogQuery(DefenderLog, System.Diagnostics.Eventing.Reader.PathType.LogName,
+                $"*[System[(EventID=1116 or EventID=1117 or EventID=1118 or EventID=1119) and TimeCreated[timediff(@SystemTime) <= {ThreatHistory.Days * 86_400_000L}]]]");
+            using var reader = new System.Diagnostics.Eventing.Reader.EventLogReader(query);
+            for (var e = reader.ReadEvent(); e is not null; e = reader.ReadEvent())
+                using (e)
+                {
+                    var p = e.Properties;
+                    string? Prop(int i) => p.Count > i ? p[i].Value?.ToString() : null;
+                    rows.Add(new DefenderEventRow(e.Id, (e.TimeCreated ?? now).ToUniversalTime(), Prop(6), Prop(7)));
+                }
+            s.Threats = ThreatHistory.FromEvents(rows, now);
+            s.ThreatSource = "eventlog";
+        }
+        catch (Exception ex) { s.ThreatNote += " | event log: " + ex.Message; }
     }
 
     private const string RunKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";

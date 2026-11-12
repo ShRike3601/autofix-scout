@@ -308,4 +308,7 @@ public enum FindingCode
     ScannerDeviceError,
     // Blue-screen causes and virtual memory
     HealthPageFileTooSmall,
+    // Security: threats found by Microsoft Defender
+    SecurityThreatActive,
+    SecurityThreatsRemoved,
 }

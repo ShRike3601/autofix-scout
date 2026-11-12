@@ -372,7 +372,7 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
       as a guided step for memory-type codes; point to the driver for driver-type codes.
 - [ ] P3 Virtual memory (check-up): page file disabled or far too small for the installed memory -> "low memory" crashes;
       fix through the executor: let Windows manage the page file size (backup of the old setting; restart needed).
-- [ ] P4 Threats found by Microsoft Defender (Security): recent detections (MSFT_MpThreatDetection) and whether they were
+- [x] P4 Threats found by Microsoft Defender (Security): recent detections (MSFT_MpThreatDetection) and whether they were
       removed; guided "Protection history" step; full scan offer.
 - [x] P5 Scanner and camera import (Printer area): Windows Image Acquisition service (stisvc) off; scanner device errors.
 - P5: OnScannerClicked (MainWindow.xaml.cs) runs the printer flow with ScanFocus; the search box routes "scanner" there. The home tile is added by the UI session.

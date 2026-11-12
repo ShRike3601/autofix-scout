@@ -197,6 +197,14 @@ public static class UserRepairs
         return (code == 0, $"MpCmdRun -SignatureUpdate exit {code}: {output}");
     }
 
+    /// <summary>security.full_scan: MpCmdRun -Scan -ScanType 2 (full system scan, fixed arguments; documented by MpCmdRun -h, no admin needed). Exit 2 = threats found; Defender handles them itself.</summary>
+    public static (bool Ok, string Detail) DefenderFullScan()
+    {
+        var (code, output) = MpCmdRun(360, "-Scan", "-ScanType", "2");
+        var verdict = code switch { 0 => "no threats found", 2 => "threats found and handed to Microsoft Defender", _ => "scan failed" };
+        return (code is 0 or 2, $"MpCmdRun full scan exit {code} ({verdict}): {output}");
+    }
+
     /// <summary>security.quick_scan: MpCmdRun -Scan -ScanType 1 (quick scan). Exit 2 = threats found; Defender handles them itself.</summary>
     public static (bool Ok, string Detail) DefenderQuickScan()
     {

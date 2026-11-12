@@ -116,6 +116,8 @@ public static class FixActions
                     return await Task.Run(Repair.UserRepairs.RemoveBrowserPoliciesUser);
                 case "security.quick_scan":
                     return await Task.Run(Repair.UserRepairs.DefenderQuickScan);
+                case "security.full_scan":
+                    return await Task.Run(Repair.UserRepairs.DefenderFullScan);
                 case "input.touchpad_on":
                     return await Task.Run(Repair.InputRepairs.TouchpadOn);
                 case "input.accessibility_keys_off":
