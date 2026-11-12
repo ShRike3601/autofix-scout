@@ -468,7 +468,9 @@ public partial class MainWindow : Window, IFixHost
         IReadOnlyList<SessionLog.SessionSummary> recent;
         try { using var db = new SessionLog(SessionLog.DefaultPath); recent = db.Recent(4); }
         catch (Exception) { recent = Array.Empty<SessionLog.SessionSummary>(); }
-        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "unknown";
+        // Informational version carries the installer version (CI passes -p:Version); drop the "+commit" suffix.
+        var info = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(System.Reflection.Assembly.GetExecutingAssembly())?.InformationalVersion;
+        var version = info?.Split('+')[0] ?? "unknown";
         SetTopic(null);
         var open = await ShowStepAsync(HistoryText.Build(version, recent), "Open the reports folder", "Close");
         if (open)

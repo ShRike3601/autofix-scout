@@ -20,9 +20,10 @@ jobs:
       # as a plain project reference it would be framework-dependent and fail on PCs without .NET.
       - name: Publish win-x64 and win-arm64
         run: |
+          $version = if ("${{ github.ref }}" -like 'refs/tags/v*') { "${{ github.ref_name }}".TrimStart('v') } else { "0.0.${{ github.run_number }}-dev" }
           foreach ($rid in 'win-x64', 'win-arm64') {
             $out = "publish/$rid"
-            dotnet publish src/AutoFixScout.UI/AutoFixScout.UI.csproj -c Release -r $rid --self-contained true -o $out
+            dotnet publish src/AutoFixScout.UI/AutoFixScout.UI.csproj -c Release -r $rid --self-contained true -o $out "-p:Version=$version"
             if ($LASTEXITCODE) { exit 1 }
             dotnet publish src/AutoFixScout.Executor/AutoFixScout.Executor.csproj -c Release -r $rid --self-contained true -o $out
             if ($LASTEXITCODE) { exit 1 }
