@@ -113,6 +113,7 @@ public partial class MainWindow
             "bluetooth" => "Bluetooth",
             "shell" => "Start menu, taskbar and search",
             "apps" => "Apps and the Microsoft Store",
+            "security" => "Security",
             "storage" => "Slow or full computer",
             "update" => "Windows Update",
             "printer" => "Printer",

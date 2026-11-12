@@ -25,6 +25,8 @@ public class SymptomRouterTests
     [InlineData("microsoft store will not open", "store")]
     [InlineData("outlook keeps crashing when I open it", "office")]
     [InlineData("onedrive is not syncing my files", "onedrive")]
+    [InlineData("my browser shows pop-ups and I think I have a virus", "security")]
+    [InlineData("windows defender says protection is off", "security")]
     [InlineData("something is wrong", "health")]
     [InlineData("", "health")]
     public void RoutesToTheRightCheck(string text, string area) => Assert.Equal(area, SymptomRouter.Best(text).Area);

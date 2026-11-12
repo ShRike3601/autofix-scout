@@ -150,6 +150,54 @@ public static class Repairs
         return Tool("netsh.exe", null, 2, "winsock", "reset").Code == 0 ? 0 : 1;
     }
 
+    // ---- security ----
+
+    private const string FirewallPolicy = @"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy";
+
+    /// <summary>
+    /// security.firewall_on: Windows Defender Firewall on for every profile (netsh, fixed arguments). The current
+    /// settings (netsh output and the EnableFirewall values) are saved first. 3 = already on everywhere.
+    /// </summary>
+    public static int FirewallOn()
+    {
+        var values = new StringBuilder();
+        var allOn = true;
+        using (var k = Registry.LocalMachine.OpenSubKey(FirewallPolicy))
+            foreach (var profile in new[] { "DomainProfile", "StandardProfile", "PublicProfile" })
+            {
+                using var p = k?.OpenSubKey(profile);
+                var v = p?.GetValue("EnableFirewall");
+                values.Append($"{profile} EnableFirewall={v}\n");
+                if (v is not int i || i == 0) allOn = false;
+            }
+        if (allOn) return 3;
+        Backup("firewall", values + "\n" + Tool("netsh.exe", null, 1, "advfirewall", "show", "allprofiles").Output);
+        return Tool("netsh.exe", null, 1, "advfirewall", "set", "allprofiles", "state", "on").Code == 0 ? 0 : 1;
+    }
+
+    private const string UacPolicy = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System";
+
+    /// <summary>
+    /// security.uac_on: User Account Control back on (EnableLUA=1) and, if it was set to never ask, the Windows default
+    /// prompt for administrators (ConsentPromptBehaviorAdmin=5). The old values are saved first. Takes effect after a restart.
+    /// 3 = already on.
+    /// </summary>
+    public static int UacOn()
+    {
+        using var k = Registry.LocalMachine.OpenSubKey(UacPolicy, writable: true);
+        if (k is null) return 1;
+        var lua = k.GetValue("EnableLUA");
+        var prompt = k.GetValue("ConsentPromptBehaviorAdmin");
+        var luaOff = lua is int l && l == 0;
+        var neverAsk = prompt is int c && c == 0;
+        if (!luaOff && !neverAsk) return 3;
+        Backup("uac", $"EnableLUA={lua}\nConsentPromptBehaviorAdmin={prompt}\n");
+        if (luaOff) k.SetValue("EnableLUA", 1, RegistryValueKind.DWord);
+        if (neverAsk) k.SetValue("ConsentPromptBehaviorAdmin", 5, RegistryValueKind.DWord);
+        Log("security.uac_on", $"EnableLUA {lua} -> {k.GetValue("EnableLUA")}, ConsentPromptBehaviorAdmin {prompt} -> {k.GetValue("ConsentPromptBehaviorAdmin")}");
+        return k.GetValue("EnableLUA") is 1 && k.GetValue("ConsentPromptBehaviorAdmin") is not 0 ? 0 : 1;
+    }
+
     // ---- services ----
 
     private static void SetStart(string service, string start, bool onlyIfDisabled = false)

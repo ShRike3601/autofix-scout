@@ -241,4 +241,12 @@ public enum FindingCode
     OfficeNotFound,
     OneDriveNotFound,
     OneDriveNotRunning,
+    // Security and unwanted software
+    SecurityNoAntivirus,
+    SecurityRealTimeOff,
+    SecuritySignaturesOld,
+    SecurityFirewallOff,
+    SecurityUacOff,
+    SecuritySmartScreenOff,
+    SecuritySuspiciousStartup,
 }

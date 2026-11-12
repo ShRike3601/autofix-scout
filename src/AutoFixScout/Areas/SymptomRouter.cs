@@ -25,6 +25,7 @@ public static class SymptomRouter
         ["store"] = new("store", "Microsoft Store or app installs", "This sounds like a problem with the Microsoft Store or with installing apps."),
         ["office"] = new("office", "Word, Excel or Outlook problems", "This sounds like a problem with Microsoft Office."),
         ["onedrive"] = new("onedrive", "OneDrive not syncing", "This sounds like a problem with OneDrive."),
+        ["security"] = new("security", "Security, viruses or pop-ups", "This sounds like a security problem or unwanted software."),
         ["health"] = new("health", "Full computer check-up", "AutoFix Scout will check the whole computer for common software problems."),
     };
 
@@ -49,8 +50,10 @@ public static class SymptomRouter
                   new[] { "store", "install", "installing", "download", "downloading" }),
         ("shell", new[] { "start menu", "start button", "taskbar", "search not", "search bar", "search box", "windows key", "notification", "action center", "system tray" },
                   new[] { "start", "taskbar", "search", "icons", "desktop icons" }),
-        ("health", new[] { "blue screen", "bsod", "clock is wrong", "wrong time", "certificate", "virus", "pop-ups", "popups", "redirect" },
-                   new[] { "restart", "restarts", "reboot", "error", "errors", "broken", "weird", "strange", "malware", "hijack" }),
+        ("security", new[] { "virus", "malware", "pop-ups", "popups", "pop up", "hacked", "antivirus", "firewall", "defender", "ransomware", "redirect", "hijack", "adware" },
+                     new[] { "virus", "security", "unsafe", "suspicious", "spyware", "trojan", "scam" }),
+        ("health", new[] { "blue screen", "bsod", "clock is wrong", "wrong time", "certificate" },
+                   new[] { "restart", "restarts", "reboot", "error", "errors", "broken", "weird", "strange" }),
         ("program", new[] { "keeps closing", "keeps crashing", "stopped working", "not responding", "won't open", "wont open", "will not open", "doesn't open", "does not open", "closes by itself", "app crash", "freezes" },
                     new[] { "crash", "crashes", "crashing", "closes", "freeze", "freezing", "hangs", "error message", "missing dll", ".dll", "vcruntime", "msvcp" }),
         ("storage", new[] { "running slow", "very slow", "is slow", "disk full", "out of space", "low disk", "takes long to start", "slow startup" },
