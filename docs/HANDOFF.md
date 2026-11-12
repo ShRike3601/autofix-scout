@@ -22,15 +22,17 @@ from it that the code follows:
 
 | Area | Files |
 |---|---|
-| Probes (read-only) | `src/AutoFixScout/Probes/Real{Audio,Network,Camera}Probe.cs` |
-| Triage + fix ladders | `src/AutoFixScout/Triage/{AudioTriage,AudioLadder,NetworkTriage,CameraTriage}.cs` (`LadderRunner`, `DriverRules` live in AudioLadder.cs) |
+| Probes (read-only) | `src/AutoFixScout/Probes/Real*Probe.cs` (audio, network, camera, microphone, Bluetooth, storage, update, printer, display, health), `ProcessSampler.cs` |
+| Areas (one class per problem: Topic, What, DiagnoseAsync, real test) | `src/AutoFixScout/Areas/*Flow.cs`; free-text routing in `SymptomRouter.cs` |
+| Repair rules shared with the executor; user-level repairs | `src/AutoFixScout/Repair/` (`ServiceDefaults`, `HostsFile`, `SystemPath` are linked into the executor; `UserRepairs`, `StartupApps`, `CrashCauses`) |
+| Triage + fix ladders | `src/AutoFixScout/Triage/*Triage.cs` (FindingCode enum and `Finding` in AudioTriage.cs) (`LadderRunner`, `DriverRules` live in AudioLadder.cs) |
 | Non-admin actions, save point markers | `src/AutoFixScout/FixActions.cs` |
 | Driver store logic (shared with executor) | `src/AutoFixScout/Drivers/DriverStore.cs`, `DriverStatus.cs` |
-| Elevated executor | `src/AutoFixScout.Executor/{Program,SavePoints,WindowsUpdateDrivers}.cs` |
+| Elevated executor | `src/AutoFixScout.Executor/{Program,SavePoints,WindowsUpdateDrivers,Repairs}.cs` (system repairs back up to `C:ProgramDataAutoFixScoutbackups`, logs in `...ogs`) |
 | Session log (SQLite, spec schema) | `src/AutoFixScout/SessionLog.cs` -> `%LOCALAPPDATA%\AutoFixScout\session.db` |
 | Helper report | `src/AutoFixScout/HelperReport.cs` -> `%LOCALAPPDATA%\AutoFixScout\reports\` |
 | UI (screens + flow) | `src/AutoFixScout.UI/MainWindow.xaml(.cs)`, look in `MainWindow.Visuals.cs` + `Theme/` (see UI below) |
-| Tests (169, all pass in CI) | `src/AutoFixScout.Tests/` |
+| Tests (all pass in CI) | `src/AutoFixScout.Tests/`; `Live*` tests touch the real machine and run only with `AFS_LIVE` set, one at a time |
 
 The unused first-skeleton leftovers (Orchestrator, SessionManager, Simulator, ActionCatalog, ActionContext, IProbe, IExecutor, Probes, StepResult, the legacy models in Models.cs, and the Serilog/YamlDotNet packages) are removed. Still to remove after the UI redesign lands: UI `IActionContext.cs` and unused UI packages (e.g. System.Data.SqlClient).
 

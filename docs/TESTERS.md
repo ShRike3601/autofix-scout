@@ -41,6 +41,12 @@ resolved, undo it yourself as shown.
 | Airplane mode | Turn on Airplane mode | Turn it off |
 | Wi-Fi off | Turn off Wi-Fi from the taskbar | Turn it back on |
 | Wi-Fi adapter turned off | Device Manager > Network adapters > your Wi-Fi adapter > **Disable device** | **Enable device** |
+| Microphone muted | Settings > System > Sound > your microphone > turn the volume to 0 or mute it | Turn it back up |
+| Bluetooth off | Turn off Bluetooth from the taskbar | Turn it back on |
+| Dead proxy server | Settings > Network & internet > Proxy > Manual setup > turn on, address `127.0.0.1`, port `9` > Save | Turn "Use a proxy server" off |
+| Windows Search off | Run `services.msc`, open "Windows Search", set Startup type to **Disabled**, select **Stop** | AutoFix Scout restores it, or set it back to **Automatic (Delayed Start)** and **Start** |
+| A program that keeps closing | Use any program that crashes for you; AutoFix Scout reads the crashes Windows recorded | - |
+| Startup apps | Install something that starts with Windows (Steam, Discord, Spotify) | Task Manager > Startup apps > enable it again |
 
 Please do **not** tick "Attempt to remove the driver for this device", delete system files, or test on a work or
 school PC that you do not own.
