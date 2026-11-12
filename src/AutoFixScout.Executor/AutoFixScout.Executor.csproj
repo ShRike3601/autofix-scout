@@ -15,6 +15,7 @@
     <Compile Include="../AutoFixScout/Repair/ServiceDefaults.cs" Link="Repair/ServiceDefaults.cs" />
     <Compile Include="../AutoFixScout/Repair/HostsFile.cs" Link="Repair/HostsFile.cs" />
     <Compile Include="../AutoFixScout/Repair/SystemPath.cs" Link="Repair/SystemPath.cs" />
+    <Compile Include="../AutoFixScout/Repair/OfficeClickToRun.cs" Link="Repair/OfficeClickToRun.cs" />
   </ItemGroup>
 
 </Project>

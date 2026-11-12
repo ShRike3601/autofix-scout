@@ -258,6 +258,30 @@ public static class Repairs
         return 0;
     }
 
+    // ---- Microsoft Office ----
+
+    /// <summary>
+    /// Office Quick Repair (Click-to-Run only). Platform and language are read here from the machine registry and checked;
+    /// the arguments are fixed text. The program must be Office's own, Microsoft-signed. 3 = Click-to-Run Office not installed.
+    /// </summary>
+    public static int OfficeQuickRepair()
+    {
+        if (OfficeClickToRun.Read() is not { } config) return 3;
+        if (OfficeClickToRun.QuickRepairArgs(config.Platform, config.Culture) is not { } args)
+        {
+            Log("office.quick_repair", "platform or language in the registry not recognised");
+            return 1;
+        }
+        var exe = OfficeClickToRun.ExePath;
+        if (!File.Exists(exe) || !IsMicrosoftSigned(exe)) { Log("office.quick_repair", "OfficeClickToRun.exe missing or not signed by Microsoft"); return 1; }
+        var psi = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true };
+        foreach (var a in args) psi.ArgumentList.Add(a);
+        using var p = Process.Start(psi)!;
+        if (!p.WaitForExit(TimeSpan.FromMinutes(60))) { Log("office.quick_repair", "timed out"); return 1; }
+        Log("office.quick_repair", $"OfficeClickToRun.exe {string.Join(' ', args)} -> {p.ExitCode}");
+        return p.ExitCode == 0 ? 0 : 1;
+    }
+
     // ---- Visual C++ runtime ----
 
     /// <summary>

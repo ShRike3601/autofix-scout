@@ -39,6 +39,7 @@ internal static class ServiceDefaults
         new("AppXSvc", "AppX Deployment Service (AppXSVC)", Start.Manual, false, "apps"),
         new("ClipSVC", "Client License Service (ClipSVC)", Start.Manual, false, "apps"),
         new("InstallService", "Microsoft Store Install Service", Start.Manual, false, "apps"),
+        new("ClickToRunSvc", "Microsoft Office Click-to-Run Service", Start.Automatic, true, "apps"),
         new("WlanSvc", "WLAN AutoConfig", Start.Automatic, true, "internet"),
         new("bthserv", "Bluetooth Support Service", Start.Manual, false, "bluetooth"),
     };
