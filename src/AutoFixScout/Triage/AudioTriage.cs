@@ -183,4 +183,12 @@ public enum FindingCode
     UpdateRebootPending,
     UpdateLowDiskSpace,
     UpdatesOutOfDate,
+    // Microphone
+    NoMicrophone,
+    NoActiveMicrophone,
+    MicDeviceError,
+    MicPrivacyOff,
+    MicWrongDefault,
+    MicMuted,
+    MicLevelVeryLow,
 }

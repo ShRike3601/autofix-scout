@@ -10,6 +10,12 @@ namespace AutoFixScout;
 /// <summary>Windows side of the fix ladders. Non-admin actions run here; admin ones go to the elevated executor.</summary>
 public static class FixActions
 {
+    /// <summary>Actions that go to the elevated executor with one argument (one Windows permission prompt each).</summary>
+    public static readonly HashSet<string> ElevatedActions = new()
+    {
+        "service.restart", "device.disable_enable", "device.enable", "network.reset_dns", "device.rescan", "service.set_manual",
+    };
+
     public static async Task<(bool Ok, string Detail)> RunAsync(Rung rung)
     {
         try
@@ -29,6 +35,8 @@ public static class FixActions
                         "startupapps" => "ms-settings:startupapps",
                         "windowsupdate" => "ms-settings:windowsupdate",
                         "troubleshoot" => "ms-settings:troubleshoot",
+                        "microphone" => "ms-settings:privacy-microphone",
+                        "sound_devices" => "ms-settings:sound-devices",
                         _ => throw new ArgumentException(rung.Arg),
                     };
                     Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
@@ -37,13 +45,14 @@ public static class FixActions
                     return (true, "person was asked to do it");
                 case "audio.unmute_and_set_volume":
                     return (true, Unmute());
+                case "audio.unmute_microphone":
+                    return (true, Unmute(DataFlow.Capture, Role.Communications));
                 case "network.flush_dns":
                     // Flushing the resolver cache doesn't need admin, so no UAC prompt.
                     return await Task.Run(() => RunFixed("ipconfig.exe", "/flushdns"));
-                case "service.restart":
-                case "device.disable_enable":
-                case "device.enable":
-                case "network.reset_dns":
+                case var elevated when ElevatedActions.Contains(elevated):
+                    var code = await Task.Run(() => RunElevated(rung.ActionId, rung.Arg!));
+                    return (code == 0, code is null ? Declined : $"executor exit code {code}");
                 case "storage.clear_user_temp":
                     // The person's own temp folder only, files older than a day; no admin needed.
                     var (freed, deleted, skipped) = await Task.Run(() =>
@@ -51,10 +60,6 @@ public static class FixActions
                     return (true, $"temporary files removed: {deleted} ({freed / 1048576} MB), skipped (in use): {skipped}");
                 case "storage.empty_recycle_bin":
                     return await Task.Run(Areas.StorageCleanup.EmptyRecycleBin);
-                case "device.rescan":
-                case "service.set_manual":
-                    var code =await Task.Run(() => RunElevated(rung.ActionId, rung.Arg!));
-                    return (code == 0, code is null ? Declined : $"executor exit code {code}");
                 default:
                     return (false, $"action not allowed: {rung.ActionId}");
             }
@@ -71,14 +76,15 @@ public static class FixActions
     }
 
     /// <summary>Returns the prior state so the report records what to restore (spec 7.1 undo).</summary>
-    private static string Unmute()
+    /// <summary>Unmutes the default output (or, for capture, the default microphone) and lifts a very low level. Non-admin.</summary>
+    private static string Unmute(DataFlow flow = DataFlow.Render, Role role = Role.Multimedia)
     {
         using var en = new MMDeviceEnumerator();
-        using var dev = en.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+        using var dev = en.GetDefaultAudioEndpoint(flow, role);
         var v = dev.AudioEndpointVolume;
-        var before = $"before: muted={v.Mute}, volume={v.MasterVolumeLevelScalar * 100:0}%";
+        var before = $"before: muted={v.Mute}, level={v.MasterVolumeLevelScalar * 100:0}%";
         v.Mute = false;
-        if (v.MasterVolumeLevelScalar < 0.3f) v.MasterVolumeLevelScalar = 0.5f;
+        if (v.MasterVolumeLevelScalar < 0.3f) v.MasterVolumeLevelScalar = flow == DataFlow.Capture ? 0.7f : 0.5f;
         return before;
     }
 

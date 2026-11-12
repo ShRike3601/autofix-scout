@@ -62,7 +62,7 @@ public sealed class RealAudioProbe : IAudioProbe
     /// (test step 5 offered the HDMI audio driver for a laptop-speaker problem). The output's own device node is a
     /// child of that device; the nearest ancestor that is one of the MEDIA devices wins. Null = couldn't tell.
     /// </summary>
-    private static string? OwningDevice(MMDevice endpoint, IReadOnlyList<AudioDeviceInfo> devices)
+    internal static string? OwningDevice(MMDevice endpoint, IReadOnlyList<AudioDeviceInfo> devices)
     {
         try
         {
@@ -133,7 +133,7 @@ public sealed class RealAudioProbe : IAudioProbe
         return "Other";
     }
 
-    private static List<AudioDeviceInfo> ReadMediaDevices()
+    internal static List<AudioDeviceInfo> ReadMediaDevices()
     {
         var drivers = new Dictionary<string, ManagementBaseObject>(StringComparer.OrdinalIgnoreCase);
         using (var q = new ManagementObjectSearcher(
