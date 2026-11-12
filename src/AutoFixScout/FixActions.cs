@@ -46,6 +46,8 @@ public static class FixActions
                         "backup" => "ms-settings:backup",
                         "dateandtime" => "ms-settings:dateandtime",
                         "bluetooth" => "ms-settings:bluetooth",
+                        "powersleep" => "ms-settings:powersleep",
+                        "batterysaver" => "ms-settings:batterysaver",
                         "windowsdefender" => "windowsdefender:",
                         "windowsdefender_appbrowser" => "windowsdefender://appbrowser",
                         _ => throw new ArgumentException(rung.Arg),
@@ -87,6 +89,9 @@ public static class FixActions
                 case "apps.reset_onedrive":
                     // The OneDrive program found on this computer; the rung carries no path.
                     return await Task.Run(Repair.AppRepairs.ResetOneDrive);
+                case "power.balanced_plan":
+                    // Fixed Balanced GUID; powercfg /setactive works for the signed-in user without admin.
+                    return await Task.Run(() => RunFixed("powercfg.exe", "/setactive " + PowerTriage.BalancedGuid));
                 case "shell.restart_start_menu":
                     return await Task.Run(Repair.UserRepairs.RestartStartMenu);
                 case "shell.restart_explorer":

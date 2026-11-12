@@ -327,7 +327,7 @@ Rules: stop at 80% of each 5-hour window, resume after the reset (02:20 IST, the
 using worktree agents. Each item: probe + triage + tests + live test + real-UI check + HANDOFF/CAPABILITIES update.
 - [x] R1 Drive health: MSFT_PhysicalDisk HealthStatus / Get-StorageReliabilityCounter (wear, read errors, temperature)
       in the full check-up; "back up now" finding; never repairs hardware.
-- [ ] R2 Battery and power ("battery drains / will not sleep / will not wake"): battery wear (design vs full charge),
+- [x] R2 Battery and power ("battery drains / will not sleep / will not wake"): battery wear (design vs full charge),
       power plan, sleep settings, hibernate/fast startup, wake timers and devices allowed to wake; guided + safe fixes.
 - [ ] R3 Any device with an error (Device Manager warning) outside sound/camera/network: listed in the check-up with
       the Windows error code meaning; rescan; driver from Windows Update only for allowed classes, otherwise guided.

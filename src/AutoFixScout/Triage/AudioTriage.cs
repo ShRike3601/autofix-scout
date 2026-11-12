@@ -252,4 +252,11 @@ public enum FindingCode
     SecurityUacOff,
     SecuritySmartScreenOff,
     SecuritySuspiciousStartup,
+    // Battery, sleep and power
+    PowerBatteryReplace,
+    PowerBatteryWorn,
+    PowerSleepNeverOnBattery,
+    PowerWakesOften,
+    PowerFastStartupOn,
+    PowerPlanHighOnBattery,
 }
