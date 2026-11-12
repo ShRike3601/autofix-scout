@@ -303,7 +303,8 @@ Goal: move from simple switches (mute, airplane mode) to real software repair: "
 7. TestBench: fault injection for each new repair, run unattended through the elevated runner.
 8. Docs, writing-style tests, CI green, PR from `overnight`.
 
-Next (in order): HealthFlow + home wiring are done (PR 11). Then: per-program crash picker (ask "Is <app> the program?"),
+Next (in order): HealthFlow, home wiring and the crash picker are done (PR 11, checked in the real UI).
+Then:
 symptom search (5), Bluetooth area, then run the admin health bench as soon
 as `schtasks /query /tn AFS-Bench-Elevated` works: job file running
 `tools\AutoFixScout.TestBench\bin\Debug\net8.0-windows\AutoFixScout.TestBench.exe health --long --out C:\afs-bench\out`.
