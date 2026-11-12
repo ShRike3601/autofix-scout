@@ -33,6 +33,7 @@ public sealed class RealStorageProbe : IStorageProbe
         catch (Exception) { /* unknown */ }
         s.WindowsTempBytes = WindowsTempSize();
         s.RecycleBinBytes = RecycleBinSize();
+        ReadBigUsers(s);
         try
         {
             var entries = Repair.StartupApps.ReadAll();
@@ -45,6 +46,47 @@ public sealed class RealStorageProbe : IStorageProbe
         s.MemoryLoadPercent = MemoryLoad();
         try { s.ProblemDevices = ReadProblemDevices(); } catch (Exception) { /* unknown */ }
         return s;
+    }
+
+    public static readonly TimeSpan OldDownload = TimeSpan.FromDays(90);
+
+    /// <summary>Big space users, each on its own so one failure only leaves that part Unknown. Read-only, no admin.</summary>
+    private static void ReadBigUsers(StorageState s)
+    {
+        var root = s.SystemDrive;
+        var b = SpaceWalker.DefaultBudget;
+        try
+        {
+            var w = Path.Combine(root, "Windows.old");
+            s.WindowsOld = Directory.Exists(w) ? SpaceWalker.Folder(w, b) : new SpaceItem(0, false);
+        }
+        catch (Exception) { /* unknown */ }
+        try { s.HiberFile = SpaceWalker.FileSize(Path.Combine(root, "hiberfil.sys")); } catch (Exception) { /* unknown */ }
+        try
+        {
+            if (SpaceWalker.DownloadsPath() is { } dl && Directory.Exists(dl))
+            {
+                var r = SpaceWalker.Measure(dl, b, DateTime.UtcNow - OldDownload);
+                if (r.TopReadable) { s.Downloads = new SpaceItem(r.Bytes, !r.Complete); s.DownloadsOldCount = r.OldFiles; }
+            }
+        }
+        catch (Exception) { /* unknown */ }
+        try
+        {
+            var parts = new[]
+            {
+                Path.Combine(s.WindowsDirectory, @"SoftwareDistribution\DeliveryOptimization"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), @"Microsoft\Windows\DeliveryOptimization\Cache"),
+            }.Select(p => SpaceWalker.Folder(p, b)).Where(x => x is not null).ToList();
+            if (parts.Count > 0) s.DeliveryOptimization = new SpaceItem(parts.Sum(x => x!.Bytes), parts.Any(x => x!.AtLeast));
+        }
+        catch (Exception) { /* unknown */ }
+        try
+        {
+            s.BigProfileFolders = SpaceWalker.BigProfileFolders(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(12));
+        }
+        catch (Exception) { /* unknown */ }
     }
 
     /// <summary>The drive Windows runs from. Shared with the Windows Update check.</summary>
