@@ -367,12 +367,14 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
 - [x] P1 Per-app privacy (Microphone and Camera areas): one app (Teams, Zoom, a browser) denied microphone or camera
       access while the global switch is on (HKCU ConsentStore\<capability>\<app or NonPackaged\path> Value=Deny);
       guided Settings step naming the app; no silent changes to privacy choices.
-- [ ] P2 Blue-screen causes (check-up): read the stop code of recent blue screens (event 1001 BugCheck parameters /
+- [x] P2 Blue-screen causes (check-up): read the stop code of recent blue screens (event 1001 BugCheck parameters /
       WER) and explain common ones in plain words (memory, driver, storage, graphics); offer Windows Memory Diagnostic
       as a guided step for memory-type codes; point to the driver for driver-type codes.
-- [ ] P3 Virtual memory (check-up): page file disabled or far too small for the installed memory -> "low memory" crashes;
+- [x] P3 Virtual memory (check-up): page file disabled or far too small for the installed memory -> "low memory" crashes;
       fix through the executor: let Windows manage the page file size (backup of the old setting; restart needed).
 - [x] P4 Threats found by Microsoft Defender (Security): recent detections (MSFT_MpThreatDetection) and whether they were
       removed; guided "Protection history" step; full scan offer.
 - [x] P5 Scanner and camera import (Printer area): Windows Image Acquisition service (stisvc) off; scanner device errors.
 - P5: OnScannerClicked (MainWindow.xaml.cs) runs the printer flow with ScanFocus; the search box routes "scanner" there. The home tile is added by the UI session.
+- P3 bug found on hardware: system.pagefile_auto used WMI path "\.\root\cimv2" (missing "\") -> "Invalid parameter"; fixed, LivePageFileTests guards it; elevated re-run: exit 3 (already automatic), bad arg 2.
+- Idea from the UI session, owner has NOT decided: SymptomRouter could return a confidence plus the next 1-2 candidates and "no good match", so the UI can offer "closest checks". Do not start unless the owner asks.

@@ -219,3 +219,18 @@ public class LiveBigSpaceTests
             Assert.DoesNotMatch(@"[A-Za-z]:\|\.\w{2,4}\b(?!\W*(old|sys))", f.PlainMessage);
     }
 }
+
+/// <summary>Regression: the page-file action once used "\.\root\cimv2" (missing a backslash) and failed with "Invalid parameter".</summary>
+[Collection("Live machine")]
+public class LivePageFileTests
+{
+    [Fact]
+    public void PageFileAuto_ReadsWmi_AndDoesNothingWhenAlreadyAutomatic()
+    {
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AFS_LIVE"))) return;
+        using var cs = new System.Management.ManagementObjectSearcher("SELECT AutomaticManagedPagefile FROM Win32_ComputerSystem");
+        var automatic = cs.Get().Cast<System.Management.ManagementObject>().First()["AutomaticManagedPagefile"] is true;
+        if (!automatic) return; // never change a real page file from a test
+        Assert.Equal(3, AutoFixScout.Executor.Repairs.PageFileAuto());
+    }
+}

@@ -287,7 +287,7 @@ public static class Repairs
     /// </summary>
     public static int PageFileAuto()
     {
-        var scope = new ManagementScope(@"\.\root\cimv2", new ConnectionOptions { EnablePrivileges = true });
+        var scope = new ManagementScope(@"\\.\root\cimv2", new ConnectionOptions { EnablePrivileges = true });
         scope.Connect();
         using var q = new ManagementObjectSearcher(scope, new ObjectQuery("SELECT * FROM Win32_ComputerSystem"));
         foreach (ManagementObject cs in q.Get())
