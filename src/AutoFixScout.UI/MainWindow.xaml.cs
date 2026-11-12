@@ -328,6 +328,35 @@ public partial class MainWindow : Window, IFixHost
                 ? await AutoCheckAsync(() => Areas.HealthFlow.AutoTestAsync(_before)) && await AskAsync(Areas.HealthFlow.TestQuestion)
                 : await AskAsync(Areas.HealthFlow.TestQuestion));
 
+
+    /// <summary>
+    /// "A program keeps closing": the full check-up, but first the person confirms which recorded program it is, so the
+    /// fix steps target that program. Asked once per flow (the re-check after the fixes keeps the answer).
+    /// </summary>
+    private async void OnProgramClosingClicked(object sender, RoutedEventArgs e)
+    {
+        string? chosen = null;
+        var asked = false;
+        async Task<Diagnosis> DiagnoseProgramAsync()
+        {
+            var d = await Areas.HealthFlow.DiagnoseAsync();
+            var s = (HealthState)d.State;
+            if (!asked)
+            {
+                asked = true;
+                var candidates = HealthTriage.CrashCandidates(s);
+                if (candidates.Count == 0)
+                    await ShowStepAsync(Areas.HealthFlow.NoCrashRecorded, "Continue");
+                foreach (var c in candidates)
+                    if (await ShowStepAsync(Areas.HealthFlow.ProgramQuestion(c), "Yes, this program", "No")) { chosen = c.App; break; }
+                ShowBusy("Preparing the next steps");
+            }
+            s.ChosenApp = chosen;
+            return Areas.HealthFlow.Diagnose(s);
+        }
+        await RunFlowAsync(Areas.HealthFlow.Topic, Areas.HealthFlow.What, DiagnoseProgramAsync,
+            () => AskAsync("Does the program work without closing now?"));
+    }
     private async void OnMicrophoneClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.MicrophoneFlow.Topic, Areas.MicrophoneFlow.What, Areas.MicrophoneFlow.DiagnoseAsync, async () =>
         {

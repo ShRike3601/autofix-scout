@@ -65,8 +65,7 @@ public sealed class RealHealthProbe : IHealthProbe
         var crashes = new List<(string App, string? Module, string? Code, DateTime When, string? Path)>();
         foreach (var e in Query("Application", "Provider[@Name='Application Error'] and EventID=1000"))
         {
-            var code = Prop(e, 6);
-            if (code is not null && !code.StartsWith("0x", StringComparison.OrdinalIgnoreCase) && uint.TryParse(code, out var n)) code = n.ToString("x8");
+            var code = Prop(e, 6); // hex text, for example "c0000005"
             crashes.Add((Prop(e, 0) ?? "unknown", Prop(e, 3), code?.Replace("0x", "", StringComparison.OrdinalIgnoreCase), e.TimeCreated?.ToUniversalTime() ?? DateTime.MinValue, Prop(e, 10)));
         }
         s.Crashes = crashes

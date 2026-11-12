@@ -24,6 +24,19 @@ public static class HealthFlow
         return new Diagnosis(s, f, HealthTriage.Ladder(s, f), HealthTriage.ProbablyHardware(s), HealthTriage.NotFixedHint(f));
     }
 
+    /// <summary>Triage again for a state the person refined (for example the program they picked).</summary>
+    public static Diagnosis Diagnose(HealthState s)
+    {
+        var f = HealthTriage.Evaluate(s);
+        return new Diagnosis(s, f, HealthTriage.Ladder(s, f), HealthTriage.ProbablyHardware(s), HealthTriage.NotFixedHint(f));
+    }
+
+    public static string ProgramQuestion(CrashInfo c) =>
+        $"Is \"{c.App.Replace(".exe", "", StringComparison.OrdinalIgnoreCase)}\" the program that keeps closing?";
+
+    public const string NoCrashRecorded =
+        "Windows has not recorded a program closing unexpectedly in the last two weeks. AutoFix Scout will check the rest of the computer instead.";
+
     public static bool UsesAutoTest(IReadOnlyList<Finding> findings) =>
         findings.Any(f => HealthTriage.Rechecked.Contains(f.Code));
 

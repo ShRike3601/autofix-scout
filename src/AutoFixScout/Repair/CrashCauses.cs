@@ -41,7 +41,7 @@ public static class CrashCauses
         var m = (module ?? "").Trim().ToLowerInvariant();
         var code = (exceptionCode ?? "").Trim().ToLowerInvariant().Replace("0x", "");
         if (code is "c0000135" or "c0000142" or "c06d007e") return CrashCause.MissingFile; // dll not found / init failed / delay-load
-        if (code == "e0434352" || code == "e0434f4d") return CrashCause.DotNet;               // .NET managed exception
+        if (code is "e0434352" or "e0434f4d" or "80131623" or "80131506") return CrashCause.DotNet; // .NET exception, FailFast, engine error
         if (code == "c0000409" && RuntimeModules.Any(m.StartsWith)) return CrashCause.Runtime;
         if (RuntimeModules.Any(m.StartsWith)) return CrashCause.Runtime;
         if (DotNetModules.Any(m.StartsWith)) return CrashCause.DotNet;

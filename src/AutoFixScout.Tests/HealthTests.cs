@@ -108,6 +108,31 @@ public class HealthTests
     }
 
     [Fact]
+    public void ChosenProgram_IsTargetedFirst_EvenAfterOneCrash()
+    {
+        var s = Healthy();
+        s.Crashes = new[]
+        {
+            new CrashInfo("Other.exe", "nvwgf2umx.dll", "c0000005", 5, DateTime.UtcNow),
+            new CrashInfo("Word.exe", "VCRUNTIME140.dll", "c0000005", 1, DateTime.UtcNow),
+        };
+        Assert.Equal("Other.exe", HealthTriage.ProgramCrashes(s)[0].App);
+        Assert.Equal(new[] { "Other.exe", "Word.exe" }, HealthTriage.CrashCandidates(s).Select(c => c.App));
+        s.ChosenApp = "word.exe";
+        var (f, l) = Run(s);
+        Assert.Contains("\"Word.exe\"", f.First(x => x.Code == FindingCode.HealthProgramCrashing).PlainMessage);
+        Assert.Contains(l, r => r.ActionId == "runtime.install_vcredist");
+    }
+
+    [Fact]
+    public void CrashCandidates_SkipWindowsShell() 
+    {
+        var s = Healthy();
+        s.Crashes = new[] { new CrashInfo("explorer.exe", "ntdll.dll", "c0000374", 9, DateTime.UtcNow) };
+        Assert.Empty(HealthTriage.CrashCandidates(s));
+    }
+
+    [Fact]
     public void SingleCrash_IsNotAFault()
     {
         var s = Healthy();
@@ -130,6 +155,7 @@ public class HealthTests
     [InlineData("ucrtbase.dll", "c0000409", CrashCause.Runtime)]
     [InlineData("KERNELBASE.dll", "e0434352", CrashCause.DotNet)]
     [InlineData("coreclr.dll", "c0000005", CrashCause.DotNet)]
+    [InlineData("unknown", "80131623", CrashCause.DotNet)]
     [InlineData("nvwgf2umx.dll", "c0000005", CrashCause.Graphics)]
     [InlineData("ntdll.dll", "c0000374", CrashCause.WindowsFiles)]
     [InlineData("unknown", "c0000135", CrashCause.MissingFile)]

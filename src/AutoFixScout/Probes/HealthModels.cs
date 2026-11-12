@@ -57,6 +57,8 @@ public sealed class HealthState
     public IReadOnlyList<UpdateServiceInfo> Services { get; set; } = new List<UpdateServiceInfo>();
     public IReadOnlyList<StoreAppInfo> BrokenStoreApps { get; set; } = new List<StoreAppInfo>();
     public Tri RebootPending { get; set; } = Tri.Unknown;
+    /// <summary>The program the person said is the one with the problem (from "A program keeps closing"); null = not asked.</summary>
+    public string? ChosenApp { get; set; }
 
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
 }

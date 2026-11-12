@@ -18,9 +18,21 @@ public static class HealthTriage
 
     public static IReadOnlyList<CrashInfo> ShellCrashes(HealthState s) => s.Crashes.Where(c => CrashCauses.IsShell(c.App)).ToList();
 
-    /// <summary>Programs (not part of Windows' shell) that closed unexpectedly at least twice.</summary>
+    /// <summary>
+    /// Programs (not part of Windows' shell) that closed unexpectedly at least twice. The program the person picked
+    /// comes first and counts even after a single crash.
+    /// </summary>
     public static IReadOnlyList<CrashInfo> ProgramCrashes(HealthState s) =>
-        s.Crashes.Where(c => !CrashCauses.IsShell(c.App) && c.Count >= 2).ToList();
+        s.Crashes.Where(c => !CrashCauses.IsShell(c.App) && (c.Count >= 2 || IsChosen(s, c)))
+            .OrderByDescending(c => IsChosen(s, c)).ToList();
+
+    private static bool IsChosen(HealthState s, CrashInfo c) =>
+        s.ChosenApp is { } a && c.App.Equals(a, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Programs to offer in "A program keeps closing", most frequent first (shell excluded).</summary>
+    public static IReadOnlyList<CrashInfo> CrashCandidates(HealthState s) =>
+        s.Crashes.Where(c => !CrashCauses.IsShell(c.App)).GroupBy(c => c.App, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(c => c.Count).First()).Take(3).ToList();
 
     public static IReadOnlyList<UpdateServiceInfo> ServiceFaults(HealthState s) =>
         s.Services.Where(x => ServiceDefaults.IsFault(x.Name, x.Status, x.StartType)).ToList();
