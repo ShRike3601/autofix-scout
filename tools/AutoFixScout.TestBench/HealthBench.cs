@@ -142,6 +142,30 @@ public static class HealthBench
                 k.SetValue("Path", pathBefore, RegistryValueKind.ExpandString);
             });
 
+        // H6 firewall off on the Public profile -> Security area -> security.firewall_on. Always switched back on.
+        if (only == null || only.Contains("H6-firewall"))
+        {
+            Log("--- H6-firewall: expect SecurityFirewallOff, fix with security.firewall_on");
+            try
+            {
+                Run("netsh.exe", "advfirewall", "set", "publicprofile", "state", "off");
+                var d = await AutoFixScout.Areas.SecurityFlow.DiagnoseAsync();
+                var rung = d.Ladder.FirstOrDefault(r => r.ActionId == "security.firewall_on");
+                Log($"  found: {string.Join(", ", d.Findings.Select(x => x.Code))}; rung: {rung?.Id ?? "MISSING"}");
+                if (d.Findings.All(x => x.Code != FindingCode.SecurityFirewallOff) || rung is null) results.Add(("H6-firewall", false, "fault not found or rung missing"));
+                else
+                {
+                    var (ok, detail) = await FixActions.RunAsync(rung);
+                    var after = await AutoFixScout.Areas.SecurityFlow.DiagnoseAsync();
+                    var gone = after.Findings.All(x => x.Code != FindingCode.SecurityFirewallOff);
+                    Log($"  ran: ok={ok} {detail}; after: {string.Join(", ", after.Findings.Select(x => x.Code))}");
+                    results.Add(("H6-firewall", ok && gone, ok && gone ? "fixed" : $"ok={ok} gone={gone} {detail}"));
+                }
+            }
+            catch (Exception ex) { results.Add(("H6-firewall", false, ex.Message)); }
+            finally { Run("netsh.exe", "advfirewall", "set", "publicprofile", "state", "on"); Log("  restored (public profile on)"); }
+        }
+
         // Repairs that have no fault to create safely: run them and check they finish cleanly.
         async Task Direct(string id, string action, string arg, int tier = 1)
         {
@@ -166,6 +190,7 @@ public static class HealthBench
             await Direct("D5-chkdsk", "disk.scan", Environment.SystemDirectory[..1]);
             await Direct("D6-dism", "repair.dism", "system");
             await Direct("D7-sfc", "repair.sfc", "system");
+            await Direct("D8-component-cleanup", "storage.cleanup_components", "system");
         }
 
         var final = Diagnose();
