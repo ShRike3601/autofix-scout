@@ -42,6 +42,7 @@ public static class FixActions
                         "printers" => "ms-settings:printers",
                         "display" => "ms-settings:display",
                         "apps" => "ms-settings:appsfeatures",
+                        "bluetooth" => "ms-settings:bluetooth",
                         _ => throw new ArgumentException(rung.Arg),
                     };
                     Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });

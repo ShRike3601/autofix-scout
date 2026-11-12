@@ -13,16 +13,16 @@ namespace AutoFixScout.Executor;
 public static class Program
 {
     internal static readonly HashSet<string> RestartableServices = new(StringComparer.OrdinalIgnoreCase)
-        { "AudioSrv", "AudioEndpointBuilder", "WlanSvc", "wuauserv", "BITS", "CryptSvc", "Spooler" };
+        { "AudioSrv", "AudioEndpointBuilder", "WlanSvc", "wuauserv", "BITS", "CryptSvc", "Spooler", "bthserv" };
 
     /// <summary>Windows Update services a person may have switched off; service.set_manual puts them back to Manual (Windows' default).</summary>
     public static readonly HashSet<string> ManualStartServices = new(StringComparer.OrdinalIgnoreCase) { "wuauserv", "BITS", "CryptSvc" };
 
     /// <summary>Same as Triage.Rescan.Areas (a test keeps them equal).</summary>
-    public static readonly string[] RescanAreas = { "audio", "camera", "network" };
+    public static readonly string[] RescanAreas = { "audio", "camera", "network", "bluetooth" };
 
-    // Sound, camera and network only (spec 3). Display and storage drivers are never touched: a bad one can stop Windows starting.
-    private static readonly string[] ToggleableClasses = { "MEDIA", "Camera", "Image", "Net" };
+    // Sound, camera, network and Bluetooth adapters only (spec 3). Display and storage drivers are never touched: a bad one can stop Windows starting.
+    private static readonly string[] ToggleableClasses = { "MEDIA", "Camera", "Image", "Net", "Bluetooth" };
 
     public static int Main(string[] args)
     {

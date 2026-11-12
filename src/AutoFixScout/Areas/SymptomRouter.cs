@@ -12,6 +12,7 @@ public static class SymptomRouter
     public static readonly IReadOnlyDictionary<string, Route> Routes = new Dictionary<string, Route>
     {
         ["sound"] = new("sound", "Sound is not working", "This sounds like a problem with sound."),
+        ["bluetooth"] = new("bluetooth", "Bluetooth is not working", "This sounds like a problem with Bluetooth."),
         ["microphone"] = new("microphone", "Microphone not working", "This sounds like a problem with the microphone."),
         ["camera"] = new("camera", "Camera is not working", "This sounds like a problem with the camera."),
         ["network"] = new("network", "Cannot connect to the internet", "This sounds like a problem with the internet connection."),
@@ -27,6 +28,8 @@ public static class SymptomRouter
     // On a tie the earlier entry wins, so the specific Windows problems (health) come before "a program".
     private static readonly (string Area, string[] Phrases, string[] Words)[] Keywords =
     {
+        ("bluetooth", new[] { "bluetooth", "airpods", "earbuds not connecting", "won't pair", "wont pair", "will not pair", "cannot pair", "can't pair", "not pairing" },
+                      new[] { "bluetooth", "airpods", "pair", "pairing", "wireless mouse", "wireless keyboard", "earbuds" }),
         ("microphone", new[] { "cannot hear me", "can't hear me", "cant hear me", "nobody can hear", "no one can hear", "they can't hear", "mic not", "microphone not" },
                        new[] { "microphone", "mic ", "mic.", "recording", "voice", "mute myself" }),
         ("sound", new[] { "no sound", "no audio", "can't hear", "cant hear", "cannot hear", "sound not", "audio not", "speakers not", "headphones not" },

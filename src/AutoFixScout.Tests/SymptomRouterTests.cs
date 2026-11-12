@@ -7,6 +7,8 @@ public class SymptomRouterTests
 {
     [Theory]
     [InlineData("there is no sound from my laptop speakers", "sound")]
+    [InlineData("my bluetooth headphones will not pair", "bluetooth")]
+    [InlineData("airpods connected but no sound", "bluetooth")]
     [InlineData("people on Zoom say they can't hear me", "microphone")]
     [InlineData("my mic is not working in teams", "microphone")]
     [InlineData("webcam shows a black picture", "camera")]

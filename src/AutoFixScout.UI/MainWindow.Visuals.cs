@@ -110,6 +110,7 @@ public partial class MainWindow
             "driver" => "Unfinished driver change",
             "health" => "Computer check-up",
             "microphone" => "Microphone",
+            "bluetooth" => "Bluetooth",
             "storage" => "Slow or full computer",
             "update" => "Windows Update",
             "printer" => "Printer",

@@ -305,6 +305,6 @@ Goal: move from simple switches (mute, airplane mode) to real software repair: "
 
 Next (in order): HealthFlow, home wiring and the crash picker are done (PR 11, checked in the real UI).
 Then:
-Bluetooth area, then run the admin health bench as soon
+Bluetooth area [done], then run the admin health bench as soon
 as `schtasks /query /tn AFS-Bench-Elevated` works: job file running
 `tools\AutoFixScout.TestBench\bin\Debug\net8.0-windows\AutoFixScout.TestBench.exe health --long --out C:\afs-bench\out`.

@@ -210,6 +210,14 @@ public enum FindingCode
     HealthServicesFailing,
     HealthUpdatesFailing,
     HealthRestartPending,
+    // Bluetooth
+    NoBluetoothAdapter,
+    BluetoothAdapterDisabled,
+    BluetoothAdapterError,
+    BluetoothServiceStopped,
+    BluetoothOff,
+    BluetoothNothingPaired,
+    BluetoothAudioNotConnected,
     // Printer
     PrintSpoolerStopped,
     NoPrinter,

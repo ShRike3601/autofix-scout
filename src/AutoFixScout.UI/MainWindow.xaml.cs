@@ -328,6 +328,7 @@ public partial class MainWindow : Window, IFixHost
             "camera" => OnCameraClicked,
             "network" => OnNetworkClicked,
             "microphone" => OnMicrophoneClicked,
+            "bluetooth" => OnBluetoothClicked,
             "program" => OnProgramClosingClicked,
             "storage" => OnStorageClicked,
             "update" => OnUpdateClicked,
@@ -395,6 +396,10 @@ public partial class MainWindow : Window, IFixHost
         await RunFlowAsync(Areas.HealthFlow.Topic, Areas.HealthFlow.What, DiagnoseProgramAsync,
             () => AskAsync("Does the program work without closing now?"));
     }
+    private async void OnBluetoothClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.BluetoothFlow.Topic, Areas.BluetoothFlow.What, Areas.BluetoothFlow.DiagnoseAsync,
+            async () => await AutoCheckAsync(Areas.BluetoothFlow.AutoTestAsync) && await AskAsync(Areas.BluetoothFlow.TestQuestion));
+
     private async void OnMicrophoneClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.MicrophoneFlow.Topic, Areas.MicrophoneFlow.What, Areas.MicrophoneFlow.DiagnoseAsync, async () =>
         {
