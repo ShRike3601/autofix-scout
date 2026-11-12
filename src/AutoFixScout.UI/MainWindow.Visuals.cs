@@ -108,6 +108,12 @@ public partial class MainWindow
             "camera" => CameraTitle.Text,
             "network" => NetworkTitle.Text,
             "driver" => "Unfinished driver change",
+            "health" => "Computer check-up",
+            "microphone" => "Microphone",
+            "storage" => "Slow or full computer",
+            "update" => "Windows Update",
+            "printer" => "Printer",
+            "display" => "Screen and display",
             _ => null,
         };
     }

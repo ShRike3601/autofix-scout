@@ -14,6 +14,7 @@ public partial class MainWindow : Window, IFixHost
     private string? _lastReportPath;
     private TaskCompletionSource<bool>? _choice;
     private Func<Task<bool>> _test = () => Task.FromResult(false);
+    private IReadOnlyList<Finding> _before = Array.Empty<Finding>(); // findings of the current flow, for its real test
     private readonly Dictionary<string, string> _savePoints = new(); // rung id -> open save point id
 
     public MainWindow()
@@ -95,11 +96,12 @@ public partial class MainWindow : Window, IFixHost
     {
         SetTopic(topic);
         Journey(Stage.Check);
-        var sessionId = StartSession(topic == "sound" ? "audio" : topic);
+        var sessionId = StartSession(topic switch { "sound" => "audio", "health" => "other", _ => topic });
         try
         {
             ShowBusy("Checking your computer", scan: true);
             var before = await diagnose();
+            _before = before.Findings;
             Journey(Stage.Diagnosis);
             await ShowStepAsync(before.Findings[0].PlainMessage, "Continue", look: FindingLook(before.Findings[0].Code));
 
@@ -297,6 +299,58 @@ public partial class MainWindow : Window, IFixHost
         return settled;
     }
 
+    // ---- more areas (home screen "Something else") ----
+
+    private void OnOtherClicked(object sender, RoutedEventArgs e) =>
+        MoreAreas.Visibility = MoreAreas.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+
+    /// <summary>The person's own answer is the real test where no automatic check exists.</summary>
+    private Task<bool> AskAsync(string question)
+    {
+        Journey(Stage.Confirm);
+        return ShowStepAsync(question, "Yes", "No");
+    }
+
+    private async Task<bool> AutoCheckAsync(Func<Task<bool>> check)
+    {
+        Journey(Stage.Confirm);
+        ShowBusy("Checking whether the problem has been resolved");
+        return await check();
+    }
+
+    private async void OnHealthClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.HealthFlow.Topic, Areas.HealthFlow.What, Areas.HealthFlow.DiagnoseAsync,
+            async () => Areas.HealthFlow.UsesAutoTest(_before)
+                ? await AutoCheckAsync(() => Areas.HealthFlow.AutoTestAsync(_before)) && await AskAsync(Areas.HealthFlow.TestQuestion)
+                : await AskAsync(Areas.HealthFlow.TestQuestion));
+
+    private async void OnMicrophoneClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.MicrophoneFlow.Topic, Areas.MicrophoneFlow.What, Areas.MicrophoneFlow.DiagnoseAsync, async () =>
+        {
+            Journey(Stage.Confirm);
+            await ShowStepAsync(Areas.MicrophoneFlow.TestPrompt, "Start the test");
+            ShowBusy("Listening to the microphone");
+            return await Areas.MicrophoneFlow.AutoTestAsync();
+        });
+
+    private async void OnStorageClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.StorageFlow.Topic, Areas.StorageFlow.What, Areas.StorageFlow.DiagnoseAsync,
+            async () => Areas.StorageFlow.UsesAutoTest(_before)
+                ? await AutoCheckAsync(Areas.StorageFlow.AutoTestAsync)
+                : await AskAsync(Areas.StorageFlow.TestQuestion));
+
+    private async void OnUpdateClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.UpdateFlow.Topic, Areas.UpdateFlow.What, Areas.UpdateFlow.DiagnoseAsync,
+            async () => await AutoCheckAsync(Areas.UpdateFlow.AutoTestAsync) && await AskAsync(Areas.UpdateFlow.TestQuestion));
+
+    private async void OnPrinterClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.PrinterFlow.Topic, Areas.PrinterFlow.What, Areas.PrinterFlow.DiagnoseAsync,
+            () => AskAsync(Areas.PrinterFlow.TestQuestion));
+
+    private async void OnDisplayClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.DisplayFlow.Topic, Areas.DisplayFlow.What, Areas.DisplayFlow.DiagnoseAsync,
+            () => AskAsync(Areas.DisplayFlow.TestQuestion));
+
     // ---- other ----
 
     private void OnHelperDetailsClicked(object sender, RoutedEventArgs e)
@@ -307,7 +361,6 @@ public partial class MainWindow : Window, IFixHost
             Process.Start(new ProcessStartInfo("notepad.exe", $"\"{_lastReportPath}\""));
     }
 
-    private void OnOtherClicked(object sender, RoutedEventArgs e) => Stub("Checks for other problems are");
     private void OnSettingsClicked(object sender, RoutedEventArgs e) => Stub("Settings are");
 
     private void Stub(string what) => MessageBox.Show(this, $"{what} not available in this version of AutoFix Scout.", AppName);
