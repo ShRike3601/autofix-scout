@@ -274,3 +274,31 @@ history; camera test uses the Windows Camera app; session row opened at flow sta
 
 Real-hardware testing first. Then: Settings screen (opt-ins, delete my data), "Something else" free-text routing
 (spec 9, LLM), packaging + code signing (Milestone 5), deleting the unused skeleton files.
+
+## Overnight plan (2026-11-12 night, unattended on AFS-TESTBENCH)
+
+The owner is away and cannot click. Merging PRs is blocked in auto mode, so everything lands on branch
+`overnight` with one PR for the owner to review. Admin tests run through the scheduled task
+`AFS-Bench-Elevated` (owner runs `C:\afs-bench\SETUP-run-once-as-admin.ps1` once): drop a `.ps1` into
+`C:\afs-bench\jobs`, run `schtasks /run /tn AFS-Bench-Elevated`, read `C:\afs-bench\out\<name>.log`
+(`<name>.done` appears when finished). Never reboot, never break the network for more than seconds (it
+would cut off the session), never change the clock.
+
+Goal: move from simple switches (mute, airplane mode) to real software repair: "deep fix engine".
+
+1. [done] Merge PR 8 (storage/update), 9 (microphone), 10 (printer/display WIP) into `overnight`.
+2. Health area ("Something else is wrong"): `HealthProbe` reads event logs (app crashes + faulting module,
+   blue screens, unexpected shutdowns, disk/NTFS/WHEA errors, missing runtimes (SideBySide), failing
+   services), clock offset, proxy (WinINet, WinHTTP), hosts-file hijacks, Winsock LSPs, system PATH, TEMP,
+   critical services disabled, broken Store apps, pending restart.
+3. Repair actions (allowlisted, validated, backups first): sfc, DISM RestoreHealth, time resync, reset
+   WinHTTP proxy, reset user proxy (non-admin), clean hosts (backup), Windows Update component reset
+   (rename, not delete), restore service default start type, repair system PATH, rebuild search index,
+   re-register broken Store app (non-admin), restart Explorer, rebuild icon cache, install VC++ runtime
+   (Microsoft URL + signature check), chkdsk /scan, winsock/TCP-IP reset (unit-tested only, needs restart).
+4. "A program keeps closing" flow: crashed apps from the event log -> cause by faulting module
+   (runtime, .NET, graphics driver, system file, the app itself) -> matching rungs.
+5. Symptom search on the home screen: free text -> area or health check.
+6. Wire all areas into the home screen ("Other problems" opens the list).
+7. TestBench: fault injection for each new repair, run unattended through the elevated runner.
+8. Docs, writing-style tests, CI green, PR from `overnight`.
