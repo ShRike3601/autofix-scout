@@ -14,6 +14,8 @@ public static class FixActions
     public static readonly HashSet<string> ElevatedActions = new()
     {
         "service.restart", "device.disable_enable", "device.enable", "network.reset_dns", "device.rescan", "service.set_manual", "printer.clear_queue", "printer.set_online",
+        "repair.dism", "repair.sfc", "time.resync", "network.reset_winhttp_proxy", "network.clean_hosts", "service.restore_default",
+        "system.repair_path", "network.reset_winsock", "update.reset_components", "search.rebuild_index", "runtime.install_vcredist", "disk.scan",
     };
 
     public static async Task<(bool Ok, string Detail)> RunAsync(Rung rung)
@@ -39,6 +41,7 @@ public static class FixActions
                         "sound_devices" => "ms-settings:sound-devices",
                         "printers" => "ms-settings:printers",
                         "display" => "ms-settings:display",
+                        "apps" => "ms-settings:appsfeatures",
                         _ => throw new ArgumentException(rung.Arg),
                     };
                     Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
@@ -65,6 +68,16 @@ public static class FixActions
                     var (freed, deleted, skipped) = await Task.Run(() =>
                         Areas.StorageCleanup.ClearTemp(Path.GetTempPath(), DateTime.UtcNow.AddHours(-24)));
                     return (true, $"temporary files removed: {deleted} ({freed / 1048576} MB), skipped (in use): {skipped}");
+                case "network.reset_user_proxy":
+                    return await Task.Run(Repair.UserRepairs.ResetUserProxy);
+                case "system.repair_temp":
+                    return await Task.Run(Repair.UserRepairs.RepairTemp);
+                case "apps.reregister":
+                    return await Task.Run(() => Repair.UserRepairs.ReregisterApp(rung.Arg ?? ""));
+                case "shell.restart_explorer":
+                    return await Task.Run(Repair.UserRepairs.RestartExplorer);
+                case "shell.rebuild_icon_cache":
+                    return await Task.Run(Repair.UserRepairs.RebuildIconCache);
                 case "storage.empty_recycle_bin":
                     return await Task.Run(Areas.StorageCleanup.EmptyRecycleBin);
                 default:

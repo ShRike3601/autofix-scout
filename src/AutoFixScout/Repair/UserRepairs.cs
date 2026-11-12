@@ -1,0 +1,136 @@
+using System.Diagnostics;
+using System.Text;
+using System.Text.RegularExpressions;
+using Microsoft.Win32;
+
+namespace AutoFixScout.Repair;
+
+/// <summary>
+/// Repairs that only touch the person's own settings, so no admin rights and no permission prompt.
+/// Each one saves what it changes to %LOCALAPPDATA%\AutoFixScout\backups first.
+/// </summary>
+public static class UserRepairs
+{
+    public static string BackupDir => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AutoFixScout", "backups");
+
+    private static string Backup(string name, string content)
+    {
+        Directory.CreateDirectory(BackupDir);
+        var path = Path.Combine(BackupDir, $"{name}-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
+        File.WriteAllText(path, content);
+        return path;
+    }
+
+    private const string InternetSettings = @"Software\Microsoft\Windows\CurrentVersion\Internet Settings";
+
+    /// <summary>Proxy off and setup script removed for the current user. Values are saved first as a .reg-style text.</summary>
+    public static (bool Ok, string Detail) ResetUserProxy()
+    {
+        using var k = Registry.CurrentUser.OpenSubKey(InternetSettings, writable: true);
+        if (k is null) return (false, "internet settings key not found");
+        var before = $"ProxyEnable={k.GetValue("ProxyEnable")}\nProxyServer={k.GetValue("ProxyServer")}\nProxyOverride={k.GetValue("ProxyOverride")}\nAutoConfigURL={k.GetValue("AutoConfigURL")}\n";
+        var saved = Backup("proxy", before);
+        k.SetValue("ProxyEnable", 0, RegistryValueKind.DWord);
+        if (k.GetValue("AutoConfigURL") != null) k.DeleteValue("AutoConfigURL", false);
+        NotifyInternetSettingsChanged();
+        return (true, $"proxy switched off; previous values saved to {saved}");
+    }
+
+    [System.Runtime.InteropServices.DllImport("wininet.dll", SetLastError = true)]
+    private static extern bool InternetSetOption(IntPtr hInternet, int option, IntPtr buffer, int length);
+
+    private static void NotifyInternetSettingsChanged()
+    {
+        InternetSetOption(IntPtr.Zero, 39 /* INTERNET_OPTION_SETTINGS_CHANGED */, IntPtr.Zero, 0);
+        InternetSetOption(IntPtr.Zero, 37 /* INTERNET_OPTION_REFRESH */, IntPtr.Zero, 0);
+    }
+
+    /// <summary>Creates the folder TEMP points to. If TEMP itself is unusable, points it back to the Windows default for this user.</summary>
+    public static (bool Ok, string Detail) RepairTemp()
+    {
+        var temp = Environment.GetEnvironmentVariable("TEMP", EnvironmentVariableTarget.User) ?? Environment.GetEnvironmentVariable("TEMP");
+        var expanded = string.IsNullOrWhiteSpace(temp) ? null : Environment.ExpandEnvironmentVariables(temp);
+        if (expanded is not null && Path.IsPathFullyQualified(expanded))
+        {
+            Directory.CreateDirectory(expanded);
+            return (true, $"created {expanded}");
+        }
+        var fallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp");
+        Directory.CreateDirectory(fallback);
+        Backup("temp", $"TEMP={temp}\nTMP={Environment.GetEnvironmentVariable("TMP", EnvironmentVariableTarget.User)}\n");
+        Environment.SetEnvironmentVariable("TEMP", @"%USERPROFILE%\AppData\Local\Temp", EnvironmentVariableTarget.User);
+        Environment.SetEnvironmentVariable("TMP", @"%USERPROFILE%\AppData\Local\Temp", EnvironmentVariableTarget.User);
+        return (true, $"TEMP/TMP set back to the Windows default ({fallback})");
+    }
+
+    /// <summary>Package full names: name_version_arch_resourceid_publisherid. Letters, digits, dot, dash, underscore and tilde only.</summary>
+    public static bool IsValidPackageFullName(string name) =>
+        name.Length is > 0 and < 256 && Regex.IsMatch(name, @"^[A-Za-z0-9.\-_~]+$");
+
+    /// <summary>
+    /// Re-registers one installed Store package from its own install folder (the standard repair for a damaged app).
+    /// The name is validated, then looked up in the installed packages; it never reaches a command line as text to run.
+    /// </summary>
+    public static (bool Ok, string Detail) ReregisterApp(string fullName)
+    {
+        if (!IsValidPackageFullName(fullName)) return (false, "rejected package name");
+        // The name is passed as a separate argument ($args[0]) to a fixed script.
+        const string Script =
+            "$p = Get-AppxPackage | Where-Object { $_.PackageFullName -eq $args[0] }; " +
+            "if (-not $p) { Write-Output 'not installed'; exit 3 }; " +
+            "Add-AppxPackage -DisableDevelopmentMode -Register (Join-Path $p.InstallLocation 'AppxManifest.xml') -ErrorAction Stop; " +
+            "$q = Get-AppxPackage | Where-Object { $_.PackageFullName -eq $args[0] }; Write-Output ('status ' + $q.Status); exit 0";
+        var (code, output) = RunPowerShell(Script, fullName);
+        return (code == 0, $"re-register {fullName}: exit {code} {output.Trim()}");
+    }
+
+    public static (int Code, string Output) RunPowerShell(string script, params string[] args)
+    {
+        var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, @"WindowsPowerShell\v1.0\powershell.exe"))
+        { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8 };
+        foreach (var a in new[] { "-NoProfile", "-NonInteractive", "-Command", "& { " + script + " }" }.Concat(args)) psi.ArgumentList.Add(a);
+        using var p = Process.Start(psi)!;
+        var stdout = p.StandardOutput.ReadToEndAsync();
+        var stderr = p.StandardError.ReadToEndAsync();
+        if (!p.WaitForExit(300_000)) { try { p.Kill(true); } catch { } return (1, "timed out"); }
+        return (p.ExitCode, stdout.Result + stderr.Result);
+    }
+
+    /// <summary>Ends and restarts the taskbar/File Explorer process. Open programs are not affected.</summary>
+    public static (bool Ok, string Detail) RestartExplorer()
+    {
+        foreach (var p in Process.GetProcessesByName("explorer"))
+        {
+            try { p.Kill(); p.WaitForExit(10_000); } catch (Exception) { }
+            p.Dispose();
+        }
+        Thread.Sleep(1500);
+        // Windows usually restarts the shell by itself; start it only if it did not.
+        if (Process.GetProcessesByName("explorer").Length == 0)
+            Process.Start(new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe")) { UseShellExecute = true });
+        Thread.Sleep(2000);
+        return (Process.GetProcessesByName("explorer").Length > 0, "explorer restarted");
+    }
+
+    /// <summary>Deletes the icon and thumbnail cache files (Windows rebuilds them), then restarts Explorer so they are rebuilt.</summary>
+    public static (bool Ok, string Detail) RebuildIconCache()
+    {
+        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var dir = Path.Combine(local, "Microsoft", "Windows", "Explorer");
+        var files = new List<string> { Path.Combine(local, "IconCache.db") };
+        if (Directory.Exists(dir))
+            files.AddRange(Directory.GetFiles(dir, "iconcache_*.db").Concat(Directory.GetFiles(dir, "thumbcache_*.db")));
+        foreach (var p in Process.GetProcessesByName("explorer")) { try { p.Kill(); p.WaitForExit(10_000); } catch (Exception) { } p.Dispose(); }
+        var deleted = 0;
+        foreach (var f in files)
+        {
+            try { if (File.Exists(f)) { File.Delete(f); deleted++; } }
+            catch (Exception) { } // in use by another process: Windows keeps using it, nothing breaks
+        }
+        Thread.Sleep(1000);
+        if (Process.GetProcessesByName("explorer").Length == 0)
+            Process.Start(new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe")) { UseShellExecute = true });
+        return (true, $"icon/thumbnail cache files removed: {deleted}");
+    }
+}

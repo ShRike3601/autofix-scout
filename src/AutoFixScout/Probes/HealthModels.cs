@@ -1,0 +1,67 @@
+using AutoFixScout.Repair;
+
+namespace AutoFixScout.Probes;
+
+/// <summary>One program that closed unexpectedly (Windows "Application Error", event 1000), grouped by program and module.</summary>
+public sealed record CrashInfo(string App, string? Module, string? ExceptionCode, int Count, DateTime LastUtc, string? AppPath = null)
+{
+    public CrashCause Cause => CrashCauses.Classify(Module, ExceptionCode, App);
+}
+
+/// <summary>A Microsoft Store app whose package Windows reports as damaged (Status other than Ok).</summary>
+public sealed record StoreAppInfo(string FullName, string Name, string Status);
+
+/// <summary>
+/// probe.health: a broad, read-only check of the software problems that sit behind many everyday symptoms.
+/// Null or Unknown means "could not be read"; the triage never treats that as healthy.
+/// </summary>
+public sealed class HealthState
+{
+    /// <summary>Program crashes in the last 14 days, most frequent first.</summary>
+    public IReadOnlyList<CrashInfo> Crashes { get; set; } = new List<CrashInfo>();
+    /// <summary>Programs that stopped responding (event 1002), by name, in the last 14 days.</summary>
+    public IReadOnlyDictionary<string, int> Hangs { get; set; } = new Dictionary<string, int>();
+    public int BlueScreens { get; set; }
+    public int UnexpectedShutdowns { get; set; }
+    /// <summary>Disk and file-system errors (disk 7/51/153, Ntfs 55/98) in the last 14 days.</summary>
+    public int DiskErrors { get; set; }
+    /// <summary>Uncorrected hardware errors reported by the processor or memory (WHEA, error level only).</summary>
+    public int HardwareErrors { get; set; }
+    /// <summary>Programs that could not start because a Microsoft runtime was missing or damaged (SideBySide errors).</summary>
+    public IReadOnlyList<string> RuntimeErrors { get; set; } = new List<string>();
+    /// <summary>Services that failed to start or stopped unexpectedly at least three times (display names).</summary>
+    public IReadOnlyList<string> FailingServices { get; set; } = new List<string>();
+    public int UpdateFailures { get; set; }
+
+    /// <summary>Computer clock minus internet time, in seconds. Null = could not be measured (for example offline).</summary>
+    public double? ClockOffsetSeconds { get; set; }
+
+    public bool UserProxyEnabled { get; set; }
+    public string? UserProxyServer { get; set; }
+    public string? AutoConfigUrl { get; set; }
+    /// <summary>Whether the user's proxy (or setup script) answers. Unknown when none is set.</summary>
+    public Tri UserProxyReachable { get; set; } = Tri.Unknown;
+    /// <summary>The system (WinHTTP) proxy; null = direct (no proxy).</summary>
+    public string? WinHttpProxy { get; set; }
+    public Tri WinHttpProxyReachable { get; set; } = Tri.Unknown;
+
+    /// <summary>Suspicious hosts-file entries (see <see cref="HostsFile.Suspicious"/>).</summary>
+    public IReadOnlyList<HostsHijack> HostsHijacks { get; set; } = new List<HostsHijack>();
+    /// <summary>Network add-ons (Winsock providers) that are not part of Windows.</summary>
+    public IReadOnlyList<string> ThirdPartyWinsock { get; set; } = new List<string>();
+    /// <summary>Windows folders missing from the system PATH.</summary>
+    public IReadOnlyList<string> MissingPathEntries { get; set; } = new List<string>();
+    public bool TempFolderMissing { get; set; }
+
+    /// <summary>Every service in <see cref="ServiceDefaults.All"/>; Status: Running/Stopped/NotFound/Unknown.</summary>
+    public IReadOnlyList<UpdateServiceInfo> Services { get; set; } = new List<UpdateServiceInfo>();
+    public IReadOnlyList<StoreAppInfo> BrokenStoreApps { get; set; } = new List<StoreAppInfo>();
+    public Tri RebootPending { get; set; } = Tri.Unknown;
+
+    public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
+}
+
+/// <summary>A hosts-file line that sends a well-known site elsewhere (or blocks a security site).</summary>
+public sealed record HostsHijack(string Host, string Ip);
+
+public interface IHealthProbe { HealthState Read(); }

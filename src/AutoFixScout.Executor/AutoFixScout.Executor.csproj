@@ -12,6 +12,9 @@
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.0" />
     <!-- Same code as the app, so both agree on what "the previous driver" is. -->
     <Compile Include="../AutoFixScout/Drivers/DriverStore.cs" Link="DriverStore.cs" />
+    <Compile Include="../AutoFixScout/Repair/ServiceDefaults.cs" Link="Repair/ServiceDefaults.cs" />
+    <Compile Include="../AutoFixScout/Repair/HostsFile.cs" Link="Repair/HostsFile.cs" />
+    <Compile Include="../AutoFixScout/Repair/SystemPath.cs" Link="Repair/SystemPath.cs" />
   </ItemGroup>
 
 </Project>

@@ -46,6 +46,18 @@ public static class Program
                 // Printer names are checked against the installed printers, never put into a query or command line.
                 (_, "printer.clear_queue") when IsValidPrinterName(args[1]) && FindPrinter(args[1]) is { } p => ClearQueue(p),
                 (_, "printer.set_online") when IsValidPrinterName(args[1]) && FindPrinter(args[1]) is { } p => SetOnline(p),
+                (_, "repair.dism") when args[1] == Repairs.System => Repairs.Dism(),
+                (_, "repair.sfc") when args[1] == Repairs.System => Repairs.Sfc(),
+                (_, "time.resync") when args[1] == Repairs.System => Repairs.TimeResync(),
+                (_, "network.reset_winhttp_proxy") when args[1] == Repairs.System => Repairs.ResetWinHttpProxy(),
+                (_, "network.clean_hosts") when args[1] == Repairs.System => Repairs.CleanHosts(),
+                (_, "network.reset_winsock") when args[1] == Repairs.System => Repairs.ResetWinsock(),
+                (_, "system.repair_path") when args[1] == Repairs.System => Repairs.RepairPath(),
+                (_, "update.reset_components") when args[1] == Repairs.System => Repairs.ResetUpdateComponents(),
+                (_, "search.rebuild_index") when args[1] == Repairs.System => Repairs.RebuildSearchIndex(),
+                (_, "service.restore_default") when AutoFixScout.Repair.ServiceDefaults.Find(args[1]) is not null => Repairs.RestoreServiceDefault(args[1]),
+                (_, "runtime.install_vcredist") when Repairs.RuntimeArchitectures.Contains(args[1]) => Repairs.InstallVcRedist(args[1]),
+                (_, "disk.scan") when Repairs.IsSystemDrive(args[1]) => Repairs.DiskScan(args[1]),
                 _ => 2,
             };
         }
