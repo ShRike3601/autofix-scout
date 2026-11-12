@@ -32,6 +32,7 @@ internal static class ServiceDefaults
         new("AudioEndpointBuilder", "Windows Audio Endpoint Builder", Start.Automatic, true, "sound"),
         new("WSearch", "Windows Search", Start.Automatic, true, "search", Delayed: true),
         new("Spooler", "Print Spooler", Start.Automatic, true, "printing"),
+        new("stisvc", "Windows Image Acquisition (WIA)", Start.Manual, false, "scanners"),
         new("W32Time", "Windows Time", Start.Manual, false, "clock"),
         new("wuauserv", "Windows Update", Start.Manual, false, "updates"),
         new("BITS", "Background Intelligent Transfer Service", Start.Manual, false, "updates"),

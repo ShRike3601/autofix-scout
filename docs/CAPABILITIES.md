@@ -50,7 +50,7 @@ Status: **Done** = built, unit-tested and checked on the test laptop (every admi
 | Blue-screen causes | stop codes explained (memory, driver, storage, graphics) | memory test (guided), driver steps, disk scan | Planned (P2) |
 | Virtual memory | page file missing or too small | let Windows manage the page file (admin, restart) | Planned (P3) |
 | Threats found by Microsoft Defender | recent detections, active or removed | Protection history, full scan, Defender Offline (guided) | Planned (P4) |
-| Scanner | image acquisition service off, scanner errors | restore service, re-detect, guided | Planned (P5) |
+| Scanner | image acquisition service off, scanner errors | restore service, re-detect, guided | Done |
 
 ## Safety rules the code enforces
 - The UI never runs elevated; the executor accepts only allowlisted action ids with fixed or validated arguments.

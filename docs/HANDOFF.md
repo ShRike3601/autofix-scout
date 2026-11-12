@@ -374,4 +374,5 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
       fix through the executor: let Windows manage the page file size (backup of the old setting; restart needed).
 - [ ] P4 Threats found by Microsoft Defender (Security): recent detections (MSFT_MpThreatDetection) and whether they were
       removed; guided "Protection history" step; full scan offer.
-- [ ] P5 Scanner and camera import (Printer area): Windows Image Acquisition service (stisvc) off; scanner device errors.
+- [x] P5 Scanner and camera import (Printer area): Windows Image Acquisition service (stisvc) off; scanner device errors.
+- P5 note: PrinterState.ScanFocus (scanner findings first) is not set by the UI yet; a 'Scanner not working' entry should set it (tell the UI session).

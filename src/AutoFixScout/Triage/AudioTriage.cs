@@ -303,4 +303,7 @@ public enum FindingCode
     // Per-app privacy choices (Microphone and Camera)
     MicAppDenied,
     CameraAppDenied,
+    // Scanners (Printer area)
+    ScannerServiceOff,
+    ScannerDeviceError,
 }

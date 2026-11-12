@@ -1,3 +1,4 @@
+using AutoFixScout.Repair;
 namespace AutoFixScout.Triage;
 
 /// <summary>
@@ -28,6 +29,18 @@ public static class PrinterTriage
 
     /// <summary>Findings, most important first; always at least one.</summary>
     public static IReadOnlyList<Finding> Evaluate(PrinterState s)
+    {
+        var printer = EvaluatePrinter(s);
+        var scan = ScannerFindings(s);
+        if (scan.Count == 0) return printer;
+        var codes = printer.Select(f => f.Code).ToHashSet();
+        if (s.ScanFocus)
+            return scan.Concat(printer.Where(f => f.Code is not (FindingCode.LooksNormal or FindingCode.NoPrinter or FindingCode.ProbeIncomplete))).ToList();
+        if (codes.Contains(FindingCode.ProbeIncomplete)) return printer; // fail closed
+        return printer.Where(f => f.Code != FindingCode.LooksNormal).Concat(scan).ToList();
+    }
+
+    private static IReadOnlyList<Finding> EvaluatePrinter(PrinterState s)
     {
         if (s.ProbeErrors.Count > 0)
             return new[] { F(FindingCode.ProbeIncomplete, Incomplete, string.Join("; ", s.ProbeErrors)) };
@@ -88,6 +101,16 @@ public static class PrinterTriage
     /// <summary>Least risky first. Every rung is T0 or T1.</summary>
     public static IReadOnlyList<Rung> Ladder(PrinterState s, IReadOnlyList<Finding> findings)
     {
+        var scannerCodes = new[] { FindingCode.ScannerServiceOff, FindingCode.ScannerDeviceError };
+        var scan = findings.Where(f => scannerCodes.Contains(f.Code)).ToList();
+        var printer = findings.Where(f => !scannerCodes.Contains(f.Code)).ToList();
+        var scanRungs = scan.Count > 0 ? ScannerLadder(s, scan) : new List<Rung>();
+        var printerRungs = printer.Count > 0 ? PrinterLadder(s, printer) : new List<Rung>();
+        return (s.ScanFocus ? scanRungs.Concat(printerRungs) : printerRungs.Concat(scanRungs)).DistinctBy(r => r.Id).ToList();
+    }
+
+    private static List<Rung> PrinterLadder(PrinterState s, IReadOnlyList<Finding> findings)
+    {
         var codes = findings.Select(f => f.Code).ToHashSet();
         var rungs = new List<Rung>();
         if (codes.Contains(FindingCode.ProbeIncomplete)) return rungs; // fail closed: do not change what could not be read
@@ -130,6 +153,60 @@ public static class PrinterTriage
         return rungs.DistinctBy(r => r.Id).ToList();
     }
 
+    private const string CheckScannerHint =
+        "Please check that the scanner is turned on and that its USB cable is firmly connected, ideally to a port directly on the computer. " +
+        "If the scanner has its own scanning app from the maker, please try scanning with that app.";
+
+    private static string ServiceLabel(string name) => ServiceDefaults.Find(name)?.DisplayName ?? name;
+
+    /// <summary>
+    /// stisvc starts on demand, so "Stopped" with the usual Manual start type is normal; only Disabled, or an automatic
+    /// service that is stopped, is a fault. Shell Hardware Detection only matters when a scanner is present or the person is scanning.
+    /// </summary>
+    private static List<Finding> ScannerFindings(PrinterState s)
+    {
+        var list = new List<Finding>();
+        if (s.ScannerErrors.Count > 0) return list; // fail closed: scanner part could not be read
+        var present = s.Scanners.Count > 0;
+        var faulty = new List<UpdateServiceInfo>();
+        if (s.WiaService is { } wia && wia.Status is not ("NotFound" or "Unknown")
+            && (ServiceDefaults.IsFault("stisvc", wia.Status, wia.StartType)
+                || (present && wia.Status == "Stopped" && wia.StartType.Equals("Automatic", StringComparison.OrdinalIgnoreCase))))
+            faulty.Add(wia);
+        if (s.ShellHardwareService is { } shell && (present || s.ScanFocus) && ServiceDefaults.IsFault("ShellHWDetection", shell.Status, shell.StartType))
+            faulty.Add(shell);
+        foreach (var x in faulty)
+            list.Add(F(FindingCode.ScannerServiceOff,
+                x.StartType.Equals("Disabled", StringComparison.OrdinalIgnoreCase)
+                    ? $"The Windows service \"{ServiceLabel(x.Name)}\", which scanners depend on, is switched off."
+                    : $"The Windows service \"{ServiceLabel(x.Name)}\", which scanners depend on, is not running.",
+                $"{x.Name}: {x.Status}/{x.StartType}; scanners present={present}"));
+        foreach (var d in s.Scanners.Where(d => d.HasProblem).Take(3))
+            list.Add(F(FindingCode.ScannerDeviceError,
+                $"Windows reports a problem with the scanner \"{d.Name}\": it {DeviceErrors.Meaning(d.ErrorCode)}.",
+                $"{d.DeviceId} ConfigManagerErrorCode={d.ErrorCode}"));
+        return list;
+    }
+
+    private static List<Rung> ScannerLadder(PrinterState s, IReadOnlyList<Finding> scan)
+    {
+        var rungs = new List<Rung>();
+        if (s.ScannerErrors.Count > 0) return rungs;
+        foreach (var name in new[] { "stisvc", "ShellHWDetection" })
+        {
+            var svc = name == "stisvc" ? s.WiaService : s.ShellHardwareService;
+            if (svc != null && scan.Any(f => f.Code == FindingCode.ScannerServiceOff && f.TechnicalDetail.StartsWith(name + ":", StringComparison.Ordinal)))
+                rungs.Add(new($"restore_{name.ToLowerInvariant()}", "service.restore_default", 1,
+                    $"AutoFix Scout can set the \"{ServiceLabel(name)}\" service back to the way Windows normally runs it. Windows will ask for your permission.", name));
+        }
+        rungs.Add(new("scanners", "ui.open_settings_page", 0,
+            "AutoFix Scout will open the \"Printers & scanners\" settings. Please check that your scanner is listed there and remove it and add it again if it is not working.", "scanners"));
+        if (scan.Any(f => f.Code == FindingCode.ScannerDeviceError))
+            rungs.Add(Rescan.Rung("devices", "scanner"));
+        rungs.Add(new("check_scanner", "ui.human_step", 0, CheckScannerHint));
+        return rungs;
+    }
+
     private static Rung RestartSpooler() =>
         new("restart_spooler", "service.restart", 1,
             "AutoFix Scout can restart the Windows printing service (\"Print Spooler\"). Windows will ask for your permission.", "Spooler");
@@ -147,6 +224,9 @@ public static class PrinterTriage
             "If the problem remains, the printer may need service.",
         FindingCode.PrinterOffline => "Windows still cannot reach the printer. The problem most likely lies with the printer, its cable " +
             "or its Wi-Fi connection. A helper can check the printer for you.",
+        FindingCode.ScannerDeviceError => "The scanner itself reports a problem. Its USB cable, its power and the maker's scanning app are the usual places to check. " +
+            "If the problem remains, a helper can check the scanner for you.",
+        FindingCode.ScannerServiceOff => "The Windows scanning service is still not working. A helper can check the scanner for you.",
         FindingCode.LooksNormal => "Windows reports no problem with the printer. If a document still does not print, please print it " +
             "again from the app. If that does not help, a helper can check the printer for you.",
         _ => null,
