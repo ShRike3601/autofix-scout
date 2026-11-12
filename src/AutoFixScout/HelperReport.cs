@@ -12,18 +12,18 @@ public static class HelperReport
     public static string Build(string topic, object probeState, IReadOnlyList<Triage.Finding> findings, IEnumerable<string> tried, Outcome outcome)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"AutoFix Scout - helper report ({topic})");
+        sb.AppendLine($"AutoFix Scout: report for the person helping you ({topic})");
         sb.AppendLine($"Created: {DateTime.UtcNow:yyyy-MM-ddTHH:mm:ssZ}");
-        sb.AppendLine($"Windows: {Environment.OSVersion.VersionString}");
-        sb.AppendLine($"Outcome: {outcome}");
+        sb.AppendLine($"Windows version: {Environment.OSVersion.VersionString}");
+        sb.AppendLine($"Result: {outcome}");
         sb.AppendLine();
-        sb.AppendLine("Findings:");
+        sb.AppendLine("What AutoFix Scout found:");
         foreach (var f in findings) sb.AppendLine($"  [{f.Code}] {f.PlainMessage} -- {f.TechnicalDetail}");
         sb.AppendLine();
-        sb.AppendLine("What was tried:");
+        sb.AppendLine("Steps that were tried:");
         foreach (var t in tried) sb.AppendLine($"  {t}");
         sb.AppendLine();
-        sb.AppendLine("What the computer reported (before any fix):");
+        sb.AppendLine("Technical details reported by Windows (before any change):");
         sb.AppendLine(JsonSerializer.Serialize(probeState, probeState.GetType(), Json));
         return sb.ToString();
     }

@@ -91,7 +91,11 @@ public class DriverLadderTests
         };
         var last = AudioLadder.For(s, AudioTriage.Evaluate(s)).Last();
         Assert.Equal(("rollback_driver", "driver.rollback", 2, "HDAUDIO\\X\\1"), (last.Id, last.ActionId, last.Tier, last.Arg));
+        // Key safety facts of a driver change (docs/WRITING.md): save point, automatic undo, permission prompt.
         Assert.Contains("save point", last.Say);
+        Assert.Contains("restore it automatically", last.Say);
+        Assert.Contains("Windows will ask for your permission", last.Say);
+        Assert.Contains("6.0.9400.1", last.Say);
     }
 
     [Fact]

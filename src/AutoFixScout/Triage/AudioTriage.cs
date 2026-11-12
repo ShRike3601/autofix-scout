@@ -12,16 +12,16 @@ public static partial class AudioTriage
     /// </summary>
     private static readonly Dictionary<FindingCode, string> _plainMessages = new()
     {
-        [FindingCode.ProbeIncomplete] = "We couldn't complete the audio check.",
-        [FindingCode.AudioServiceStopped] = "The Windows audio service is stopped.",
-        [FindingCode.EndpointBuilderStopped] = "The audio device manager service is stopped.",
-        [FindingCode.NoOutputEndpoint] = "No audio output devices are available.",
-        [FindingCode.NoActiveOutput] = "Audio output devices exist but none are currently active.",
-        [FindingCode.DefaultIsHdmiOrBluetooth] = "Your computer is using HDMI or Bluetooth audio instead of your speakers.",
-        [FindingCode.Muted] = "The system volume is muted.",
-        [FindingCode.VolumeVeryLow] = "The system volume is set very low.",
-        [FindingCode.DeviceError] = "An audio device has a reported problem.",
-        [FindingCode.LooksNormal] = "Everything looks normal.",
+        [FindingCode.ProbeIncomplete] = "AutoFix Scout could not complete the sound check.",
+        [FindingCode.AudioServiceStopped] = "The Windows sound service (\"Windows Audio\") is not running.",
+        [FindingCode.EndpointBuilderStopped] = "The Windows service that manages sound devices (\"Windows Audio Endpoint Builder\") is not running.",
+        [FindingCode.NoOutputEndpoint] = "Windows does not show any device that can play sound.",
+        [FindingCode.NoActiveOutput] = "Sound devices are installed, but none of them is currently available to play sound.",
+        [FindingCode.DefaultIsHdmiOrBluetooth] = "Your computer is sending sound to an HDMI or Bluetooth device instead of your speakers.",
+        [FindingCode.Muted] = "The sound output is muted.",
+        [FindingCode.VolumeVeryLow] = "The volume is set very low.",
+        [FindingCode.DeviceError] = "A sound device reports a problem.",
+        [FindingCode.LooksNormal] = "No problem was found with your sound settings.",
     };
 
     public static IReadOnlyList<Finding> Evaluate(AudioState state)

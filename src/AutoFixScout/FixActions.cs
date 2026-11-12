@@ -103,7 +103,7 @@ public static class FixActions
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223) { return null; }
     }
 
-    private const string Declined = "person declined the Windows permission prompt";
+    private const string Declined = "The Windows permission prompt was declined, so nothing was changed.";
 
     // ---- save points (T2) ----
     // The executor keeps the save point itself (admin-only folder). The app keeps an "open" marker per save point
@@ -132,11 +132,11 @@ public static class FixActions
             null => Declined,
             0 => $"{change}; save point {id}",
             3 => actionId == "driver.rollback"
-                ? "no previous driver to go back to; nothing changed"
-                : "Windows Update had no driver for this device, or couldn't be reached; nothing changed",
-            4 => $"{change}, but the device didn't come up right, so it was put back automatically (save point {id})",
-            6 => $"{change}, the device didn't come up right, and putting it back FAILED. Save point {id} is kept for a helper.",
-            _ => $"couldn't make a save point (exit code {code}); nothing changed",
+                ? "no previous driver to restore; nothing was changed"
+                : "Windows Update had no driver for this device, or could not be reached; nothing was changed",
+            4 => $"{change}, but the device did not start correctly, so the save point was restored automatically (save point {id})",
+            6 => $"{change}, but the device did not start correctly, and restoring the save point FAILED. Save point {id} is kept for a helper.",
+            _ => $"could not create a save point (exit code {code}); nothing was changed",
         };
         // Only a live change (0) or a failed restore (6) leaves something to settle.
         if (code is not (0 or 6)) File.Delete(Path.Combine(PendingDir, id));

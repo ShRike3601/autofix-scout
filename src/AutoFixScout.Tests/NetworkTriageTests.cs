@@ -80,6 +80,7 @@ public class NetworkTriageTests
         Assert.Equal(new[] { "flush_dns", "reset_dns", "toggle_adapter", "restart_router" }, ladder.Select(r => r.Id));
         Assert.Equal(WifiUp.InstanceId, ladder[1].Arg);
         Assert.Contains("192.0.2.1", ladder[1].Say);
+        Assert.Contains("back to automatic", ladder[1].Say);
     }
 
     [Fact]
@@ -97,12 +98,18 @@ public class NetworkTriageTests
     {
         var f = NetworkTriage.Evaluate(Online(Tri.No, Tri.No, Tri.No));
         Assert.Equal(FindingCode.GatewayUnreachable, f[0].Code);
-        Assert.Contains("router", NetworkTriage.NotFixedHint(f)!);
+        var hint = NetworkTriage.NotFixedHint(f)!;
+        Assert.Contains("cannot reach your router", hint);
+        Assert.Contains("internet provider", hint);
     }
 
     [Fact]
-    public void DnsOkButNoInternet_HintNamesProvider() =>
-        Assert.Contains("provider", NetworkTriage.NotFixedHint(NetworkTriage.Evaluate(Online(Tri.Yes, Tri.Yes, Tri.No)))!);
+    public void DnsOkButNoInternet_HintNamesProvider()
+    {
+        var hint = NetworkTriage.NotFixedHint(NetworkTriage.Evaluate(Online(Tri.Yes, Tri.Yes, Tri.No)))!;
+        Assert.Contains("router is working", hint);
+        Assert.Contains("internet provider", hint);
+    }
 
     [Fact]
     public void Executor_RejectsEnableForNonsenseId() =>

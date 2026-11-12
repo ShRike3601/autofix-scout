@@ -30,7 +30,7 @@ from it that the code follows:
 | Session log (SQLite, spec schema) | `src/AutoFixScout/SessionLog.cs` -> `%LOCALAPPDATA%\AutoFixScout\session.db` |
 | Helper report | `src/AutoFixScout/HelperReport.cs` -> `%LOCALAPPDATA%\AutoFixScout\reports\` |
 | UI (screens + flow) | `src/AutoFixScout.UI/MainWindow.xaml(.cs)`, look in `MainWindow.Visuals.cs` + `Theme/` (see UI below) |
-| Tests (107, all pass in CI) | `src/AutoFixScout.Tests/` |
+| Tests (169, all pass in CI) | `src/AutoFixScout.Tests/` |
 
 The unused first-skeleton leftovers (Orchestrator, SessionManager, Simulator, ActionCatalog, ActionContext, IProbe, IExecutor, Probes, StepResult, the legacy models in Models.cs, and the Serilog/YamlDotNet packages) are removed. Still to remove after the UI redesign lands: UI `IActionContext.cs` and unused UI packages (e.g. System.Data.SqlClient).
 
@@ -52,6 +52,16 @@ The unused first-skeleton leftovers (Orchestrator, SessionManager, Simulator, Ac
     when the person confirms the fix. A marker found at startup = unfinished change -> app offers to restore.
   - Executor exit codes: 0 ok, 1 failed (nothing changed), 2 rejected input, 3 nothing to do (restore: nothing to put
     back), 4 changed but undone, 6 restore failed (save point kept). Retention: see "Steps 5-6 findings".
+
+## Wording
+
+Every sentence a person reads follows `docs/WRITING.md`: formal, no contractions, the app never says "I" (it names
+the action or "AutoFix Scout"), permission prompts, save points and automatic undo are always stated, Windows names
+in quotes. Done for the logic project (finding messages, rung sentences, camera hints, network "not fixed" hints,
+`FixActions` details, helper report headings); the UI project's own texts are a separate change.
+`WritingStyleTests` scans every finding message, rung sentence and hint the triage classes produce for a set of
+representative states (no contractions, no "I", no "we", no "!", admin rungs say "Windows will ask for your
+permission"). New sentences must pass it; add a state there when you add a finding or rung.
 
 ## Real-hardware test results (AFS-TESTBENCH)
 
