@@ -28,7 +28,7 @@ from it that the code follows:
 | Triage + fix ladders | `src/AutoFixScout/Triage/*Triage.cs` (FindingCode enum and `Finding` in AudioTriage.cs) (`LadderRunner`, `DriverRules` live in AudioLadder.cs) |
 | Non-admin actions, save point markers | `src/AutoFixScout/FixActions.cs` |
 | Driver store logic (shared with executor) | `src/AutoFixScout/Drivers/DriverStore.cs`, `DriverStatus.cs` |
-| Elevated executor | `src/AutoFixScout.Executor/{Program,SavePoints,WindowsUpdateDrivers,Repairs}.cs` (system repairs back up to `C:ProgramDataAutoFixScoutbackups`, logs in `...ogs`) |
+| Elevated executor | `src/AutoFixScout.Executor/{Program,SavePoints,WindowsUpdateDrivers,Repairs}.cs` (system repairs back up to `C:\ProgramData\AutoFixScout\backups`, tool output in `C:\ProgramData\AutoFixScout\logs`) |
 | Session log (SQLite, spec schema) | `src/AutoFixScout/SessionLog.cs` -> `%LOCALAPPDATA%\AutoFixScout\session.db` |
 | Helper report | `src/AutoFixScout/HelperReport.cs` -> `%LOCALAPPDATA%\AutoFixScout\reports\` |
 | UI (screens + flow) | `src/AutoFixScout.UI/MainWindow.xaml(.cs)`, look in `MainWindow.Visuals.cs` + `Theme/` (see UI below) |
