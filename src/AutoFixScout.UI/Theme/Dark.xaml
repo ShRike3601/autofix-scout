@@ -22,9 +22,11 @@
     <SolidColorBrush x:Key="AccentPressedBrush" Color="#4FB3E3"/>
     <SolidColorBrush x:Key="OnAccentBrush" Color="#000000"/>
     <SolidColorBrush x:Key="AccentSoftBrush" Color="#1E3A55"/>
-    <LinearGradientBrush x:Key="AccentFillBrush" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Color="#76D5FF" Offset="0"/>
-        <GradientStop Color="#55C3F5" Offset="1"/>
+    <!-- Primary buttons: a lively cyan-to-violet sweep (dark text keeps ~9:1 contrast across it). -->
+    <LinearGradientBrush x:Key="AccentFillBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#7AD8FF" Offset="0"/>
+        <GradientStop Color="#9DB4FF" Offset="0.55"/>
+        <GradientStop Color="#C3A6FF" Offset="1"/>
     </LinearGradientBrush>
 
     <SolidColorBrush x:Key="ButtonBrush" Color="#17FFFFFF"/>

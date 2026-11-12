@@ -65,6 +65,12 @@ public partial class MainWindow
     protected override void OnContentRendered(EventArgs e)
     {
         base.OnContentRendered(e);
+        Greeting.Text = DateTime.Now.Hour switch
+        {
+            < 5 or >= 18 => "Good evening",
+            < 12 => "Good morning",
+            _ => "Good afternoon",
+        };
         // Ambient header movement: very slow, and none at all when Windows animation effects are off.
         Motion.Drift(Glow1Shift, 70, 26, 13);
         Motion.Drift(Glow2Shift, -80, 34, 17);
@@ -254,6 +260,7 @@ public partial class MainWindow
             ShowPicture(look);
             ShowBanner(look);
             ShowChecks(look == Look.Scan);
+            if (look == Look.Fixed) Motion.Confetti(ConfettiLayer);
             if (from.Home) Motion.Enter(StepPanel, distance: 22);
             else Motion.Enter(StepContent, distance: 12);
         }

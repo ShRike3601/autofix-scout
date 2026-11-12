@@ -47,7 +47,8 @@
                             <TextBlock Text="Troubleshooting assistant" FontSize="{StaticResource OverlineSize}" Foreground="{DynamicResource HeroSubtextBrush}"/>
                         </StackPanel>
                     </StackPanel>
-                    <TextBlock Style="{StaticResource DisplayText}" Text="What would you like to check today?" Margin="0,22,0,8"
+                    <TextBlock x:Name="Greeting" Style="{StaticResource OverlineText}" Margin="0,22,0,0" Foreground="{DynamicResource HeroSubtextBrush}"/>
+                    <TextBlock Style="{StaticResource DisplayText}" Text="What would you like to check today?" Margin="0,6,0,8"
                                Foreground="{DynamicResource HeroTextBrush}" AutomationProperties.HeadingLevel="Level1"/>
                     <TextBlock Style="{StaticResource BodyText}" Foreground="{DynamicResource HeroSubtextBrush}" MaxWidth="560" HorizontalAlignment="Left"
                                Text="Please select the problem you are experiencing. AutoFix Scout checks your computer first and does not change anything without your permission."/>
@@ -222,5 +223,8 @@
                         Foreground="{DynamicResource TextSecondaryBrush}" Click="OnSettingsClicked"/>
             </DockPanel>
         </Border>
+
+        <!-- Celebration layer for "fixed" (Motion.Confetti); never takes clicks or keyboard focus. -->
+        <Canvas x:Name="ConfettiLayer" Grid.RowSpan="3" IsHitTestVisible="False" ClipToBounds="True" Focusable="False"/>
     </Grid>
 </Window>
