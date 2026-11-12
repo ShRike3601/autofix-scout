@@ -234,3 +234,29 @@ public class LivePageFileTests
         Assert.Equal(3, AutoFixScout.Executor.Repairs.PageFileAuto());
     }
 }
+
+/// <summary>shell.notifications_on on the real machine (AFS_LIVE set); the original ToastEnabled value (or absence) is always restored.</summary>
+[Collection("Live machine")] // one at a time: they change and restore the same settings
+public class LiveNotificationTests
+{
+    [Fact]
+    public async Task NotificationsOn_SetsToastEnabled_AndRestoresOriginal()
+    {
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AFS_LIVE"))) return;
+        using var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(AutoFixScout.Repair.NotificationRepairs.PushKey, true);
+        var original = k.GetValue("ToastEnabled");
+        var kind = original is null ? Microsoft.Win32.RegistryValueKind.DWord : k.GetValueKind("ToastEnabled");
+        try
+        {
+            k.SetValue("ToastEnabled", 0, Microsoft.Win32.RegistryValueKind.DWord);
+            var (ok, detail) = await FixActions.RunAsync(new Rung("t", "shell.notifications_on", 0, ""));
+            Assert.True(ok, detail);
+            Assert.Equal(1, k.GetValue("ToastEnabled"));
+        }
+        finally
+        {
+            if (original is null) k.DeleteValue("ToastEnabled", false);
+            else k.SetValue("ToastEnabled", original, kind);
+        }
+    }
+}

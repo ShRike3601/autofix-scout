@@ -386,7 +386,7 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
 - [ ] F2 Programs will not install (Store/apps area): Windows Installer service (msiserver) disabled, MsiInstaller
       failure events (11708/1033 with error codes explained), pending restart blocking installs, low space; fixes:
       service default, restart guide, clear the user's temp (exists).
-- [ ] F3 Notifications missing (Start menu/taskbar area): notifications switched off globally or per app, Do not
+- [x] F3 Notifications missing (Start menu/taskbar area): notifications switched off globally or per app, Do not
       disturb / Focus on, notification banners off; guided Settings steps naming the app; non-admin switch back on for the
       global toggle if it can be done safely.
 - [ ] F4 USB devices disconnecting (check-up): Kernel-PnP / USB hub errors and frequent device add/remove events, USB

@@ -311,4 +311,8 @@ public enum FindingCode
     // Security: threats found by Microsoft Defender
     SecurityThreatActive,
     SecurityThreatsRemoved,
+    // Missing notifications (Start menu and taskbar area)
+    NotificationsOff,
+    AppNotificationsOff,
+    DoNotDisturbOn,
 }

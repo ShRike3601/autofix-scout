@@ -54,6 +54,7 @@ public static class FixActions
                         "touchpad" => "ms-settings:devices-touchpad",
                         "keyboard_access" => "ms-settings:easeofaccess-keyboard",
                         "mouse" => "ms-settings:mousetouchpad",
+                        "notifications" => "ms-settings:notifications",
                         "windowsdefender" => "windowsdefender:",
                         "windowsdefender_appbrowser" => "windowsdefender://appbrowser",
                         _ => throw new ArgumentException(rung.Arg),
@@ -100,6 +101,8 @@ public static class FixActions
                 case "power.balanced_plan":
                     // Fixed Balanced GUID; powercfg /setactive works for the signed-in user without admin.
                     return await Task.Run(() => RunFixed("powercfg.exe", "/setactive " + PowerTriage.BalancedGuid));
+                case "shell.notifications_on":
+                    return await Task.Run(Repair.NotificationRepairs.NotificationsOn);
                 case "shell.restart_start_menu":
                     return await Task.Run(Repair.UserRepairs.RestartStartMenu);
                 case "shell.restart_explorer":
