@@ -121,6 +121,19 @@ public static partial class AudioTriage
             }
         }
 
+        // Rule 9b: per-app sound (Volume mixer), only when the device itself is fine so the device findings keep priority.
+        if (findings.Count == 0)
+        {
+            foreach (var app in state.Sessions.Where(s => s.Muted).DistinctBy(s => s.Label))
+                findings.Add(new Finding(FindingCode.AppSoundMuted,
+                    $"Sound is muted for \"{app.Label}\" in the Volume mixer.",
+                    $"Session '{app.Process}': muted, level {app.VolumePercent}%, {(app.Active ? "active" : "inactive")}"));
+            foreach (var app in state.Sessions.Where(s => !s.Muted && s.VolumePercent < AppSound.LowPercent).DistinctBy(s => s.Label))
+                findings.Add(new Finding(FindingCode.AppSoundVeryLow,
+                    $"Sound is set very low for \"{app.Label}\" in the Volume mixer.",
+                    $"Session '{app.Process}': level {app.VolumePercent}%, {(app.Active ? "active" : "inactive")}"));
+        }
+
         // Rule 10: LooksNormal ONLY if no other findings AND no Unknown values
         var hasOtherFindings = findings.Count > 0;
         var hasUnknownMuteOrVolume = state.DefaultMuted == Tri.Unknown || (state.DefaultVolumePercent.HasValue && state.DefaultVolumePercent.Value == 0); // Treat 0 as potentially unknown/neutral
@@ -276,4 +289,7 @@ public enum FindingCode
     NetWeakWifi,
     NetIpConflict,
     NetMetered,
+    // Per-app sound (Volume mixer)
+    AppSoundMuted,
+    AppSoundVeryLow,
 }

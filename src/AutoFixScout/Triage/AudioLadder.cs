@@ -31,6 +31,17 @@ public static class AudioLadder
             rungs.Add(new("unmute", "audio.unmute_and_set_volume", 1,
                 "The sound was muted or set very low. AutoFix Scout can turn the volume back on. You can change it again at any time."));
 
+        if (codes.Contains(FindingCode.AppSoundMuted) || codes.Contains(FindingCode.AppSoundVeryLow))
+        {
+            var app = state.Sessions.Where(s => AppSound.IsValidName(s.Process))
+                .OrderByDescending(s => s.Muted).ThenByDescending(s => s.Active).FirstOrDefault(s => s.Muted || s.VolumePercent < AppSound.LowPercent);
+            if (app != null)
+                rungs.Add(new("unmute_app", "audio.unmute_app", 1,
+                    $"Sound is turned off or very low for \"{app.Label}\". AutoFix Scout can turn it back on for this app only. You can change it again at any time.", app.Process));
+            rungs.Add(new("volume_mixer", "ui.open_settings_page", 0,
+                "AutoFix Scout will open the \"Volume mixer\" settings. Please check that the volume of the app is not turned down or muted.", "volume_mixer"));
+        }
+
         rungs.Add(new("restart_services", "service.restart", 1,
             "AutoFix Scout can restart the part of Windows that plays sound. Windows will ask for your permission.", "AudioEndpointBuilder"));
         // An uninstalled or vanished sound device leaves no active output; Windows reinstalls it on a hardware scan.
@@ -42,6 +53,11 @@ public static class AudioLadder
             rungs.Add(new("toggle_device", "device.disable_enable", 1,
                 $"Your sound device \"{broken.Name}\" reports a problem. AutoFix Scout can turn it off and on again. Windows will ask for your permission.",
                 broken.InstanceId));
+        // Enhancements are a known cause of distorted or crackling sound; the person turns them off in Windows.
+        if (state.Endpoints.Any(e => e.IsActive))
+            rungs.Add(new("audio_enhancements", "ui.human_step", 0,
+                "Audio enhancements can distort sound. Please open \"Settings\", select \"System\", then \"Sound\", and select your output device. " +
+                "Under \"Audio enhancements\", please select \"Off\". You can turn them on again at any time."));
         // T2, last before escalating (spec 8.1): often the real fix for "it broke after an update".
         var rollback = RollbackTargets(state)
             .Select(d => DriverRules.Rollback("sound", d.Name, d.InstanceId, d.Driver)).FirstOrDefault(r => r != null);
