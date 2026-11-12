@@ -268,4 +268,7 @@ public enum FindingCode
     FilterKeysOn,
     ToggleKeysOn,
     MouseKeysOn,
+    // Devices with a Device Manager warning, temporary profile
+    HealthDeviceProblem,
+    HealthTempProfile,
 }

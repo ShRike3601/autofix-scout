@@ -26,7 +26,10 @@ public class LiveProbeTests
             $"winsock 3rd party: {string.Join("; ", s.ThirdPartyWinsock)}; path missing: {string.Join("; ", s.MissingPathEntries)}; reboot {s.RebootPending}" };
         lines.AddRange(f.Select(x => $"FINDING {x.Code}: {x.PlainMessage} [{x.TechnicalDetail}]"));
         lines.AddRange(HealthTriage.Ladder(s, f).Select(r => $"RUNG {r.Id} {r.ActionId}({r.Arg})"));
+        lines.Add("devices: " + string.Join("; ", s.DeviceProblems.Select(d => $"{d.PnpClass} code={d.Code}")) + "; temp profile: " + s.TempProfile);
         File.WriteAllLines(output, lines);
+        Assert.DoesNotContain(s.ProbeErrors, e => e.StartsWith("device errors") || e.StartsWith("user profile"));
+        Assert.NotNull(s.DeviceProblems);
         Assert.NotEmpty(s.Drives);
         Assert.All(s.Drives, d => Assert.False(d.Failing || d.Warning));
         Assert.Empty(s.ProbeErrors);

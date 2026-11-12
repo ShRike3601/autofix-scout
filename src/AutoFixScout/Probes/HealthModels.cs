@@ -61,6 +61,11 @@ public sealed class HealthState
     public Tri RebootPending { get; set; } = Tri.Unknown;
     /// <summary>Physical drives (HDD/SSD) with Windows' health verdict.</summary>
     public IReadOnlyList<PhysicalDriveInfo> Drives { get; set; } = new List<PhysicalDriveInfo>();
+    /// <summary>Present devices with a Device Manager warning (code 45 "not connected" and phantom devices left out).</summary>
+    public IReadOnlyList<DeviceProblem> DeviceProblems { get; set; } = new List<DeviceProblem>();
+    /// <summary>Windows signed the person in with a temporary profile (folder name or Application log event 1511/1515 in 2 days).</summary>
+    public bool TempProfile { get; set; }
+    public string? TempProfileDetail { get; set; }
     /// <summary>The program the person said is the one with the problem (from "A program keeps closing"); null = not asked.</summary>
     public string? ChosenApp { get; set; }
 

@@ -37,6 +37,9 @@ public static class HealthTriage
     public static IReadOnlyList<UpdateServiceInfo> ServiceFaults(HealthState s) =>
         s.Services.Where(x => ServiceDefaults.IsFault(x.Name, x.Status, x.StartType)).ToList();
 
+    /// <summary>Devices that need attention; devices the person switched off (code 22) are listed in the detail only.</summary>
+    public static IReadOnlyList<DeviceProblem> DeviceFaults(HealthState s) => s.DeviceProblems.Where(d => !d.DisabledByPerson).ToList();
+
     private static string Names(IEnumerable<string> names) => string.Join(", ", names.Select(n => $"\"{n}\""));
 
     private static string ServiceName(string name) => ServiceDefaults.Find(name)?.DisplayName ?? name;
@@ -53,6 +56,15 @@ public static class HealthTriage
         else if (s.Drives.FirstOrDefault(d => d.Warning) is { } warn)
             f.Add(F(FindingCode.HealthDriveWarning, $"Windows reports a warning for the drive \"{warn.Name}\". It is a good idea to back up your important files.",
                 $"{warn.Name} ({warn.MediaType}) health={warn.Health} status={string.Join(",", warn.OperationalStatus)}"));
+        if (s.TempProfile)
+            f.Add(F(FindingCode.HealthTempProfile, "Windows signed you in with a temporary profile, so your desktop and files may look missing. Your files are most likely still safe in your normal profile; nothing is deleted.",
+                s.TempProfileDetail ?? "temporary profile"));
+        var devices = DeviceFaults(s);
+        if (devices.Count > 0)
+            f.Add(F(FindingCode.HealthDeviceProblem,
+                $"Windows reports a problem with the device \"{devices[0].Name}\": it {DeviceErrors.Meaning(devices[0].Code)}." +
+                (devices.Count > 1 ? $" {devices.Count - 1} other {(devices.Count == 2 ? "device has" : "devices have")} a problem as well." : ""),
+                string.Join("; ", s.DeviceProblems.OrderBy(d => d.DisabledByPerson).Select(d => $"{d.Name} class={d.PnpClass} code={d.Code}{(d.DisabledByPerson ? " (switched off, information only)" : "")}"))));
         if (s.HardwareErrors > 0)
             f.Add(F(FindingCode.HealthHardwareErrors, "Windows has recorded errors reported by the computer's hardware (processor or memory). Software repairs cannot correct these.",
                 $"WHEA errors (error level) in 14 days: {s.HardwareErrors}"));
@@ -147,6 +159,16 @@ public static class HealthTriage
         if (codes.Contains(FindingCode.ProbeIncomplete)) return r;
         var systemRepair = codes.Contains(FindingCode.LooksNormal);
 
+        if (codes.Contains(FindingCode.HealthTempProfile))
+        {
+            r.Add(new("restart_sign_in_again", "ui.human_step", 0,
+                "Please save your work and restart the computer: select \"Start\", then \"Power\", then \"Restart\". Then sign in again as usual. A restart often brings back the normal profile."));
+            r.Add(new("profile_helper_steps", "ui.human_step", 0,
+                "If the temporary profile appears again after a restart, a helper can usually correct it. In the registry, under \"ProfileList\", the entry for this account ends in \".bak\", and Windows no longer finds the normal one. " +
+                "The helper removes \".bak\" from that name and sets the state value to zero. AutoFix Scout does not change the registry or any profile; please ask a person who is comfortable with this to do it, and keep a backup of your files first."));
+        }
+        if (codes.Contains(FindingCode.HealthDeviceProblem))
+            AddDeviceRungs(s, r);
         if (codes.Contains(FindingCode.HealthDriveFailing) || codes.Contains(FindingCode.HealthDriveWarning))
             r.Add(new("back_up_files", "ui.open_settings_page", 0,
                 "Please copy your important files (documents, photos) to a USB drive or to OneDrive before anything else. " +
@@ -235,6 +257,27 @@ public static class HealthTriage
             r.Add(new("restart_pc", "ui.human_step", 0,
                 "Windows needs a restart to finish installing changes. Please save your work, then select \"Start\", then \"Power\", then \"Restart\". After the restart, please open AutoFix Scout again."));
         return r;
+    }
+
+    /// <summary>Scan for hardware changes (any class, nothing is changed), then guided steps only: no driver of any device is switched or changed.</summary>
+    private static void AddDeviceRungs(HealthState s, List<Rung> r)
+    {
+        var devices = DeviceFaults(s);
+        r.Add(new("rescan", "device.rescan", 1,
+            "A device does not work properly. AutoFix Scout can ask Windows to search for hardware changes again. " +
+            "This is the same as \"Scan for hardware changes\" in \"Device Manager\". Windows will ask for your permission.", "devices"));
+        if (devices.Any(d => d.NeedsDriver))
+        {
+            r.Add(new("device_driver_update", "ui.open_settings_page", 0,
+                "AutoFix Scout will open \"Windows Update\". Please select \"Check for updates\", then \"Advanced options\", then \"Optional updates\", and install any driver offered for the device.",
+                "windowsupdate"));
+            r.Add(new("device_driver_manufacturer", "ui.human_step", 0,
+                "If Windows Update offers no driver, please open the support web site of the computer's maker (or of the device's maker), search for the model, and download the driver for Windows. " +
+                "Run the installer, then restart the computer. AutoFix Scout does not install drivers from other sources."));
+        }
+        if (devices.Any(d => d.Code == 43 && d.IsUsb))
+            r.Add(new("device_replug", "ui.human_step", 0,
+                "A USB device reported a problem to Windows. Please unplug it, wait ten seconds, and plug it into a different USB port directly on the computer, not through a hub."));
     }
 
     public static string RuntimeArch() => System.Runtime.InteropServices.RuntimeInformation.OSArchitecture switch
