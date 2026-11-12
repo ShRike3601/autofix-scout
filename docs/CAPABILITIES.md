@@ -42,6 +42,12 @@ Status: **Done** = built, unit-tested and checked on the test laptop (every admi
 | Keyboard, mouse, touchpad | touchpad switched off, Sticky/Filter/Toggle/Mouse Keys on, missing or failing input devices | touchpad on, accessibility keys off (backed up), re-detect devices, guided steps | Done |
 | Clock settings (in the full check-up) | wrong clock with "Set time automatically" off | Date and time settings step, then clock sync | Done |
 
+| Browser taken over by policies ("managed by your organization") | forced extensions, homepage, search engine, browser proxy | remove the policy values (backed up) | Planned (Q1) |
+| What changed before the problem | programs, updates and drivers installed in the last 7 days | uninstall guidance, System Restore as a last resort (guided) | Planned (Q2) |
+| Graphics driver resets | display driver resets and freezes | driver update guidance | Planned (Q3) |
+| One app has no sound | app muted or at zero in the Volume mixer, audio enhancements | unmute that app, guided | Planned (Q4) |
+| What fills the drive | Windows.old, hibernation file, Downloads, update caches | Storage Sense, component cleanup, guided (personal files never deleted) | Planned (Q5) |
+
 ## Safety rules the code enforces
 - The UI never runs elevated; the executor accepts only allowlisted action ids with fixed or validated arguments.
 - Display and storage drivers are never touched; driver changes have save points and automatic undo.
