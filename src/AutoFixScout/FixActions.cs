@@ -16,7 +16,7 @@ public static class FixActions
         "service.restart", "device.disable_enable", "device.enable", "network.reset_dns", "network.renew_address", "device.rescan", "service.set_manual", "printer.clear_queue", "printer.set_online",
         "repair.dism", "repair.sfc", "time.resync", "network.reset_winhttp_proxy", "network.clean_hosts", "service.restore_default",
         "system.repair_path", "network.reset_winsock", "update.reset_components", "search.rebuild_index", "runtime.install_vcredist", "disk.scan",
-        "storage.cleanup_components", "office.quick_repair", "security.firewall_on", "security.uac_on",
+        "storage.cleanup_components", "office.quick_repair", "security.firewall_on", "security.uac_on", "security.remove_browser_policies",
     };
 
     public static async Task<(bool Ok, string Detail)> RunAsync(Rung rung)
@@ -107,6 +107,8 @@ public static class FixActions
                 case "security.update_signatures":
                     // MpCmdRun with fixed arguments; Defender allows this without admin rights.
                     return await Task.Run(Repair.UserRepairs.UpdateDefenderSignatures);
+                case "security.remove_browser_policies_user":
+                    return await Task.Run(Repair.UserRepairs.RemoveBrowserPoliciesUser);
                 case "security.quick_scan":
                     return await Task.Run(Repair.UserRepairs.DefenderQuickScan);
                 case "input.touchpad_on":

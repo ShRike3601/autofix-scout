@@ -276,4 +276,7 @@ public enum FindingCode
     NetWeakWifi,
     NetIpConflict,
     NetMetered,
+    // Security: browser policies
+    SecurityBrowserPolicy,
+    SecurityBrowserPolicyManaged,
 }

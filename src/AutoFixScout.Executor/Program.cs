@@ -63,6 +63,7 @@ public static class Program
                 (_, "office.quick_repair") when args[1] == Repairs.System => Repairs.OfficeQuickRepair(),
                 (_, "security.firewall_on") when args[1] == Repairs.System => Repairs.FirewallOn(),
                 (_, "security.uac_on") when args[1] == Repairs.System => Repairs.UacOn(),
+                (_, "security.remove_browser_policies") when args[1] == Repairs.System => Repairs.RemoveBrowserPolicies(),
                 _ => 2,
             };
         }
