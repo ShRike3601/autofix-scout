@@ -378,3 +378,16 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
 - P5: OnScannerClicked (MainWindow.xaml.cs) runs the printer flow with ScanFocus; the search box routes "scanner" there. The home tile is added by the UI session.
 - P3 bug found on hardware: system.pagefile_auto used WMI path "\.\root\cimv2" (missing "\") -> "Invalid parameter"; fixed, LivePageFileTests guards it; elevated re-run: exit 3 (already automatic), bad arg 2.
 - Idea from the UI session, owner has NOT decided: SymptomRouter could return a confidence plus the next 1-2 candidates and "no good match", so the UI can offer "closest checks". Do not start unless the owner asks.
+
+## Roadmap (part 5, queued 2026-11-13 ~04:40 IST; start after the next usage reset, agents on Sonnet in worktrees)
+- [ ] F1 Wi-Fi keeps dropping (internet check): frequent disconnects (WLAN-AutoConfig 8003/8001 counts), adapter
+      power saving ("Allow the computer to turn off this device"), roaming aggressiveness; guided steps; never change
+      the network live in tests.
+- [ ] F2 Programs will not install (Store/apps area): Windows Installer service (msiserver) disabled, MsiInstaller
+      failure events (11708/1033 with error codes explained), pending restart blocking installs, low space; fixes:
+      service default, restart guide, clear the user's temp (exists).
+- [ ] F3 Notifications missing (Start menu/taskbar area): notifications switched off globally or per app, Do not
+      disturb / Focus on, notification banners off; guided Settings steps naming the app; non-admin switch back on for the
+      global toggle if it can be done safely.
+- [ ] F4 USB devices disconnecting (check-up): Kernel-PnP / USB hub errors and frequent device add/remove events, USB
+      selective suspend on battery; guided power setting step, replug/hub advice.
