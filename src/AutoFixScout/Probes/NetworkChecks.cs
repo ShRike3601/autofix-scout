@@ -58,7 +58,15 @@ public static class NetworkChecks
                 using (ev) events.Add(WifiDrops.ParseEvent(ev.ToXml()));
         }
         catch (EventLogNotFoundException) { }
-        return WifiDrops.Count(events);
+        var transitions = 0;
+        try
+        {
+            var q = $"*[System[((Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=42) or (Provider[@Name='Microsoft-Windows-Kernel-General'] and EventID=13)) and TimeCreated[timediff(@SystemTime) <= {(long)TimeSpan.FromDays(WifiDrops.Days).TotalMilliseconds}]]]";
+            using var r = new EventLogReader(new EventLogQuery("System", PathType.LogName, q));
+            for (var ev = r.ReadEvent(); ev != null; ev = r.ReadEvent()) using (ev) transitions++;
+        }
+        catch (EventLogException) { }
+        return WifiDrops.Count(events) with { SleepsAndShutdowns = transitions };
     }
 
     /// <summary>Whether Windows may turn the adapter with this connection GUID off to save power (class key PnPCapabilities). Unknown when no key matches.</summary>

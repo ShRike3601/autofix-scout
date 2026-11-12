@@ -164,3 +164,14 @@ public class LiveWifiDropsTests
         return m.Success ? m.Groups[1].Value : null;
     }
 }
+
+public class WifiSleepTests
+{
+    [Fact]
+    public void SleepsAndShutdowns_AreNotCountedAsDrops()
+    {
+        var s = new AutoFixScout.Probes.WifiDropStats(Disconnects: 8, Connects: 8, ByPerson: 1, SignalLost: 0, Driver: 7, Other: 0, SleepsAndShutdowns: 5);
+        Assert.Equal(2, s.Unintentional);
+        Assert.Equal(0, (s with { SleepsAndShutdowns = 20 }).Unintentional);
+    }
+}

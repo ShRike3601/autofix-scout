@@ -6,10 +6,11 @@ namespace AutoFixScout.Probes;
 /// Disconnect (8003) and connect (8001) counts of the WLAN-AutoConfig log over the last days. The reason of a disconnect
 /// is kept as a category only; the network name, profile name and access point address are never read from the event.
 /// </summary>
-public sealed record WifiDropStats(int Disconnects, int Connects, int ByPerson, int SignalLost, int Driver, int Other)
+public sealed record WifiDropStats(int Disconnects, int Connects, int ByPerson, int SignalLost, int Driver, int Other, int SleepsAndShutdowns = 0)
 {
     /// <summary>Disconnects that were not caused by a person.</summary>
-    public int Unintentional => Disconnects - ByPerson;
+    /// <summary>Going to sleep or shutting down also logs a disconnect; those are subtracted.</summary>
+    public int Unintentional => Math.Max(0, Disconnects - ByPerson - SleepsAndShutdowns);
 
     /// <summary>"3 disconnects (1 signal lost, 2 driver), 5 connects"</summary>
     public string Describe() =>
