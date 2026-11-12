@@ -361,4 +361,17 @@ No UI edits in this session (another session reworks the UI). New checks go into
       Optimization cache, old Windows Update cleanup; safe cleanups only (Storage Sense / component cleanup), guided
       for personal folders (never delete personal files).
 Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This session works in C:\afs-wt\overnight (branch overnight); agents in C:\afs-wt\<name>.
-- Q1 note: the executor's admin path for browser policies (HKLM+HKCU) is unit-tested only; run it through the elevated bench with a dummy HKCU Chrome HomepageLocation next.
+- Q1 admin path verified on hardware (2026-11-13 03:55): dummy HKCU Chrome HomepageLocation removed by the elevated executor (exit 0), bad arg rejected (2), cleaned up.
+
+## Roadmap (part 4, from 2026-11-13 ~04:00 IST)
+- [ ] P1 Per-app privacy (Microphone and Camera areas): one app (Teams, Zoom, a browser) denied microphone or camera
+      access while the global switch is on (HKCU ConsentStore\<capability>\<app or NonPackaged\path> Value=Deny);
+      guided Settings step naming the app; no silent changes to privacy choices.
+- [ ] P2 Blue-screen causes (check-up): read the stop code of recent blue screens (event 1001 BugCheck parameters /
+      WER) and explain common ones in plain words (memory, driver, storage, graphics); offer Windows Memory Diagnostic
+      as a guided step for memory-type codes; point to the driver for driver-type codes.
+- [ ] P3 Virtual memory (check-up): page file disabled or far too small for the installed memory -> "low memory" crashes;
+      fix through the executor: let Windows manage the page file size (backup of the old setting; restart needed).
+- [ ] P4 Threats found by Microsoft Defender (Security): recent detections (MSFT_MpThreatDetection) and whether they were
+      removed; guided "Protection history" step; full scan offer.
+- [ ] P5 Scanner and camera import (Printer area): Windows Image Acquisition service (stisvc) off; scanner device errors.
