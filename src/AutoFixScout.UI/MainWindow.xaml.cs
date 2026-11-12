@@ -301,8 +301,12 @@ public partial class MainWindow : Window, IFixHost
 
     // ---- more areas (home screen "Something else") ----
 
-    private void OnOtherClicked(object sender, RoutedEventArgs e) =>
-        MoreAreas.Visibility = MoreAreas.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+    private void OnOtherClicked(object sender, RoutedEventArgs e)
+    {
+        var show = MoreAreas.Visibility != Visibility.Visible;
+        MoreAreas.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (show) Dispatcher.BeginInvoke(() => MoreAreas.BringIntoView(), System.Windows.Threading.DispatcherPriority.Loaded);
+    }
 
     /// <summary>The person's own answer is the real test where no automatic check exists.</summary>
     private Task<bool> AskAsync(string question)
