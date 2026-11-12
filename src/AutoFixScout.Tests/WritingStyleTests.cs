@@ -93,6 +93,15 @@ public class WritingStyleTests
         dns.StaticDnsServers = new[] { "192.0.2.1" };
         dns.StaticDnsAdapterId = wifi.InstanceId;
         yield return dns;
+        var extras = Online(Tri.Yes, Tri.Yes, Tri.Yes);
+        extras.AddressObtained = Tri.No; extras.WifiSignalPercent = 20; extras.Supports5GHz = Tri.Yes; extras.IpConflictRecent = true; extras.Metered = Tri.Yes;
+        yield return extras;
+        var noAddress = Online(Tri.No, Tri.No, Tri.No);
+        noAddress.AddressObtained = Tri.No;
+        yield return noAddress;
+        var weak = Online(Tri.Yes, Tri.Yes, Tri.Yes);
+        weak.WifiSignalPercent = 30;
+        yield return weak;
     }
 
     /// <summary>Every finding message, rung sentence and "not fixed" hint the triage classes produce for the states above.</summary>
@@ -153,7 +162,7 @@ public class WritingStyleTests
     [Fact]
     public void AdminRungsSayWindowsWillAskForPermission()
     {
-        var adminActions = new[] { "service.restart", "device.disable_enable", "device.enable", "network.reset_dns", "device.rescan",
+        var adminActions = new[] { "service.restart", "device.disable_enable", "device.enable", "network.reset_dns", "network.renew_address", "device.rescan",
             "driver.rollback", "driver.install_from_windows_update", "storage.cleanup_components" };
         var rungs = AudioStates().SelectMany(s => AudioLadder.For(s, AudioTriage.Evaluate(s)))
             .Concat(CameraStates().SelectMany(s => CameraTriage.Ladder(s, CameraTriage.Evaluate(s))))

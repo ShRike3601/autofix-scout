@@ -10,6 +10,7 @@ public class FixActionRoutingTests
     [InlineData("device.disable_enable")]
     [InlineData("device.enable")]
     [InlineData("network.reset_dns")]
+    [InlineData("network.renew_address")]
     [InlineData("device.rescan")]
     [InlineData("service.set_manual")]
     [InlineData("printer.clear_queue")]

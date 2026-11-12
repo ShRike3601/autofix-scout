@@ -33,6 +33,8 @@ public sealed class RealNetworkProbe : INetworkProbe
         }
         catch (Exception ex) { errors.Add($"DNS settings: {ex.Message}"); }
 
+        ReadExtras(state);
+
         state.GatewayReachable = await PingGatewayAsync();
         try
         {
@@ -48,6 +50,39 @@ public sealed class RealNetworkProbe : INetworkProbe
         }
         else state.InternetReachable = Tri.No;
         return state;
+    }
+
+    /// <summary>Address, Wi-Fi signal, IP conflict and metered cost. Each read is separate; a failure goes to ExtraProbeErrors only.</summary>
+    private static void ReadExtras(NetworkState state)
+    {
+        var errors = new List<string>();
+        state.ExtraProbeErrors = errors;
+        var connected = state.Adapters.OrderByDescending(a => a.IsWireless).First(a => a.Connected);
+        try
+        {
+            var guid = ReadAdapterGuid(connected.InstanceId);
+            if (guid != null) state.AddressObtained = NetworkChecks.ReadAddressObtained(guid);
+        }
+        catch (Exception ex) { errors.Add($"Address: {ex.Message}"); }
+        if (connected.IsWireless)
+        {
+            try
+            {
+                if (NetworkChecks.ReadWifi() is { } wifi) { state.WifiSignalPercent = wifi.SignalPercent; state.Supports5GHz = wifi.Supports5GHz; }
+            }
+            catch (Exception ex) { errors.Add($"Wi-Fi signal: {ex.Message}"); }
+        }
+        try { state.IpConflictRecent = NetworkChecks.ReadRecentIpConflict(); }
+        catch (Exception ex) { errors.Add($"Event log: {ex.Message}"); }
+        try { state.Metered = NetworkChecks.ReadMetered(connected.IsWireless); }
+        catch (Exception ex) { errors.Add($"Connection cost: {ex.Message}"); }
+    }
+
+    private static string? ReadAdapterGuid(string instanceId)
+    {
+        using var q = new ManagementObjectSearcher(
+            $"SELECT GUID FROM Win32_NetworkAdapter WHERE PNPDeviceID = '{instanceId.Replace(@"\", @"\\").Replace("'", "")}'");
+        return q.Get().Cast<ManagementBaseObject>().Select(a => a["GUID"] as string).FirstOrDefault(g => g != null);
     }
 
     private static List<NetAdapterInfo> ReadAdapters()

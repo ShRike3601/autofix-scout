@@ -268,4 +268,9 @@ public enum FindingCode
     FilterKeysOn,
     ToggleKeysOn,
     MouseKeysOn,
+    // Network extras
+    NetNoAddress,
+    NetWeakWifi,
+    NetIpConflict,
+    NetMetered,
 }

@@ -40,6 +40,7 @@ public static class Program
                 (_, "device.disable_enable") when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) => ToggleDevice(args[1]),
                 (_, "device.enable") when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) => Pnputil("/enable-device", args[1]) == 0 ? 0 : 1,
                 (_, "network.reset_dns") when IsValidInstanceId(args[1]) && IsNetAdapter(args[1]) => ResetDns(args[1]),
+                (_, "network.renew_address") when IsValidInstanceId(args[1]) && IsNetAdapter(args[1]) => RenewAddress(args[1]),
                 // The area is only recorded; the scan itself takes no input.
                 (_, "device.rescan") when RescanAreas.Contains(args[1]) => ScanForHardwareChanges(),
                 (_, "service.set_manual") when ManualStartServices.Contains(args[1]) => SetManualAndStart(args[1]),
@@ -147,6 +148,21 @@ public static class Program
             var result = Convert.ToUInt32(cfg.InvokeMethod("SetDNSServerSearchOrder", inParams, null)["ReturnValue"]);
             return result is 0 or 1 ? 0 : 1; // 1 = done, restart suggested
         }
+        return 1;
+    }
+
+    /// <summary>
+    /// network.renew_address: asks the router for a new IPv4 address on one adapter (Win32_NetworkAdapterConfiguration.RenewDHCPLease,
+    /// the same call as ipconfig /renew). Needs admin. Only that adapter is touched; no command line is built.
+    /// </summary>
+    private static int RenewAddress(string instanceId)
+    {
+        using var a = new ManagementObjectSearcher($"SELECT GUID FROM Win32_NetworkAdapter WHERE PNPDeviceID = '{instanceId.Replace(@"\", @"\\")}'");
+        var guid = a.Get().Cast<ManagementBaseObject>().Select(x => x["GUID"] as string).FirstOrDefault(g => g != null);
+        if (guid is null) return 1;
+        using var c = new ManagementObjectSearcher($"SELECT * FROM Win32_NetworkAdapterConfiguration WHERE SettingID = '{guid}'");
+        foreach (ManagementObject cfg in c.Get())
+            return Convert.ToUInt32(cfg.InvokeMethod("RenewDHCPLease", null)) == 0 ? 0 : 1;
         return 1;
     }
 

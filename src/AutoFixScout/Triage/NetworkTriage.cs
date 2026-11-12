@@ -32,6 +32,12 @@ public static class NetworkTriage
         }
 
         // Ping alone isn't trusted (some routers ignore it), so a silent router only counts when DNS fails too.
+        return WithExtras(s, Main(s));
+    }
+
+    /// <summary>The existing verdict for a connected computer. Unchanged by the extra checks.</summary>
+    private static Finding[] Main(NetworkState s)
+    {
         return (s.GatewayReachable, s.DnsResolving, s.InternetReachable) switch
         {
             (_, _, Tri.Yes) => new[] { F(FindingCode.LooksNormal, "Your internet connection is working.", "NCSI test passed") },
@@ -41,6 +47,33 @@ public static class NetworkTriage
             _ => new[] { F(FindingCode.ProbeIncomplete, Incomplete, $"gateway={s.GatewayReachable} dns={s.DnsResolving} internet={s.InternetReachable}") },
         };
     }
+
+    /// <summary>
+    /// Extra findings after the main one. The main finding stays first, except that "no address from the router" replaces
+    /// "cannot reach your router" (it is the reason for it). Order: no address, IP conflict, weak signal, metered.
+    /// </summary>
+    private static IReadOnlyList<Finding> WithExtras(NetworkState s, Finding[] main)
+    {
+        if (main[0].Code == FindingCode.ProbeIncomplete) return main; // fail closed
+        var list = new List<Finding>();
+        var noAddress = s.AddressObtained == Tri.No;
+        if (noAddress && main[0].Code == FindingCode.GatewayUnreachable) list.Add(NoAddress()); // the reason for it
+        else
+        {
+            list.AddRange(main);
+            if (noAddress) list.Add(NoAddress());
+        }
+        if (s.IpConflictRecent)
+            list.Add(F(FindingCode.NetIpConflict, "Another device on your network recently used the same address as your computer.", "Tcpip event 4199 in the last 24 hours"));
+        if (s.WifiSignalPercent is < NetworkChecks.WeakSignalPercent and var pct)
+            list.Add(F(FindingCode.NetWeakWifi, $"Your Wi-Fi signal is weak ({pct} percent).", $"signal quality {pct}%"));
+        if (s.Metered == Tri.Yes)
+            list.Add(F(FindingCode.NetMetered, "Your connection is set as a \"Metered connection\", so Windows Update and OneDrive may pause.", "connection cost is fixed or variable"));
+        return list;
+    }
+
+    private static Finding NoAddress() =>
+        F(FindingCode.NetNoAddress, "Your computer is connected, but your router has not given it an address.", "only a 169.254.x.x address or no default gateway");
 
     public static IReadOnlyList<Rung> Ladder(NetworkState s, IReadOnlyList<Finding> findings)
     {
@@ -97,8 +130,40 @@ public static class NetworkTriage
                     "Please unplug your router for 30 seconds, then plug it back in. Then wait about two minutes until its lights are steady."));
                 break;
         }
-        return rungs;
+        // Rungs of the extra findings follow those of the main one (a working connection has none of its own).
+        foreach (var f in findings)
+            switch (f.Code)
+            {
+                case FindingCode.NetNoAddress or FindingCode.NetIpConflict:
+                    if (connected == null) break;
+                    rungs.Add(new("renew_address", "network.renew_address", 1,
+                        $"AutoFix Scout can ask your router for a new address for \"{connected.Name}\". " +
+                        "Your connection may pause for a few seconds. Windows will ask for your permission.", connected.InstanceId));
+                    if (f.Code == FindingCode.NetNoAddress)
+                        rungs.Add(new("toggle_adapter", "device.disable_enable", 1,
+                            $"AutoFix Scout can turn your network adapter \"{connected.Name}\" off and on again. Windows will ask for your permission.", connected.InstanceId));
+                    rungs.Add(RestartRouter);
+                    break;
+                case FindingCode.NetWeakWifi:
+                    rungs.Add(new("move_closer", "ui.human_step", 0,
+                        "Please move closer to your router and away from thick walls or large metal objects. Then run the check again."));
+                    if (s.Supports5GHz == Tri.Yes)
+                        rungs.Add(new("use_5ghz", "ui.open_settings_page", 0,
+                            "Your Wi-Fi adapter supports the 5 GHz band, which is often faster at short range. " +
+                            "AutoFix Scout will open the \"Wi-Fi\" settings. If your router offers a 5 GHz network, please select it and connect.", "wifi"));
+                    rungs.Add(RestartRouter);
+                    break;
+                case FindingCode.NetMetered:
+                    rungs.Add(new("metered_off", "ui.open_settings_page", 0,
+                        "Windows Update and OneDrive may pause on a \"Metered connection\". AutoFix Scout will open the \"Wi-Fi\" settings. " +
+                        "If you want them to continue, please select your network and set \"Metered connection\" to \"Off\".", "wifi"));
+                    break;
+            }
+        return rungs.DistinctBy(r => r.Id).ToList();
     }
+
+    private static readonly Rung RestartRouter = new("restart_router", "ui.human_step", 0,
+        "Please unplug your router for 30 seconds, then plug it back in. Then wait about two minutes until its lights are steady.");
 
     private static void AddIfNotNull(List<Rung> rungs, Rung? rung) { if (rung != null) rungs.Add(rung); }
 

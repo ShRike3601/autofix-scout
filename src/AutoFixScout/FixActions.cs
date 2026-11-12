@@ -13,7 +13,7 @@ public static class FixActions
     /// <summary>Actions that go to the elevated executor with one argument (one Windows permission prompt each).</summary>
     public static readonly HashSet<string> ElevatedActions = new()
     {
-        "service.restart", "device.disable_enable", "device.enable", "network.reset_dns", "device.rescan", "service.set_manual", "printer.clear_queue", "printer.set_online",
+        "service.restart", "device.disable_enable", "device.enable", "network.reset_dns", "network.renew_address", "device.rescan", "service.set_manual", "printer.clear_queue", "printer.set_online",
         "repair.dism", "repair.sfc", "time.resync", "network.reset_winhttp_proxy", "network.clean_hosts", "service.restore_default",
         "system.repair_path", "network.reset_winsock", "update.reset_components", "search.rebuild_index", "runtime.install_vcredist", "disk.scan",
         "storage.cleanup_components", "office.quick_repair", "security.firewall_on", "security.uac_on",
