@@ -16,7 +16,7 @@ public static class FixActions
         "service.restart", "device.disable_enable", "device.enable", "network.reset_dns", "device.rescan", "service.set_manual", "printer.clear_queue", "printer.set_online",
         "repair.dism", "repair.sfc", "time.resync", "network.reset_winhttp_proxy", "network.clean_hosts", "service.restore_default",
         "system.repair_path", "network.reset_winsock", "update.reset_components", "search.rebuild_index", "runtime.install_vcredist", "disk.scan",
-        "storage.cleanup_components",
+        "storage.cleanup_components", "office.quick_repair",
     };
 
     public static async Task<(bool Ok, string Detail)> RunAsync(Rung rung)
@@ -76,6 +76,13 @@ public static class FixActions
                     return await Task.Run(Repair.UserRepairs.RepairTemp);
                 case "apps.reregister":
                     return await Task.Run(() => Repair.UserRepairs.ReregisterApp(rung.Arg ?? ""));
+                case "apps.reset_store_cache":
+                    return await Task.Run(Repair.AppRepairs.ResetStoreCache);
+                case "apps.start_onedrive":
+                    return await Task.Run(Repair.AppRepairs.StartOneDrive);
+                case "apps.reset_onedrive":
+                    // The OneDrive program found on this computer; the rung carries no path.
+                    return await Task.Run(Repair.AppRepairs.ResetOneDrive);
                 case "shell.restart_start_menu":
                     return await Task.Run(Repair.UserRepairs.RestartStartMenu);
                 case "shell.restart_explorer":

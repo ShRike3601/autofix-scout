@@ -59,6 +59,7 @@ public static class Program
                 (_, "runtime.install_vcredist") when Repairs.RuntimeArchitectures.Contains(args[1]) => Repairs.InstallVcRedist(args[1]),
                 (_, "disk.scan") when Repairs.IsSystemDrive(args[1]) => Repairs.DiskScan(args[1]),
                 (_, "storage.cleanup_components") when args[1] == Repairs.System => Repairs.CleanupComponents(),
+                (_, "office.quick_repair") when args[1] == Repairs.System => Repairs.OfficeQuickRepair(),
                 _ => 2,
             };
         }

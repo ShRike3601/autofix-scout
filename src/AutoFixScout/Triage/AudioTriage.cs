@@ -235,4 +235,10 @@ public enum FindingCode
     DisplayAdapterError,
     ExternalDisplayNotShown,
     BrightnessVeryLow,
+    // Apps, Microsoft Store, Office, OneDrive
+    StoreMissing,
+    StorePackageDamaged,
+    OfficeNotFound,
+    OneDriveNotFound,
+    OneDriveNotRunning,
 }
