@@ -191,4 +191,16 @@ public enum FindingCode
     MicWrongDefault,
     MicMuted,
     MicLevelVeryLow,
+    // Printer
+    PrintSpoolerStopped,
+    NoPrinter,
+    DefaultPrinterVirtual,
+    PrinterOffline,
+    PrinterPaused,
+    PrinterError,
+    PrintJobsStuck,
+    // Display
+    DisplayAdapterError,
+    ExternalDisplayNotShown,
+    BrightnessVeryLow,
 }

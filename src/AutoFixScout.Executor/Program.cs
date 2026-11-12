@@ -13,7 +13,7 @@ namespace AutoFixScout.Executor;
 public static class Program
 {
     internal static readonly HashSet<string> RestartableServices = new(StringComparer.OrdinalIgnoreCase)
-        { "AudioSrv", "AudioEndpointBuilder", "WlanSvc", "wuauserv", "BITS", "CryptSvc" };
+        { "AudioSrv", "AudioEndpointBuilder", "WlanSvc", "wuauserv", "BITS", "CryptSvc", "Spooler" };
 
     /// <summary>Windows Update services a person may have switched off; service.set_manual puts them back to Manual (Windows' default).</summary>
     public static readonly HashSet<string> ManualStartServices = new(StringComparer.OrdinalIgnoreCase) { "wuauserv", "BITS", "CryptSvc" };
@@ -43,6 +43,9 @@ public static class Program
                 // The area is only recorded; the scan itself takes no input.
                 (_, "device.rescan") when RescanAreas.Contains(args[1]) => ScanForHardwareChanges(),
                 (_, "service.set_manual") when ManualStartServices.Contains(args[1]) => SetManualAndStart(args[1]),
+                // Printer names are checked against the installed printers, never put into a query or command line.
+                (_, "printer.clear_queue") when IsValidPrinterName(args[1]) && FindPrinter(args[1]) is { } p => ClearQueue(p),
+                (_, "printer.set_online") when IsValidPrinterName(args[1]) && FindPrinter(args[1]) is { } p => SetOnline(p),
                 _ => 2,
             };
         }
@@ -64,6 +67,45 @@ public static class Program
     {
         using var q = new ManagementObjectSearcher($"SELECT PNPClass FROM Win32_PnPEntity WHERE DeviceID = '{id.Replace(@"\", @"\\")}'");
         return q.Get().Cast<ManagementBaseObject>().Any(d => ToggleableClasses.Contains(d["PNPClass"] as string, StringComparer.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Shape check before the installed-printer lookup: printable, no quotes, commas (Windows forbids them in printer
+    /// names) or shell characters, at most 256 characters.
+    /// </summary>
+    public static bool IsValidPrinterName(string name) =>
+        name.Length is > 0 and <= 256 && name.Trim().Length > 0
+        && !name.Any(c => char.IsControl(c) || c is '"' or '\'' or ',' or ';' or '|' or '<' or '>' or '*' or '?');
+
+    /// <summary>The installed printer with exactly this name (case-insensitive), or null. Enumerates; no name in WQL.</summary>
+    private static ManagementObject? FindPrinter(string name)
+    {
+        using var q = new ManagementObjectSearcher("SELECT * FROM Win32_Printer");
+        return q.Get().Cast<ManagementObject>().FirstOrDefault(p => string.Equals(p["Name"] as string, name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>printer.clear_queue: cancels every document waiting for this one printer (Win32_Printer.CancelAllJobs).</summary>
+    private static int ClearQueue(ManagementObject printer)
+    {
+        using (printer)
+            return Convert.ToUInt32(printer.InvokeMethod("CancelAllJobs", null)) == 0 ? 0 : 1;
+    }
+
+    /// <summary>printer.set_online: clears "Use printer offline" and resumes a paused printer. Nothing else is changed.</summary>
+    private static int SetOnline(ManagementObject printer)
+    {
+        using (printer)
+        {
+            if (printer["WorkOffline"] is true)
+            {
+                printer["WorkOffline"] = false;
+                printer.Put();
+            }
+            var paused = printer["ExtendedPrinterStatus"] is ushort ext && ext == 8
+                || (printer["PrinterState"] is { } st && (Convert.ToInt64(st) & 1) != 0);
+            if (paused && Convert.ToUInt32(printer.InvokeMethod("Resume", null)) != 0) return 1;
+            return 0;
+        }
     }
 
     private static bool IsNetAdapter(string id)

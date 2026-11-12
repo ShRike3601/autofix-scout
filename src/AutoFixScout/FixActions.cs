@@ -13,7 +13,7 @@ public static class FixActions
     /// <summary>Actions that go to the elevated executor with one argument (one Windows permission prompt each).</summary>
     public static readonly HashSet<string> ElevatedActions = new()
     {
-        "service.restart", "device.disable_enable", "device.enable", "network.reset_dns", "device.rescan", "service.set_manual",
+        "service.restart", "device.disable_enable", "device.enable", "network.reset_dns", "device.rescan", "service.set_manual", "printer.clear_queue", "printer.set_online",
     };
 
     public static async Task<(bool Ok, string Detail)> RunAsync(Rung rung)
@@ -37,6 +37,8 @@ public static class FixActions
                         "troubleshoot" => "ms-settings:troubleshoot",
                         "microphone" => "ms-settings:privacy-microphone",
                         "sound_devices" => "ms-settings:sound-devices",
+                        "printers" => "ms-settings:printers",
+                        "display" => "ms-settings:display",
                         _ => throw new ArgumentException(rung.Arg),
                     };
                     Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
@@ -50,6 +52,11 @@ public static class FixActions
                 case "network.flush_dns":
                     // Flushing the resolver cache doesn't need admin, so no UAC prompt.
                     return await Task.Run(() => RunFixed("ipconfig.exe", "/flushdns"));
+                case "display.extend":
+                    // Fixed argument, no admin. The person can undo it with Windows+P.
+                    return await Task.Run(() => { var r = RunFixed("DisplaySwitch.exe", "/extend"); Thread.Sleep(3000); return r; });
+                case "display.set_brightness":
+                    return await Task.Run(SetBrightness);
                 case var elevated when ElevatedActions.Contains(elevated):
                     var code = await Task.Run(() => RunElevated(rung.ActionId, rung.Arg!));
                     return (code == 0, code is null ? Declined : $"executor exit code {code}");
@@ -86,6 +93,25 @@ public static class FixActions
         v.Mute = false;
         if (v.MasterVolumeLevelScalar < 0.3f) v.MasterVolumeLevelScalar = flow == DataFlow.Capture ? 0.7f : 0.5f;
         return before;
+    }
+
+    /// <summary>
+    /// display.set_brightness: built-in screen to 70 %, only when it is below DisplayTriage.LowBrightness (no admin;
+    /// WmiMonitorBrightnessMethods). Returns the prior value for the report. Fails honestly where Windows refuses it.
+    /// </summary>
+    private static (bool Ok, string Detail) SetBrightness()
+    {
+        using var read = new System.Management.ManagementObjectSearcher(@"root\wmi", "SELECT CurrentBrightness FROM WmiMonitorBrightness WHERE Active = TRUE");
+        var before = read.Get().Cast<System.Management.ManagementBaseObject>().Select(m => (int?)Convert.ToInt32(m["CurrentBrightness"])).FirstOrDefault();
+        if (before is null) return (false, "no built-in screen brightness control");
+        if (before >= DisplayTriage.LowBrightness) return (true, $"brightness already {before}%, nothing changed");
+        using var q = new System.Management.ManagementObjectSearcher(@"root\wmi", "SELECT * FROM WmiMonitorBrightnessMethods WHERE Active = TRUE");
+        foreach (System.Management.ManagementObject m in q.Get())
+        {
+            m.InvokeMethod("WmiSetBrightness", new object[] { 1u, (byte)70 });
+            return (true, $"before: brightness={before}%, set to 70%");
+        }
+        return (false, "no brightness control found");
     }
 
     /// <summary>audio.play_test_tone: 1.5 s, 440 Hz on the default output.</summary>
