@@ -28,6 +28,7 @@ public static class SymptomRouter
         ["security"] = new("security", "Security, viruses or pop-ups", "This sounds like a security problem or unwanted software."),
         ["power"] = new("power", "Battery, sleep and power", "This sounds like a problem with the battery, sleep or power settings."),
         ["input"] = new("input", "Keyboard, mouse or touchpad", "This sounds like a problem with the keyboard, mouse or touchpad."),
+        ["scanner"] = new("scanner", "Scanner not working", "This sounds like a problem with the scanner."),
         ["health"] = new("health", "Full computer check-up", "AutoFix Scout will check the whole computer for common software problems."),
     };
 
@@ -66,6 +67,7 @@ public static class SymptomRouter
                     new[] { "slow", "sluggish", "lag", "lagging", "space", "storage", "full", "disk", "memory", "startup" }),
         ("update", new[] { "windows update", "update failed", "updates fail", "update error", "update stuck", "cannot update", "can't update" },
                    new[] { "update", "updates", "updating", "0x8024", "0x8007" }),
+        ("scanner", new[] { "scanner", "cannot scan", "can't scan", "scanning", "scan a document" }, new[] { "scan", "scanner" }),
         ("printer", new[] { "won't print", "wont print", "will not print", "cannot print", "can't print", "printer offline", "print queue" },
                     new[] { "printer", "print", "printing", "scanner" }),
         ("display", new[] { "second monitor", "external monitor", "screen is dark", "screen too dark", "screen flickers", "no display", "projector not" },

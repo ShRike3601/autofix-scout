@@ -375,4 +375,4 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
 - [ ] P4 Threats found by Microsoft Defender (Security): recent detections (MSFT_MpThreatDetection) and whether they were
       removed; guided "Protection history" step; full scan offer.
 - [x] P5 Scanner and camera import (Printer area): Windows Image Acquisition service (stisvc) off; scanner device errors.
-- P5 note: PrinterState.ScanFocus (scanner findings first) is not set by the UI yet; a 'Scanner not working' entry should set it (tell the UI session).
+- P5: OnScannerClicked (MainWindow.xaml.cs) runs the printer flow with ScanFocus; the search box routes "scanner" there. The home tile is added by the UI session.
