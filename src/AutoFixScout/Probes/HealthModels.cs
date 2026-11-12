@@ -22,6 +22,12 @@ public sealed class HealthState
     /// <summary>Programs that stopped responding (event 1002), by name, in the last 14 days.</summary>
     public IReadOnlyDictionary<string, int> Hangs { get; set; } = new Dictionary<string, int>();
     public int BlueScreens { get; set; }
+    /// <summary>Stop codes of the blue screens in the last 14 days, most frequent first (empty when none could be read).</summary>
+    public IReadOnlyList<StopCodeCount> StopCodes { get; set; } = new List<StopCodeCount>();
+    /// <summary>The page file (virtual memory) settings and size; null = could not be read.</summary>
+    public PageFileState? PageFile { get; set; }
+    /// <summary>Resource-Exhaustion-Detector event 2004 ("low virtual memory") in the last 14 days.</summary>
+    public int LowMemoryEvents { get; set; }
     public int UnexpectedShutdowns { get; set; }
     /// <summary>Disk and file-system errors (disk 7/51/153, Ntfs 55/98) in the last 14 days.</summary>
     public int DiskErrors { get; set; }
@@ -98,3 +104,17 @@ public enum RecentChangeKind { Program, Update, Driver }
 
 /// <summary>Something installed in the last week. WhenUtc is the install date (programs record the day only).</summary>
 public sealed record RecentChange(RecentChangeKind Kind, string Name, DateTime WhenUtc);
+
+/// <summary>Page file as Windows reports it. Sizes in MB. Automatic = null when it could not be read.</summary>
+public sealed record PageFileState(bool? Automatic, long TotalRamMb, IReadOnlyList<PageFileSetting> Settings, IReadOnlyList<PageFileUse> Usage)
+{
+    /// <summary>Total size of the page files that exist now.</summary>
+    public long AllocatedMb => Usage.Sum(u => u.AllocatedMb);
+    public bool Exists => Usage.Count > 0;
+}
+
+/// <summary>Win32_PageFileSetting: the size the person set by hand (0 = system chooses).</summary>
+public sealed record PageFileSetting(string Name, long InitialMb, long MaximumMb);
+
+/// <summary>Win32_PageFileUsage: a page file that exists, its size and how much is in use.</summary>
+public sealed record PageFileUse(string Name, long AllocatedMb, long CurrentUsageMb);

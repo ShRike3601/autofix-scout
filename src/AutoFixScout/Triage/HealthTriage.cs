@@ -104,8 +104,11 @@ public static class HealthTriage
             f.Add(F(FindingCode.HealthShellCrashing, "Parts of Windows itself, such as the taskbar, the Start menu or search, have closed unexpectedly.",
                 string.Join("; ", shell.Select(c => $"{c.App} x{c.Count} ({c.Module}, {c.ExceptionCode})"))));
         if (s.BlueScreens > 0)
-            f.Add(F(FindingCode.HealthBlueScreens, $"Windows has stopped with an error screen (a \"blue screen\") {Times(s.BlueScreens)} in the last two weeks.",
-                $"bugchecks: {s.BlueScreens}, unexpected shutdowns: {s.UnexpectedShutdowns}"));
+            f.Add(F(FindingCode.HealthBlueScreens, $"Windows has stopped with an error screen (a \"blue screen\") {Times(s.BlueScreens)} in the last two weeks.{BlueScreenCause(s)}",
+                $"bugchecks: {s.BlueScreens}, unexpected shutdowns: {s.UnexpectedShutdowns}" +
+                (s.StopCodes.Count > 0 ? "; stop codes: " + string.Join(", ", s.StopCodes.Select(c => $"{StopCodes.Hex(c.Code)}{(StopCodes.Meaning(c.Code) is { } m ? " " + m.Name : "")} x{c.Count}")) : "")));
+        if (PageFileTooSmall(s))
+            f.Add(F(FindingCode.HealthPageFileTooSmall, PageFileSentence(s), PageFileDetail(s)));
         var programs = ProgramCrashes(s);
         if (programs.Count > 0)
             f.Add(F(FindingCode.HealthProgramCrashing, $"\"{programs[0].App}\" has closed unexpectedly {Times(programs[0].Count)} in the last two weeks. {CauseSentence(programs[0].Cause)}",
@@ -163,6 +166,38 @@ public static class HealthTriage
             r.Add(new("system_restore", "ui.human_step", 0,
                 "As a last resort, System Restore can return Windows to an earlier time. Please press the Windows key and R together, type \"rstrui.exe\", and select \"OK\". " +
                 "Choose a restore point from before the problems started, and follow the steps. Your documents and photos are not removed, but programs installed after that time are. AutoFix Scout does not start System Restore."));
+    }
+
+    /// <summary>The most frequent stop code, explained; empty when no code could be read or it is not a common one.</summary>
+    private static string BlueScreenCause(HealthState s)
+    {
+        if (s.StopCodes.Count == 0) return "";
+        var top = s.StopCodes[0];
+        return StopCodes.Meaning(top.Code) is { } m
+            ? $" The most frequent stop code was {StopCodes.Hex(top.Code)} ({m.Name}). {m.Explanation}"
+            : $" The most frequent stop code was {StopCodes.Hex(top.Code)}.";
+    }
+
+    public const long PageFileMinimumMb = 1024;
+
+    /// <summary>No page file at all, or less than 1 GB, while Windows is not managing it (fail closed when it could not be read).</summary>
+    public static bool PageFileTooSmall(HealthState s) =>
+        s.PageFile is { Automatic: false } p && (!p.Exists || p.AllocatedMb < PageFileMinimumMb);
+
+    private static string PageFileSentence(HealthState s)
+    {
+        var p = s.PageFile!;
+        var what = !p.Exists ? "The page file (virtual memory) is switched off." : $"The page file (virtual memory) is only {p.AllocatedMb} MB.";
+        var evidence = s.LowMemoryEvents > 0 ? $" Windows has also warned about low virtual memory {Times(s.LowMemoryEvents)} in the last two weeks." : "";
+        return what + " Programs can close or fail to start when the computer runs short of memory." + evidence;
+    }
+
+    private static string PageFileDetail(HealthState s)
+    {
+        var p = s.PageFile!;
+        return $"automatic={p.Automatic}; RAM {p.TotalRamMb} MB; allocated {p.AllocatedMb} MB; " +
+               $"settings: {(p.Settings.Count == 0 ? "none" : string.Join(", ", p.Settings.Select(x => $"{x.Name} {x.InitialMb}-{x.MaximumMb} MB")))}; " +
+               $"usage: {(p.Usage.Count == 0 ? "none" : string.Join(", ", p.Usage.Select(x => $"{x.Name} {x.AllocatedMb} MB (in use {x.CurrentUsageMb} MB)")))}; low virtual memory events: {s.LowMemoryEvents}";
     }
 
     private static string Times(int n) => n == 1 ? "once" : n == 2 ? "twice" : $"{n} times";
@@ -286,8 +321,31 @@ public static class HealthTriage
         }
         if (codes.Contains(FindingCode.HealthStoreAppsDamaged) || codes.Contains(FindingCode.HealthServicesFailing) || codes.Contains(FindingCode.HealthBlueScreens))
             systemRepair = true;
-        if (codes.Contains(FindingCode.HealthDiskErrors))
+        var causes = codes.Contains(FindingCode.HealthBlueScreens)
+            ? s.StopCodes.Take(3).Select(c => StopCodes.Meaning(c.Code)?.Category).Where(c => c is not null).Select(c => c!.Value).Distinct().ToList()
+            : new List<StopCategory>();
+        if (codes.Contains(FindingCode.HealthDiskErrors) || causes.Contains(StopCategory.Storage))
             r.Add(Admin("scan_disk", "disk.scan", "AutoFix Scout can ask Windows to scan the drive for file system errors while you keep working.", "C"));
+        if (causes.Contains(StopCategory.Memory))
+            r.Add(new("memory_diagnostic", "ui.human_step", 0,
+                "Faulty memory (RAM) can cause these blue screens. Please save your work, then press the Windows key and R together, type \"mdsched.exe\", and select \"OK\". " +
+                "Choose \"Restart now and check for problems\". The computer restarts, and the Windows Memory Diagnostic test takes several minutes. " +
+                "Windows shows the result after it starts again. AutoFix Scout does not start the Windows Memory Diagnostic."));
+        if (causes.Contains(StopCategory.Graphics) || causes.Contains(StopCategory.Driver))
+            r.Add(new("bluescreen_driver_updates", "ui.open_settings_page", 0,
+                "AutoFix Scout will open \"Windows Update\". Please select \"Check for updates\", then \"Advanced options\", then \"Optional updates\", then \"Driver updates\", and install any driver offered" +
+                (causes.Contains(StopCategory.Graphics) ? ", in particular a display driver." : "."), "windowsupdate"));
+        if (causes.Contains(StopCategory.Driver))
+            r.Add(new("bluescreen_driver_maker", "ui.human_step", 0,
+                "If Windows Update offers no driver, please open the support web site of the computer's maker, search for the model, and download the newest drivers for Windows, starting with the chipset, storage and network drivers. " +
+                "Run the installers, then restart the computer. AutoFix Scout does not install drivers from other sources."));
+        if (codes.Contains(FindingCode.HealthPageFileTooSmall))
+        {
+            r.Add(Admin("pagefile_automatic", "system.pagefile_auto",
+                "AutoFix Scout can let Windows manage the size of the page file (virtual memory) itself. The current settings are saved first. The change takes effect after the computer restarts."));
+            r.Add(new("restart_after_pagefile", "ui.human_step", 0,
+                "Please save your work and restart the computer: select \"Start\", then \"Power\", then \"Restart\". The new page file size is used after the restart."));
+        }
         if (codes.Contains(FindingCode.HealthGraphicsResets))
         {
             r.Add(new("graphics_reset_updates", "ui.open_settings_page", 0,
@@ -335,7 +393,7 @@ public static class HealthTriage
     };
 
     /// <summary>Hardware and disk errors are the only findings that point at hardware.</summary>
-    public static bool ProbablyHardware(HealthState s) => s.HardwareErrors > 0 || s.DiskErrors >= 5 || s.GraphicsResets >= 20 || s.Drives.Any(d => d.Failing);
+    public static bool ProbablyHardware(HealthState s) => s.HardwareErrors > 0 || s.DiskErrors >= 5 || s.GraphicsResets >= 20 || s.Drives.Any(d => d.Failing) || s.StopCodes.Any(c => StopCodes.IsHardware(c.Code));
 
     public static string? NotFixedHint(IReadOnlyList<Finding> after)
     {
@@ -357,6 +415,7 @@ public static class HealthTriage
     {
         FindingCode.HealthClockWrong, FindingCode.HealthDeadProxy, FindingCode.HealthDeadSystemProxy, FindingCode.HealthHostsHijacked,
         FindingCode.HealthServiceOff, FindingCode.HealthPathDamaged, FindingCode.HealthTempMissing, FindingCode.HealthStoreAppsDamaged,
+        FindingCode.HealthPageFileTooSmall,
     };
 
     public static bool Resolved(IReadOnlyList<Finding> before, IReadOnlyList<Finding> after) =>

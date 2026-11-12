@@ -300,4 +300,6 @@ public enum FindingCode
     // Security: browser policies
     SecurityBrowserPolicy,
     SecurityBrowserPolicyManaged,
+    // Blue-screen causes and virtual memory
+    HealthPageFileTooSmall,
 }

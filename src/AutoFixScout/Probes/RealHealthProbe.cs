@@ -51,6 +51,9 @@ public sealed class RealHealthProbe : IHealthProbe
         Part("recent changes", () => ReadRecentChanges(s));
         Part("restore points", () => ReadRestorePoints(s));
         Part("graphics resets", () => ReadGraphicsResets(s));
+        Part("blue screen causes", () => ReadStopCodes(s));
+        Part("virtual memory", () => s.PageFile = ReadPageFile());
+        Part("low memory events", () => s.LowMemoryEvents = Query("System", "Provider[@Name='Microsoft-Windows-Resource-Exhaustion-Detector'] and EventID=2004").Count());
 
         s.ProbeErrors = errors;
         return s;
@@ -134,6 +137,50 @@ public sealed class RealHealthProbe : IHealthProbe
     }
 
 
+
+    private static void ReadStopCodes(HealthState s)
+    {
+        var codes = new List<uint>();
+        foreach (var e in Query("System", "(Provider[@Name='Microsoft-Windows-WER-SystemErrorReporting'] or Provider[@Name='BugCheck']) and EventID=1001"))
+        {
+            var code = StopCodes.Parse(Prop(e, 0));
+            if (code is null)
+            {
+                string text;
+                try { text = e.FormatDescription() ?? ""; } catch (Exception) { text = ""; }
+                code = StopCodes.Parse(text);
+            }
+            if (code is { } c) codes.Add(c);
+        }
+        s.StopCodes = StopCodes.Count(codes);
+    }
+
+    private static long ToLong(object? v) => v is null ? 0 : Convert.ToInt64(v);
+
+    /// <summary>Automatic management, the manual settings, the page files that exist, and the installed memory (read-only WMI).</summary>
+    private static PageFileState ReadPageFile()
+    {
+        bool? automatic = null;
+        long ramMb = 0;
+        using (var q = new System.Management.ManagementObjectSearcher("SELECT AutomaticManagedPagefile, TotalPhysicalMemory FROM Win32_ComputerSystem"))
+            foreach (System.Management.ManagementObject o in q.Get())
+                using (o)
+                {
+                    if (o["AutomaticManagedPagefile"] is bool b) automatic = b;
+                    ramMb = ToLong(o["TotalPhysicalMemory"]) / 1048576;
+                }
+        var settings = new List<PageFileSetting>();
+        using (var q = new System.Management.ManagementObjectSearcher("SELECT Name, InitialSize, MaximumSize FROM Win32_PageFileSetting"))
+            foreach (System.Management.ManagementObject o in q.Get())
+                using (o)
+                    settings.Add(new(o["Name"] as string ?? "", ToLong(o["InitialSize"]), ToLong(o["MaximumSize"])));
+        var usage = new List<PageFileUse>();
+        using (var q = new System.Management.ManagementObjectSearcher("SELECT Name, AllocatedBaseSize, CurrentUsage FROM Win32_PageFileUsage"))
+            foreach (System.Management.ManagementObject o in q.Get())
+                using (o)
+                    usage.Add(new(o["Name"] as string ?? "", ToLong(o["AllocatedBaseSize"]), ToLong(o["CurrentUsage"])));
+        return new PageFileState(automatic, ramMb, settings, usage);
+    }
 
     // ---- recent changes and graphics resets ----
 

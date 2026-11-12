@@ -28,12 +28,18 @@ public class LiveProbeTests
         lines.AddRange(HealthTriage.Ladder(s, f).Select(r => $"RUNG {r.Id} {r.ActionId}({r.Arg})"));
         lines.Add($"recent changes: {s.RecentChanges.Count} (programs {s.RecentChanges.Count(c => c.Kind == RecentChangeKind.Program)}, updates {s.RecentChanges.Count(c => c.Kind == RecentChangeKind.Update)}, drivers {s.RecentChanges.Count(c => c.Kind == RecentChangeKind.Driver)}); restore points {s.RestorePointsKnown}/{s.RestorePoints.Count}; graphics resets {s.GraphicsResets}");
         lines.Add("devices: " + string.Join("; ", s.DeviceProblems.Select(d => $"{d.PnpClass} code={d.Code}")) + "; temp profile: " + s.TempProfile);
+        lines.Add("stop codes: " + string.Join(", ", s.StopCodes.Select(c => $"{StopCodes.Hex(c.Code)} x{c.Count}")) + $"; pagefile auto={s.PageFile?.Automatic} ram={s.PageFile?.TotalRamMb} MB allocated={s.PageFile?.AllocatedMb} MB settings={s.PageFile?.Settings.Count}; low memory events {s.LowMemoryEvents}");
         File.WriteAllLines(output, lines);
         Assert.DoesNotContain(s.ProbeErrors, e => e.StartsWith("device errors") || e.StartsWith("user profile"));
         Assert.NotNull(s.DeviceProblems);
         Assert.NotEmpty(s.Drives);
         Assert.All(s.Drives, d => Assert.False(d.Failing || d.Warning));
         Assert.DoesNotContain(s.ProbeErrors, e => e.StartsWith("recent changes") || e.StartsWith("restore points") || e.StartsWith("graphics resets"));
+        Assert.DoesNotContain(s.ProbeErrors, e => e.StartsWith("blue screen causes") || e.StartsWith("virtual memory") || e.StartsWith("low memory events"));
+        Assert.NotNull(s.PageFile);
+        Assert.NotNull(s.PageFile!.Automatic);
+        Assert.True(s.PageFile.TotalRamMb > 0);
+        Assert.True(s.StopCodes.Sum(c => c.Count) <= s.BlueScreens);
         Assert.Empty(s.ProbeErrors);
     }
 }
