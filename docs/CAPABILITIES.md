@@ -51,10 +51,10 @@ Status: **Done** = built, unit-tested and checked on the test laptop (every admi
 | Virtual memory | page file missing or too small | let Windows manage the page file (admin, restart) | Done |
 | Threats found by Microsoft Defender | recent detections, active or removed | Protection history, full scan, Defender Offline (guided) | Done |
 | Scanner | image acquisition service off, scanner errors | restore service, re-detect, guided | Done |
-| Wi-Fi keeps dropping | frequent disconnects, adapter power saving | guided | Planned (F1) |
+| Wi-Fi keeps dropping | frequent disconnects (sleep and shutdown excluded), adapter power saving | guided | Done |
 | Programs will not install | Windows Installer off, install failures explained, restart pending | service default, guided | Done |
 | Notifications missing | notifications or app notifications off, Do not disturb on | guided, switch back on | Done |
-| USB devices disconnecting | USB errors and frequent reconnects, selective suspend | guided | Planned (F4) |
+| USB devices disconnecting | USB errors and frequent reconnects (beyond starts and wakes), selective suspend | guided | Done |
 
 ## Safety rules the code enforces
 - The UI never runs elevated; the executor accepts only allowlisted action ids with fixed or validated arguments.

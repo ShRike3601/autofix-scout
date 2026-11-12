@@ -380,7 +380,7 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
 - Idea from the UI session, owner has NOT decided: SymptomRouter could return a confidence plus the next 1-2 candidates and "no good match", so the UI can offer "closest checks". Do not start unless the owner asks.
 
 ## Roadmap (part 5, queued 2026-11-13 ~04:40 IST; start after the next usage reset, agents on Sonnet in worktrees)
-- [ ] F1 Wi-Fi keeps dropping (internet check): frequent disconnects (WLAN-AutoConfig 8003/8001 counts), adapter
+- [x] F1 Wi-Fi keeps dropping (internet check): frequent disconnects (WLAN-AutoConfig 8003/8001 counts), adapter
       power saving ("Allow the computer to turn off this device"), roaming aggressiveness; guided steps; never change
       the network live in tests.
 - [x] F2 Programs will not install (Store/apps area): Windows Installer service (msiserver) disabled, MsiInstaller
@@ -389,6 +389,8 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
 - [x] F3 Notifications missing (Start menu/taskbar area): notifications switched off globally or per app, Do not
       disturb / Focus on, notification banners off; guided Settings steps naming the app; non-admin switch back on for the
       global toggle if it can be done safely.
-- [ ] F4 USB devices disconnecting (check-up): Kernel-PnP / USB hub errors and frequent device add/remove events, USB
+- [x] F4 USB devices disconnecting (check-up): Kernel-PnP / USB hub errors and frequent device add/remove events, USB
       selective suspend on battery; guided power setting step, replug/hub advice.
 - F2/F3 entries: OnInstallClicked (Apps, Install focus) and OnNotificationsClicked (Shell, notification focus) in MainWindow.xaml.cs; search routes 'install' and 'notifications'. Tiles: UI session. Bench note: the full check-up/install focus reports a pending restart, most likely from tonight's SFC repair; a restart clears it.
+- F1/F4 found on the bench: the USB check first read the System log (no Kernel-PnP device events there: 0 vs 671) and then, with real data, flagged the built-in webcam because devices log events at every start-up/wake; fixed (Kernel-PnP Configuration log; threshold grows with starts and wakes). Wi-Fi drops subtract sleeps/shutdowns. The bench's Wi-Fi drops finding (about 28 in 3 days) is real: earlier test runs switched the adapter off and on.
+- Roadmap part 5 complete.
