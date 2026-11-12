@@ -58,6 +58,22 @@ public static class Repairs
         return (p.ExitCode, output);
     }
 
+
+    /// <summary>
+    /// Best effort: a Windows restore point before a system-wide change, so a helper can roll the whole computer back.
+    /// Windows creates at most one per 24 hours by default and may have System Protection off; neither stops the repair.
+    /// </summary>
+    internal static void RestorePoint(string action)
+    {
+        try
+        {
+            using var sr = new System.Management.ManagementClass(@"\.\root\default", "SystemRestore", null);
+            // 12 = MODIFY_SETTINGS, 100 = BEGIN_SYSTEM_CHANGE.
+            var result = sr.InvokeMethod("CreateRestorePoint", new object[] { $"AutoFix Scout: {action}", 12, 100 });
+            Log(action, $"restore point result {result}");
+        }
+        catch (Exception ex) { Log(action, $"restore point not created: {ex.Message}"); }
+    }
     // ---- system files ----
 
     public static int Dism() => Tool("dism.exe", null, 90, "/Online", "/Cleanup-Image", "/RestoreHealth", "/NoRestart").Code == 0 ? 0 : 1;
@@ -100,6 +116,7 @@ public static class Repairs
 
     public static int ResetWinHttpProxy()
     {
+        RestorePoint("network.reset_winhttp_proxy");
         using (var k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings\Connections"))
             Backup("winhttp-proxy", "WinHttpSettings (base64)=" + Convert.ToBase64String(k?.GetValue("WinHttpSettings") as byte[] ?? Array.Empty<byte>()) + "\n"
                                     + Tool("netsh.exe", null, 1, "winhttp", "show", "proxy").Output);
@@ -112,6 +129,7 @@ public static class Repairs
     {
         var lines = File.ReadAllLines(HostsPath);
         if (HostsFile.Suspicious(lines).Count == 0) return 3;
+        RestorePoint("network.clean_hosts");
         Backup("hosts", string.Join("\r\n", lines));
         File.WriteAllLines(HostsPath, HostsFile.Clean(lines, DateTime.UtcNow), new UTF8Encoding(false));
         Tool("ipconfig.exe", null, 1, "/flushdns");
@@ -120,6 +138,7 @@ public static class Repairs
 
     public static int ResetWinsock()
     {
+        RestorePoint("network.reset_winsock");
         Backup("winsock-catalog", Tool("netsh.exe", null, 1, "winsock", "show", "catalog").Output);
         return Tool("netsh.exe", null, 2, "winsock", "reset").Code == 0 ? 0 : 1;
     }
@@ -178,6 +197,7 @@ public static class Repairs
         var raw = k.GetValue("Path", null, RegistryValueOptions.DoNotExpandEnvironmentNames) as string;
         var root = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
         if (SystemPath.Missing(raw, root).Count == 0) return 3;
+        RestorePoint("system.repair_path");
         Backup("system-path", raw ?? "");
         k.SetValue("Path", SystemPath.Repair(raw, root), RegistryValueKind.ExpandString);
         SendMessageTimeout((IntPtr)0xffff, 0x001A /* WM_SETTINGCHANGE */, IntPtr.Zero, "Environment", 0x0002, 5000, out _);
@@ -191,6 +211,7 @@ public static class Repairs
     /// <summary>The classic Windows Update reset: stop the services, rename (not delete) the download and catalog folders, start again.</summary>
     public static int ResetUpdateComponents()
     {
+        RestorePoint("update.reset_components");
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
         var folders = new[] { Path.Combine(windows, "SoftwareDistribution"), Path.Combine(Environment.SystemDirectory, "catroot2") };
         var stamp = Stamp;
