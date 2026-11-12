@@ -97,6 +97,20 @@ public static class UserRepairs
         return (p.ExitCode, stdout.Result + stderr.Result);
     }
 
+
+    /// <summary>Ends the Start menu, search and shell-experience processes; Windows starts them again on demand.</summary>
+    public static (bool Ok, string Detail) RestartStartMenu()
+    {
+        var ended = 0;
+        foreach (var name in new[] { "StartMenuExperienceHost", "SearchHost", "SearchApp", "ShellExperienceHost" })
+            foreach (var p in Process.GetProcessesByName(name))
+            {
+                try { p.Kill(); p.WaitForExit(5000); ended++; } catch (Exception) { }
+                p.Dispose();
+            }
+        Thread.Sleep(3000);
+        return (true, $"shell processes restarted: {ended}");
+    }
     /// <summary>Ends and restarts the taskbar/File Explorer process. Open programs are not affected.</summary>
     public static (bool Ok, string Detail) RestartExplorer()
     {

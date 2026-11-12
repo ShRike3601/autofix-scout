@@ -96,7 +96,7 @@ public partial class MainWindow : Window, IFixHost
     {
         SetTopic(topic);
         Journey(Stage.Check);
-        var sessionId = StartSession(topic switch { "sound" => "audio", "health" => "other", _ => topic });
+        var sessionId = StartSession(topic switch { "sound" => "audio", "health" or "shell" => "other", _ => topic });
         try
         {
             ShowBusy("Checking your computer", scan: true);
@@ -333,6 +333,7 @@ public partial class MainWindow : Window, IFixHost
             "network" => OnNetworkClicked,
             "microphone" => OnMicrophoneClicked,
             "bluetooth" => OnBluetoothClicked,
+            "shell" => OnShellClicked,
             "program" => OnProgramClosingClicked,
             "storage" => OnStorageClicked,
             "update" => OnUpdateClicked,
@@ -403,6 +404,10 @@ public partial class MainWindow : Window, IFixHost
     private async void OnBluetoothClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.BluetoothFlow.Topic, Areas.BluetoothFlow.What, Areas.BluetoothFlow.DiagnoseAsync,
             async () => await AutoCheckAsync(Areas.BluetoothFlow.AutoTestAsync) && await AskAsync(Areas.BluetoothFlow.TestQuestion));
+
+    private async void OnShellClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.ShellFlow.Topic, Areas.ShellFlow.What, Areas.ShellFlow.DiagnoseAsync,
+            () => AskAsync(Areas.ShellFlow.TestQuestion));
 
     private async void OnMicrophoneClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.MicrophoneFlow.Topic, Areas.MicrophoneFlow.What, Areas.MicrophoneFlow.DiagnoseAsync, async () =>

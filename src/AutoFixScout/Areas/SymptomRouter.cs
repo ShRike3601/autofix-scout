@@ -21,6 +21,7 @@ public static class SymptomRouter
         ["update"] = new("update", "Windows Update problems", "This sounds like a problem with Windows Update."),
         ["printer"] = new("printer", "Printer not working", "This sounds like a problem with printing."),
         ["display"] = new("display", "Screen or display problem", "This sounds like a problem with the screen or display."),
+        ["shell"] = new("shell", "Start menu, taskbar or search not working", "This sounds like a problem with the Start menu, the taskbar or search."),
         ["health"] = new("health", "Full computer check-up", "AutoFix Scout will check the whole computer for common software problems."),
     };
 
@@ -38,7 +39,9 @@ public static class SymptomRouter
                    new[] { "camera", "webcam", "video call", "cam " }),
         ("network", new[] { "no internet", "not connecting", "can't connect", "cannot connect", "cant connect", "no wifi", "wi-fi not", "wifi not", "pages not loading", "websites not", "dns", "limited connectivity" },
                     new[] { "internet", "wifi", "wi-fi", "network", "online", "connection", "router", "ethernet", "website", "websites", "browser", "offline" }),
-        ("health", new[] { "blue screen", "bsod", "start menu", "taskbar", "search not", "clock is wrong", "wrong time", "certificate", "virus", "pop-ups", "popups", "redirect" },
+        ("shell", new[] { "start menu", "start button", "taskbar", "search not", "search bar", "search box", "windows key", "notification", "action center", "system tray" },
+                  new[] { "start", "taskbar", "search", "icons", "desktop icons" }),
+        ("health", new[] { "blue screen", "bsod", "clock is wrong", "wrong time", "certificate", "virus", "pop-ups", "popups", "redirect" },
                    new[] { "restart", "restarts", "reboot", "error", "errors", "broken", "weird", "strange", "malware", "hijack" }),
         ("program", new[] { "keeps closing", "keeps crashing", "stopped working", "not responding", "won't open", "wont open", "will not open", "doesn't open", "does not open", "closes by itself", "app crash", "freezes" },
                     new[] { "crash", "crashes", "crashing", "closes", "freeze", "freezing", "hangs", "error message", "missing dll", ".dll", "vcruntime", "msvcp" }),

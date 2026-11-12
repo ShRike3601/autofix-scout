@@ -111,6 +111,7 @@ public partial class MainWindow
             "health" => "Computer check-up",
             "microphone" => "Microphone",
             "bluetooth" => "Bluetooth",
+            "shell" => "Start menu, taskbar and search",
             "storage" => "Slow or full computer",
             "update" => "Windows Update",
             "printer" => "Printer",

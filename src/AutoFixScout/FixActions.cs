@@ -75,6 +75,8 @@ public static class FixActions
                     return await Task.Run(Repair.UserRepairs.RepairTemp);
                 case "apps.reregister":
                     return await Task.Run(() => Repair.UserRepairs.ReregisterApp(rung.Arg ?? ""));
+                case "shell.restart_start_menu":
+                    return await Task.Run(Repair.UserRepairs.RestartStartMenu);
                 case "shell.restart_explorer":
                     return await Task.Run(Repair.UserRepairs.RestartExplorer);
                 case "shell.rebuild_icon_cache":

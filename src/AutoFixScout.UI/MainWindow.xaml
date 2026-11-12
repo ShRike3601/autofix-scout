@@ -167,6 +167,7 @@
                         <WrapPanel>
                             <Button Style="{StaticResource SubtleButton}" Content="Full computer check-up" Tag="&#xE9D9;" FontSize="16" Padding="14,10" Margin="0,0,8,8" Click="OnHealthClicked"/>
                             <Button Style="{StaticResource SubtleButton}" Content="A program keeps closing" Tag="&#xE783;" FontSize="16" Padding="14,10" Margin="0,0,8,8" Click="OnProgramClosingClicked"/>
+                            <Button Style="{StaticResource SubtleButton}" Content="Start menu, taskbar or search" Tag="&#xE8FC;" FontSize="16" Padding="14,10" Margin="0,0,8,8" Click="OnShellClicked"/>
                             <Button Style="{StaticResource SubtleButton}" Content="Bluetooth not working" Tag="&#xE702;" FontSize="16" Padding="14,10" Margin="0,0,8,8" Click="OnBluetoothClicked"/>
                             <Button Style="{StaticResource SubtleButton}" Content="Microphone not working" Tag="&#xE720;" FontSize="16" Padding="14,10" Margin="0,0,8,8" Click="OnMicrophoneClicked"/>
                             <Button Style="{StaticResource SubtleButton}" Content="Slow or full computer" Tag="&#xEDA2;" FontSize="16" Padding="14,10" Margin="0,0,8,8" Click="OnStorageClicked"/>

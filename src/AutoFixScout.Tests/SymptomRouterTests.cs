@@ -20,7 +20,8 @@ public class SymptomRouterTests
     [InlineData("printer is offline and won't print", "printer")]
     [InlineData("second monitor not showing anything", "display")]
     [InlineData("I keep getting a blue screen", "health")]
-    [InlineData("the start menu does not open", "health")]
+    [InlineData("the start menu does not open", "shell")]
+    [InlineData("taskbar is frozen and search does not work", "shell")]
     [InlineData("something is wrong", "health")]
     [InlineData("", "health")]
     public void RoutesToTheRightCheck(string text, string area) => Assert.Equal(area, SymptomRouter.Best(text).Area);

@@ -111,3 +111,17 @@ public class LiveInternetTests
         }
     }
 }
+
+public class LiveShellTests
+{
+    [Fact]
+    public async Task ShellProbe_ReadsPackages_AndStartMenuRestarts()
+    {
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AFS_LIVE"))) return;
+        var s = AutoFixScout.Areas.ShellFlow.Read();
+        Assert.Empty(s.ProbeErrors);
+        Assert.Contains(s.Packages, p => p.Name == "Microsoft.Windows.StartMenuExperienceHost" && p.Status == "Ok");
+        var (ok, detail) = await FixActions.RunAsync(new Rung("t", "shell.restart_start_menu", 0, ""));
+        Assert.True(ok, detail);
+    }
+}

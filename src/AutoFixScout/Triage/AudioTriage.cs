@@ -218,6 +218,8 @@ public enum FindingCode
     BluetoothOff,
     BluetoothNothingPaired,
     BluetoothAudioNotConnected,
+    // Start menu, taskbar, search
+    ShellPackageDamaged,
     // Printer
     PrintSpoolerStopped,
     NoPrinter,
