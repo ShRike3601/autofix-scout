@@ -34,18 +34,19 @@ public partial class MainWindow : Window, IFixHost
     {
         var open = FixActions.OpenSavePoints();
         if (open.Count == 0) return;
+        SetTopic("driver");
         var restore = await ShowStepAsync(
-            "Last time I changed a driver, I didn't get to finish checking it. To be safe, I'd like to put the old driver back. " +
-            "Windows will ask for permission.", "Put it back", "Not now");
+            "The last driver change made by AutoFix Scout was not confirmed as working. To keep your computer safe, " +
+            "AutoFix Scout recommends restoring the previous driver. Windows will ask for your permission.", "Restore driver", "Not now");
         if (!restore) { ShowHome(); return; }
-        ShowBusy("Putting your driver back. This can take a minute...");
+        ShowBusy("Restoring the previous driver. This can take a minute.");
         var failed = 0;
         foreach (var id in open)
             if (!await FixActions.SettleSavePointAsync(id, keep: false)) failed++;
         await ShowStepAsync(failed == 0
-            ? "Done. Your driver is back the way it was."
-            : "I couldn't put the driver back. Please ask your helper; the save point is kept so they can do it.", "OK",
-            look: failed == 0 ? Look.Fixed : Look.Problem);
+            ? "The previous driver has been restored."
+            : "AutoFix Scout could not restore the previous driver. The save point has been kept so that the person helping you can restore it.",
+            "Continue", look: failed == 0 ? Look.Fixed : Look.Problem);
         ShowHome();
     }
 
@@ -63,14 +64,15 @@ public partial class MainWindow : Window, IFixHost
         PrimaryButton.Visibility = primary is null ? Visibility.Collapsed : Visibility.Visible;
         SecondaryButton.Content = secondary;
         SecondaryButton.Visibility = secondary is null ? Visibility.Collapsed : Visibility.Visible;
-        PresentStep(from, primary is null ? Look.Busy : look);
+        PresentStep(from, primary is null ? (look == Look.Scan ? Look.Scan : Look.Busy) : look);
         if (primary is not null) PrimaryButton.Focus();
         _choice = new TaskCompletionSource<bool>();
         return _choice.Task;
     }
 
-    /// <summary>A screen with no buttons, for "Checking..." and "Working on it...".</summary>
-    private void ShowBusy(string text) => _ = ShowStepAsync(text, null);
+    /// <summary>A screen with no buttons, for "Checking your computer" and "Applying the fix".</summary>
+    /// <param name="scan">Also lists what the check looks at (only for the read-only check itself).</param>
+    private void ShowBusy(string text, bool scan = false) => _ = ShowStepAsync(text, null, look: scan ? Look.Scan : Look.Busy);
 
     private void ShowHome()
     {
@@ -92,12 +94,14 @@ public partial class MainWindow : Window, IFixHost
     private async Task RunFlowAsync(string topic, string what, Func<Task<Diagnosis>> diagnose, Func<Task<bool>> test)
     {
         SetTopic(topic);
+        Journey(Stage.Check);
         var sessionId = StartSession(topic == "sound" ? "audio" : topic);
         try
         {
-            ShowBusy("Checking your computer...");
+            ShowBusy("Checking your computer", scan: true);
             var before = await diagnose();
-            await ShowStepAsync(before.Findings[0].PlainMessage, "Next");
+            Journey(Stage.Diagnosis);
+            await ShowStepAsync(before.Findings[0].PlainMessage, "Continue", look: FindingLook(before.Findings[0].Code));
 
             var log = new List<StepLog>();
             var after = before;
@@ -108,7 +112,7 @@ public partial class MainWindow : Window, IFixHost
                 outcome = await LadderRunner.RunAsync(before.Ladder, this, log);
                 if (outcome == Outcome.NotFixed)
                 {
-                    ShowBusy("Checking your computer again...");
+                    ShowBusy("Checking your computer again", scan: true);
                     after = await diagnose();
                 }
             }
@@ -119,12 +123,14 @@ public partial class MainWindow : Window, IFixHost
             if (logError != null) report += $"\nSession log unavailable: {logError}\n";
             _lastReportPath = HelperReport.Save(topic, report);
             var end = outcome == Outcome.NotFixed && after.NotFixedHint is { } hint ? hint : EndMessage(outcome, what);
-            await ShowStepAsync(end, "Done", look: EndLook(outcome));
+            Journey(Stage.Done, warn: outcome is not (Outcome.Fixed or Outcome.NoFaultFound));
+            await ShowStepAsync(end, "Finish", look: EndLook(outcome));
         }
         catch (Exception ex)
         {
             FinishSession(sessionId, new List<StepLog>(), Outcome.Abandoned);
-            await ShowStepAsync($"I couldn't finish the check.\n\n({ex.Message})", "Done", look: Look.Problem);
+            Journey(Stage.Done, warn: true);
+            await ShowStepAsync($"AutoFix Scout could not complete the check.\n\nTechnical detail: {ex.Message}", "Finish", look: Look.Problem);
         }
         ShowHome();
     }
@@ -170,13 +176,14 @@ public partial class MainWindow : Window, IFixHost
 
     private static string EndMessage(Outcome outcome, string what) => outcome switch
     {
-        Outcome.Fixed => $"Your {what} is working again.",
-        Outcome.NoFaultFound => $"Your {what} seems to be working fine, so I didn't change anything. " +
-                                "If the problem comes back, run the check again while it's happening.",
-        Outcome.ProbableHardware => "This is probably a hardware fault. A repair shop can check it. " +
-                                    "Press \"Details for my helper\" to see a report you can show them.",
-        Outcome.Abandoned => "Okay, nothing else was changed. You can come back any time.",
-        _ => "I couldn't fix it this time. Press \"Details for my helper\" for a report you can send to someone who can help.",
+        Outcome.Fixed => $"The problem has been resolved. Your {what} is working again.",
+        Outcome.NoFaultFound => $"No problem was found with your {what}, so no changes were made. " +
+                                "If the problem returns, please run the check again while it is happening.",
+        Outcome.ProbableHardware => "The problem is most likely caused by the hardware. A repair service can examine the device. " +
+                                    "Please select \"Report for your helper\" to view a report that you can show them.",
+        Outcome.Abandoned => "No further changes were made. You can return to AutoFix Scout at any time.",
+        _ => "AutoFix Scout could not resolve this problem. A report has been prepared for the person helping you. " +
+             "Please select \"Report for your helper\" to view it.",
     };
 
     // ---- no sound ----
@@ -194,11 +201,12 @@ public partial class MainWindow : Window, IFixHost
 
     private async Task<bool> BeepTestAsync()
     {
-        await ShowStepAsync("Now I'll play a short beep. Please listen.", "Play the beep");
-        ShowBusy("Playing the beep...");
+        Journey(Stage.Confirm);
+        await ShowStepAsync("AutoFix Scout will now play a short test sound. Please listen carefully.", "Play test sound");
+        ShowBusy("Playing the test sound");
         try { await Task.Run(FixActions.PlayTestTone); }
         catch (Exception) { return false; } // no usable output device: counts as not fixed
-        return await ShowStepAsync("Did you hear the beep?", "Yes, I heard it", "No");
+        return await ShowStepAsync("Did you hear the test sound?", "Yes, I heard it", "No, I did not");
     }
 
     // ---- can't get online ----
@@ -216,9 +224,10 @@ public partial class MainWindow : Window, IFixHost
     /// <summary>Real test: the same connectivity check Windows uses. Retries because Wi-Fi takes a few seconds to come up.</summary>
     private async Task<bool> ConnectionTestAsync()
     {
+        Journey(Stage.Confirm);
         for (var attempt = 0; attempt < 4; attempt++)
         {
-            ShowBusy("Checking the connection...");
+            ShowBusy("Testing the internet connection");
             if ((await Task.Run(_networkProbe.ReadAsync)).InternetReachable == Tri.Yes) return true;
             await Task.Delay(TimeSpan.FromSeconds(5));
         }
@@ -240,34 +249,40 @@ public partial class MainWindow : Window, IFixHost
     /// <summary>Real test: the built-in Camera app shows a live picture. shortcut: no in-app preview, add one with MediaCapture if pilots find the app switch confusing.</summary>
     private async Task<bool> CameraTestAsync()
     {
-        await ShowStepAsync("Now I'll open the Camera app so you can check.", "Open the Camera app");
+        Journey(Stage.Confirm);
+        await ShowStepAsync("AutoFix Scout will now open the Camera app so that you can check the picture.", "Open the Camera app");
         var (ok, _) = await FixActions.RunAsync(new Rung("camera_test", "ui.open_settings_page", 0, "", "camera_app"));
         if (!ok) return false;
-        return await ShowStepAsync("Can you see yourself in the Camera app? You can close it afterwards.", "Yes, I can see myself", "No");
+        return await ShowStepAsync("Can you see yourself in the Camera app? You may close the Camera app afterwards.",
+            "Yes, I can see myself", "No, I cannot");
     }
 
     // ---- IFixHost ----
 
     // T2 needs an explicit "I understand" step in Simple mode (spec 6).
-    Task<bool> IFixHost.ConfirmAsync(Rung rung) =>
-        ShowStepAsync(rung.Say, rung.Tier >= 2 ? "I understand, go ahead" : "Yes, try it", "Not now");
+    Task<bool> IFixHost.ConfirmAsync(Rung rung)
+    {
+        Journey(Stage.Fix);
+        return ShowStepAsync(rung.Say, rung.Tier >= 2 ? "I understand, apply fix" : "Apply fix", "Not now");
+    }
 
     async Task<(bool Ok, string Detail)> IFixHost.RunAsync(Rung rung)
     {
+        Journey(Stage.Fix);
         if (FixActions.IsDriverChange(rung.ActionId))
         {
             ShowBusy(rung.ActionId == "driver.rollback"
-                ? "Making a save point and changing the driver. This can take a minute..."
-                : "Making a save point and asking Windows Update for a driver. This can take a few minutes...");
+                ? "Creating a save point and changing the driver. This can take a minute."
+                : "Creating a save point and requesting a driver from Windows Update. This can take several minutes.");
             var (ok, detail, savePoint) = await FixActions.ChangeDriverAsync(rung.ActionId, rung.Arg!);
             if (savePoint != null) _savePoints[rung.Id] = savePoint;
             return (ok, detail);
         }
-        ShowBusy("Working on it...");
+        ShowBusy("Applying the fix");
         var result = await FixActions.RunAsync(rung);
         // Steps the person does themselves: wait until they say they're done before testing.
         if (rung.ActionId is "ui.open_settings_page" or "ui.human_step" && result.Ok)
-            await ShowStepAsync("When you've done that, come back here and press Next.", "Next");
+            await ShowStepAsync("When you have finished, please return to this window and select Continue.", "Continue");
         return result;
     }
 
@@ -276,7 +291,7 @@ public partial class MainWindow : Window, IFixHost
     async Task<bool> IFixHost.SettleAsync(Rung rung, bool keep)
     {
         if (!_savePoints.TryGetValue(rung.Id, out var id)) return true; // nothing was changed
-        if (!keep) ShowBusy("That didn't help, so I'm putting the old driver back...");
+        if (!keep) ShowBusy("The change did not resolve the problem, so AutoFix Scout is restoring the previous driver.");
         var settled = await FixActions.SettleSavePointAsync(id, keep);
         if (settled) _savePoints.Remove(rung.Id);
         return settled;
@@ -287,13 +302,13 @@ public partial class MainWindow : Window, IFixHost
     private void OnHelperDetailsClicked(object sender, RoutedEventArgs e)
     {
         if (_lastReportPath is null)
-            MessageBox.Show(this, "Run a check first, then the details will be ready here.", AppName);
+            MessageBox.Show(this, "A report will be available here after a check has been completed.", AppName);
         else
             Process.Start(new ProcessStartInfo("notepad.exe", $"\"{_lastReportPath}\""));
     }
 
-    private void OnOtherClicked(object sender, RoutedEventArgs e) => Stub("Other");
-    private void OnSettingsClicked(object sender, RoutedEventArgs e) => Stub("Settings");
+    private void OnOtherClicked(object sender, RoutedEventArgs e) => Stub("Checks for other problems are");
+    private void OnSettingsClicked(object sender, RoutedEventArgs e) => Stub("Settings are");
 
-    private void Stub(string name) => MessageBox.Show(this, $"{name} is not wired up yet.", AppName);
+    private void Stub(string what) => MessageBox.Show(this, $"{what} not available in this version of AutoFix Scout.", AppName);
 }

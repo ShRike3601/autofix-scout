@@ -35,3 +35,6 @@ build.txt
 # TestBench: keep the Markdown reports, not raw logs (they can name local networks)
 docs/testbench-results/*.log
 docs/testbench-results/*.ps1
+
+# Graphify code graph (local tool output, never commit: public repo)
+graphify-out/

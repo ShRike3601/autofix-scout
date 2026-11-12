@@ -1,146 +1,230 @@
 <Window x:Class="AutoFixScout.UI.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AutoFix Scout" Width="680" Height="720" MinWidth="420" MinHeight="460"
+        Title="AutoFix Scout" Width="720" Height="800" MinWidth="440" MinHeight="480"
         WindowStartupLocation="CenterScreen" UseLayoutRounding="True"
         Background="{DynamicResource WindowBackgroundBrush}"
         Foreground="{DynamicResource TextPrimaryBrush}"
         FontFamily="{StaticResource TextFont}">
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
-            <Grid MaxWidth="640" Margin="28,20,28,12">
+        <!-- Branded header: gradient with slowly drifting glows. Tall on the home screen, compact with the journey during a check. -->
+        <Grid x:Name="Hero" Grid.Row="0" ClipToBounds="True">
+            <Border Background="{DynamicResource HeroBackgroundBrush}" BorderBrush="{DynamicResource HeroBorderBrush}" BorderThickness="0,0,0,1"/>
+            <Grid IsHitTestVisible="False">
+                <Ellipse Width="420" Height="320" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-150,-170,0,0" Fill="{DynamicResource HeroGlow1Brush}">
+                    <Ellipse.RenderTransform><TranslateTransform x:Name="Glow1Shift"/></Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse Width="460" Height="360" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-200,-160,0" Fill="{DynamicResource HeroGlow2Brush}">
+                    <Ellipse.RenderTransform><TranslateTransform x:Name="Glow2Shift"/></Ellipse.RenderTransform>
+                </Ellipse>
+                <Ellipse Width="360" Height="280" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="160,0,0,-190" Fill="{DynamicResource HeroGlow3Brush}">
+                    <Ellipse.RenderTransform><TranslateTransform x:Name="Glow3Shift"/></Ellipse.RenderTransform>
+                </Ellipse>
+                <!-- Scanner rings, echoing the app mark. -->
+                <Grid x:Name="HeroRings" Width="300" Height="300" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,-120,-110,-120"
+                      RenderTransformOrigin="0.5,0.5">
+                    <Grid.RenderTransform><RotateTransform x:Name="HeroRingsRotate"/></Grid.RenderTransform>
+                    <Ellipse Stroke="{DynamicResource HeroLineBrush}" StrokeThickness="1.2"/>
+                    <Ellipse Margin="40" Stroke="{DynamicResource HeroLineBrush}" StrokeThickness="1.2"/>
+                    <Ellipse Margin="80" Stroke="{DynamicResource HeroLineBrush}" StrokeThickness="1.2"/>
+                    <Ellipse Width="9" Height="9" VerticalAlignment="Top" Margin="0,35.5,0,0" Fill="{DynamicResource HeroLineBrush}"/>
+                    <Ellipse Width="7" Height="7" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-3.5,0,0,0" Fill="{DynamicResource HeroLineBrush}"/>
+                </Grid>
+            </Grid>
+
+            <Grid MaxWidth="680" Margin="28,20,28,22">
+                <StackPanel x:Name="HeroHome">
+                    <StackPanel Orientation="Horizontal">
+                        <ContentControl Template="{StaticResource ArtLogo}" Width="40" Height="40" Focusable="False"/>
+                        <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="AutoFix Scout" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource HeroTextBrush}"/>
+                            <TextBlock Text="Troubleshooting assistant" FontSize="{StaticResource OverlineSize}" Foreground="{DynamicResource HeroSubtextBrush}"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <TextBlock x:Name="Greeting" Style="{StaticResource OverlineText}" Margin="0,22,0,0" Foreground="{DynamicResource HeroSubtextBrush}"/>
+                    <TextBlock Style="{StaticResource DisplayText}" Text="What would you like to check today?" Margin="0,6,0,8"
+                               Foreground="{DynamicResource HeroTextBrush}" AutomationProperties.HeadingLevel="Level1"/>
+                    <TextBlock Style="{StaticResource BodyText}" Foreground="{DynamicResource HeroSubtextBrush}" MaxWidth="560" HorizontalAlignment="Left"
+                               Text="Please select the problem you are experiencing. AutoFix Scout checks your computer first and does not change anything without your permission."/>
+                </StackPanel>
+
+                <StackPanel x:Name="HeroStep" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal">
+                        <ContentControl Template="{StaticResource ArtLogo}" Width="28" Height="28" Focusable="False"/>
+                        <TextBlock Text="AutoFix Scout" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="{StaticResource CaptionSize}"
+                                   FontWeight="SemiBold" Foreground="{DynamicResource HeroSubtextBrush}"/>
+                    </StackPanel>
+                    <TextBlock x:Name="HeroTitle" Style="{StaticResource TitleText}" Margin="0,12,0,0" Foreground="{DynamicResource HeroTextBrush}"
+                               AutomationProperties.HeadingLevel="Level1"/>
+                    <!-- Check, Diagnosis, Fix, Confirm: built in MainWindow.Visuals.cs -->
+                    <Grid x:Name="JourneyBar" Margin="0,18,0,0" HorizontalAlignment="Stretch" MaxWidth="560"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+            <Grid MaxWidth="680" Margin="28,24,28,16">
 
                 <!-- Home: three symptoms + something else (spec 4.1) -->
-                <StackPanel x:Name="HomePanel" VerticalAlignment="Center" KeyboardNavigation.DirectionalNavigation="Contained">
-                    <StackPanel x:Name="HomeHeader">
-                        <StackPanel Orientation="Horizontal">
-                            <Border Width="30" Height="30" CornerRadius="8" Background="{DynamicResource AccentBrush}">
-                                <TextBlock Style="{StaticResource Icon}" Text="&#xE90F;" FontSize="16" Foreground="{DynamicResource OnAccentBrush}"/>
-                            </Border>
-                            <TextBlock Text="AutoFix Scout" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="{StaticResource CaptionSize}"
-                                       FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        </StackPanel>
-                        <TextBlock Text="What's wrong?" FontFamily="{StaticResource DisplayFont}" FontSize="{StaticResource TitleSize}"
-                                   FontWeight="SemiBold" Margin="0,18,0,22" AutomationProperties.HeadingLevel="Level1"/>
-                    </StackPanel>
-
+                <StackPanel x:Name="HomePanel" VerticalAlignment="Top" KeyboardNavigation.DirectionalNavigation="Contained">
                     <Border x:Name="SoundCardHost">
-                        <Button Style="{StaticResource CardButton}" Click="OnSoundClicked" AutomationProperties.Name="My sound isn't working">
+                        <Button Style="{StaticResource CardButton}" Click="OnSoundClicked"
+                                AutomationProperties.Name="Sound is not working" AutomationProperties.HelpText="Speakers, headphones and volume">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <Border Width="56" Height="56" CornerRadius="14" Background="{DynamicResource SoundTileBrush}">
-                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE767;" FontSize="26" Foreground="{DynamicResource SoundGlyphBrush}"/>
+                                <ContentControl Template="{StaticResource ArtSound}" Width="64" Height="64" Focusable="False"/>
+                                <StackPanel Grid.Column="1" Margin="18,0,12,0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="SoundTitle" Text="Sound is not working" FontFamily="{StaticResource DisplayFont}"
+                                               FontSize="{StaticResource CardTitleSize}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="Speakers, headphones and volume" Margin="0,3,0,0"/>
+                                </StackPanel>
+                                <Border Grid.Column="2" Width="36" Height="36" CornerRadius="18" Background="{DynamicResource SubtleHoverBrush}">
+                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE76C;" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 </Border>
-                                <TextBlock x:Name="SoundTitle" Grid.Column="1" Text="My sound isn't working" Margin="18,0,12,0" VerticalAlignment="Center"
-                                           FontSize="{StaticResource CardTitleSize}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                <TextBlock Grid.Column="2" Style="{StaticResource Icon}" Text="&#xE76C;" FontSize="16" Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </Grid>
                         </Button>
                     </Border>
 
                     <Border x:Name="CameraCardHost">
-                        <Button Style="{StaticResource CardButton}" Click="OnCameraClicked" AutomationProperties.Name="My camera isn't working">
+                        <Button Style="{StaticResource CardButton}" Click="OnCameraClicked"
+                                AutomationProperties.Name="Camera is not working" AutomationProperties.HelpText="Webcam, privacy settings and camera apps">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <Border Width="56" Height="56" CornerRadius="14" Background="{DynamicResource CameraTileBrush}">
-                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE722;" FontSize="26" Foreground="{DynamicResource CameraGlyphBrush}"/>
+                                <ContentControl Template="{StaticResource ArtCamera}" Width="64" Height="64" Focusable="False"/>
+                                <StackPanel Grid.Column="1" Margin="18,0,12,0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="CameraTitle" Text="Camera is not working" FontFamily="{StaticResource DisplayFont}"
+                                               FontSize="{StaticResource CardTitleSize}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="Webcam, privacy settings and camera apps" Margin="0,3,0,0"/>
+                                </StackPanel>
+                                <Border Grid.Column="2" Width="36" Height="36" CornerRadius="18" Background="{DynamicResource SubtleHoverBrush}">
+                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE76C;" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 </Border>
-                                <TextBlock x:Name="CameraTitle" Grid.Column="1" Text="My camera isn't working" Margin="18,0,12,0" VerticalAlignment="Center"
-                                           FontSize="{StaticResource CardTitleSize}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                <TextBlock Grid.Column="2" Style="{StaticResource Icon}" Text="&#xE76C;" FontSize="16" Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </Grid>
                         </Button>
                     </Border>
 
                     <Border x:Name="NetworkCardHost">
-                        <Button Style="{StaticResource CardButton}" Click="OnNetworkClicked" AutomationProperties.Name="I can't get online">
+                        <Button Style="{StaticResource CardButton}" Click="OnNetworkClicked"
+                                AutomationProperties.Name="Cannot connect to the internet" AutomationProperties.HelpText="Wi-Fi, network cable and connection">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <Border Width="56" Height="56" CornerRadius="14" Background="{DynamicResource NetworkTileBrush}">
-                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE701;" FontSize="26" Foreground="{DynamicResource NetworkGlyphBrush}"/>
+                                <ContentControl Template="{StaticResource ArtNetwork}" Width="64" Height="64" Focusable="False"/>
+                                <StackPanel Grid.Column="1" Margin="18,0,12,0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="NetworkTitle" Text="Cannot connect to the internet" FontFamily="{StaticResource DisplayFont}"
+                                               FontSize="{StaticResource CardTitleSize}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                    <TextBlock Style="{StaticResource CaptionText}" Text="Wi-Fi, network cable and connection" Margin="0,3,0,0"/>
+                                </StackPanel>
+                                <Border Grid.Column="2" Width="36" Height="36" CornerRadius="18" Background="{DynamicResource SubtleHoverBrush}">
+                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE76C;" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                 </Border>
-                                <TextBlock x:Name="NetworkTitle" Grid.Column="1" Text="I can't get online" Margin="18,0,12,0" VerticalAlignment="Center"
-                                           FontSize="{StaticResource CardTitleSize}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                <TextBlock Grid.Column="2" Style="{StaticResource Icon}" Text="&#xE76C;" FontSize="16" Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </Grid>
                         </Button>
                     </Border>
 
-                    <Border x:Name="OtherHost" HorizontalAlignment="Left" Margin="-4,2,0,0">
+                    <Border x:Name="OtherHost" HorizontalAlignment="Left" Margin="-4,0,0,0">
                         <Button Style="{StaticResource SubtleButton}" Content="Something else" Tag="&#xE897;"
-                                FontSize="18" Padding="14,11" Foreground="{DynamicResource TextSecondaryBrush}" Click="OnOtherClicked"/>
+                                FontSize="17" Padding="14,11" Foreground="{DynamicResource TextSecondaryBrush}" Click="OnOtherClicked"/>
                     </Border>
                 </StackPanel>
 
                 <!-- Step screen: one sentence, at most two choices (spec 4.2: one decision per screen) -->
-                <Border x:Name="StepPanel" Visibility="Collapsed" VerticalAlignment="Center"
-                        Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardBorderBrush}"
-                        BorderThickness="1" CornerRadius="14" Padding="32,30,32,32">
-                    <StackPanel x:Name="StepContent">
-                        <!-- One of: topic tile, busy ring, animated check -->
-                        <Grid Width="64" Height="64" HorizontalAlignment="Left" Margin="0,0,0,22">
-                            <Border x:Name="StepTile" CornerRadius="16" RenderTransformOrigin="0.5,0.5">
-                                <TextBlock x:Name="StepGlyph" Style="{StaticResource Icon}" FontSize="30"/>
+                <Grid x:Name="StepPanel" Visibility="Collapsed" VerticalAlignment="Top">
+                    <Border CornerRadius="16" Background="{DynamicResource WindowBackgroundBrush}" Margin="3,8,3,0">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="30" ShadowDepth="6" Direction="270"
+                                              Color="{DynamicResource ShadowColor}" Opacity="{DynamicResource ShadowOpacity}"/>
+                        </Border.Effect>
+                    </Border>
+                    <Border CornerRadius="16" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1">
+                        <StackPanel>
+                            <!-- Status banner: colour and icon by severity (results and endings only). -->
+                            <Border x:Name="StatusBanner" CornerRadius="15,15,0,0" Padding="28,13" BorderThickness="0,0,0,1" Visibility="Collapsed">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border x:Name="StatusDot" Width="28" Height="28" CornerRadius="14">
+                                        <TextBlock x:Name="StatusGlyph" Style="{StaticResource Icon}" FontSize="14" FontWeight="Bold"
+                                                   Foreground="{DynamicResource OnStatusBrush}"/>
+                                    </Border>
+                                    <TextBlock x:Name="StatusLabel" Margin="12,0,0,0" VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
                             </Border>
-                            <Grid x:Name="BusyRing" Width="56" Height="56" Visibility="Collapsed">
-                                <Ellipse Stroke="{DynamicResource RingTrackBrush}" StrokeThickness="5"/>
-                                <Path Stroke="{DynamicResource AccentBrush}" StrokeThickness="5" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                                      Data="M 28,2.5 A 25.5,25.5 0 0 1 53.5,28">
-                                    <Path.RenderTransform>
-                                        <RotateTransform x:Name="BusyRotate" CenterX="28" CenterY="28"/>
-                                    </Path.RenderTransform>
-                                </Path>
-                            </Grid>
-                            <Grid x:Name="CheckMark" Visibility="Collapsed" RenderTransformOrigin="0.5,0.5">
-                                <Grid.RenderTransform>
-                                    <ScaleTransform x:Name="CheckScale"/>
-                                </Grid.RenderTransform>
-                                <Ellipse x:Name="CheckCircle"/>
-                                <Path x:Name="CheckPath" StrokeThickness="4.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                                      StrokeLineJoin="Round" StrokeDashArray="9 9" StrokeDashOffset="0"
-                                      Data="M 20,33 L 28,41 L 45,23"/>
-                            </Grid>
-                        </Grid>
 
-                        <TextBlock x:Name="StepTopic" Visibility="Collapsed" Margin="0,0,0,8" FontSize="{StaticResource CaptionSize}"
-                                   FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/>
-                        <TextBlock x:Name="StepText" FontFamily="{StaticResource DisplayFont}" FontSize="{StaticResource MessageSize}"
-                                   TextWrapping="Wrap" LineHeight="34" Margin="0,0,0,28"
-                                   AutomationProperties.LiveSetting="Assertive"/>
+                            <StackPanel x:Name="StepContent" Margin="32,28,32,32">
+                                <!-- One of: illustration, scanner -->
+                                <Grid HorizontalAlignment="Left" Margin="0,0,0,20">
+                                    <ContentControl x:Name="StepArt" Width="72" Height="72" Focusable="False" RenderTransformOrigin="0.5,0.5"/>
+                                    <Grid x:Name="ScanVisual" Width="96" Height="96" Visibility="Collapsed">
+                                        <Ellipse x:Name="Pulse1" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2" RenderTransformOrigin="0.5,0.5">
+                                            <Ellipse.RenderTransform><ScaleTransform x:Name="Pulse1Scale"/></Ellipse.RenderTransform>
+                                        </Ellipse>
+                                        <Ellipse x:Name="Pulse2" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2" RenderTransformOrigin="0.5,0.5">
+                                            <Ellipse.RenderTransform><ScaleTransform x:Name="Pulse2Scale"/></Ellipse.RenderTransform>
+                                        </Ellipse>
+                                        <Ellipse Width="66" Height="66" Fill="{DynamicResource AccentSoftBrush}"/>
+                                        <Ellipse Width="66" Height="66" Stroke="{DynamicResource RingTrackBrush}" StrokeThickness="4"/>
+                                        <Path Stroke="{DynamicResource AccentBrush}" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                              Data="M 48,17 A 31,31 0 0 1 79,48">
+                                            <Path.RenderTransform><RotateTransform x:Name="ScanRotate" CenterX="48" CenterY="48"/></Path.RenderTransform>
+                                        </Path>
+                                        <Canvas Width="96" Height="96">
+                                            <Ellipse Canvas.Left="36" Canvas.Top="35" Width="21" Height="21" Stroke="{DynamicResource AccentBrush}" StrokeThickness="3.5"/>
+                                            <Path Data="M54,53 L60.5,59.5" Stroke="{DynamicResource AccentBrush}" StrokeThickness="4.5"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                        </Canvas>
+                                    </Grid>
+                                </Grid>
 
-                        <StackPanel x:Name="StepButtons">
-                            <Button x:Name="PrimaryButton" Style="{StaticResource AccentButton}" IsDefault="True" Click="OnPrimaryClicked"/>
-                            <Button x:Name="SecondaryButton" Style="{StaticResource StandardButton}" Margin="0,12,0,0" IsCancel="True" Click="OnSecondaryClicked"/>
+                                <TextBlock x:Name="StepOverline" Style="{StaticResource OverlineText}" Margin="0,0,0,8" Visibility="Collapsed"
+                                           Foreground="{DynamicResource AccentBrush}"/>
+                                <TextBlock x:Name="StepText" Style="{StaticResource TitleText}" AutomationProperties.LiveSetting="Assertive"/>
+                                <TextBlock x:Name="StepDetail" Style="{StaticResource BodyText}" Margin="0,10,0,0" Visibility="Collapsed"/>
+
+                                <!-- Checks being run (busy screen of a check). -->
+                                <StackPanel x:Name="ChecksPanel" Margin="0,22,0,0" Visibility="Collapsed">
+                                    <TextBlock Style="{StaticResource CaptionText}" Margin="0,0,0,14"
+                                               Text="Checks in progress. The results will be shown when all checks are complete."/>
+                                    <StackPanel x:Name="ChecksList"/>
+                                </StackPanel>
+
+                                <StackPanel x:Name="StepButtons" Margin="0,30,0,0">
+                                    <Button x:Name="PrimaryButton" Style="{StaticResource AccentButton}" IsDefault="True" Click="OnPrimaryClicked"/>
+                                    <Button x:Name="SecondaryButton" Style="{StaticResource StandardButton}" Margin="0,12,0,0" IsCancel="True" Click="OnSecondaryClicked"/>
+                                </StackPanel>
+                            </StackPanel>
                         </StackPanel>
-                    </StackPanel>
-                </Border>
+                    </Border>
+                </Grid>
             </Grid>
         </ScrollViewer>
 
-        <Border Grid.Row="1" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource DividerBrush}" Padding="20,8,20,10">
+        <Border Grid.Row="2" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource DividerBrush}" Padding="20,8,20,10">
             <DockPanel LastChildFill="False">
-                <Button x:Name="HelperButton" DockPanel.Dock="Left" Style="{StaticResource SubtleButton}" Content="Details for my helper"
+                <Button x:Name="HelperButton" DockPanel.Dock="Left" Style="{StaticResource SubtleButton}" Content="Report for your helper"
                         Tag="&#xE8A5;" Click="OnHelperDetailsClicked"/>
                 <Button DockPanel.Dock="Right" Style="{StaticResource SubtleButton}" Content="Settings" Tag="&#xE713;"
                         Foreground="{DynamicResource TextSecondaryBrush}" Click="OnSettingsClicked"/>
             </DockPanel>
         </Border>
+
+        <!-- Celebration layer for "fixed" (Motion.Confetti); never takes clicks or keyboard focus. -->
+        <Canvas x:Name="ConfettiLayer" Grid.RowSpan="3" IsHitTestVisible="False" ClipToBounds="True" Focusable="False"/>
     </Grid>
 </Window>
