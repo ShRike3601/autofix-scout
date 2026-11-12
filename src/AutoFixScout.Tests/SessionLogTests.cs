@@ -65,7 +65,7 @@ public class SessionLogTests : IDisposable
     public void SchemaRejectsUnknownSymptom()
     {
         using var db = new SessionLog(_path);
-        Assert.Throws<SqliteException>(() => db.Start("printer"));
+        Assert.Throws<SqliteException>(() => db.Start("fax"));
     }
 
     [Fact]
@@ -118,7 +118,32 @@ public class SessionLogTests : IDisposable
         Assert.Equal(1L, db.Scalar("SELECT COUNT(*) FROM session WHERE outcome = 'no_fault_found'"));
         Assert.Equal(1L, db.Scalar("SELECT COUNT(*) FROM step_log WHERE session_id = 'old1'"));
         Assert.Equal(0L, db.Scalar("SELECT COUNT(*) FROM pragma_foreign_key_check"));
-        Assert.Throws<SqliteException>(() => db.Start("printer")); // other CHECKs still enforced
+        db.End(db.Start("printer"), Outcome.Fixed); // new problem areas are accepted after the migration
+        Assert.Throws<SqliteException>(() => db.Start("fax")); // other CHECKs still enforced
+    }
+
+    [Fact]
+    public void V010Database_GainsNewAreas_KeepingRows()
+    {
+        // session.db from v0.1.0: knows no_fault_found but not the new problem areas.
+        using (var db = new SessionLog(_path)) db.End(db.Start("audio"), Outcome.Fixed);
+        using (var old = new SqliteConnection($"Data Source={_path}"))
+        {
+            old.Open();
+            using var cmd = old.CreateCommand();
+            cmd.CommandText = "PRAGMA foreign_keys = OFF; BEGIN; CREATE TABLE s2 AS SELECT * FROM session; DROP TABLE session; " +
+                "CREATE TABLE session (session_id TEXT PRIMARY KEY, started_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), " +
+                "ended_at TEXT, symptom TEXT NOT NULL CHECK (symptom IN ('audio','camera','network','other')), " +
+                "outcome TEXT CHECK (outcome IN ('fixed','not_fixed','probable_hardware','abandoned','no_fault_found')), " +
+                "app_version TEXT NOT NULL, playbook_version TEXT NOT NULL); INSERT INTO session SELECT * FROM s2; DROP TABLE s2; COMMIT;";
+            cmd.ExecuteNonQuery();
+        }
+        SqliteConnection.ClearAllPools();
+
+        using var reopened = new SessionLog(_path);
+        foreach (var area in new[] { "microphone", "bluetooth", "printer", "display", "storage", "update" })
+            reopened.End(reopened.Start(area), Outcome.NoFaultFound);
+        Assert.Equal(7L, reopened.Scalar("SELECT COUNT(*) FROM session"));
     }
 
     private sealed class Host : IFixHost
