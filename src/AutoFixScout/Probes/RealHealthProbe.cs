@@ -276,14 +276,16 @@ public sealed class RealHealthProbe : IHealthProbe
     {
         var u = new UsbState();
         var events = new List<UsbPnpEvent>();
-        foreach (var e in QueryWindow("System", "Provider[@Name='Microsoft-Windows-Kernel-PnP'] and (EventID=400 or EventID=410 or EventID=420 or EventID=430)", UsbHealth.Window, 3000))
+        // Device start/configure events live in the Kernel-PnP Configuration log, not in System (checked on the bench: 0 vs 671).
+        foreach (var e in QueryWindow("Microsoft-Windows-Kernel-PnP/Configuration", "(EventID=400 or EventID=410 or EventID=420 or EventID=430)", UsbHealth.Window, 3000))
             if (Prop(e, 0) is { } id && UsbHealth.IsUsbInstance(id))
                 events.Add(new UsbPnpEvent(id, e.TimeCreated?.ToUniversalTime() ?? DateTime.UtcNow));
         u.PnpEvents = events.Count;
         u.HubErrors = QueryWindow("System",
             "(Provider[@Name='USBHUB3'] or Provider[@Name='Microsoft-Windows-USB-USBHUB3'] or Provider[@Name='USBHUB'] or Provider[@Name='USBXHCI'] or Provider[@Name='Microsoft-Windows-USB-USBXHCI'] or Provider[@Name='USBPORT']) and (Level=1 or Level=2 or Level=3)",
             UsbHealth.Window).Count();
-        u.Churn = UsbHealth.Repeated(events).Select(r => LookUpUsb(r.InstanceId, r.Count)).ToList();
+        var sessions = QueryWindow("System", "(Provider[@Name='Microsoft-Windows-Kernel-General'] and EventID=12) or (Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1)", UsbHealth.Window).Count();
+        u.Churn = UsbHealth.Repeated(events, UsbHealth.ThresholdFor(sessions)).Select(r => LookUpUsb(r.InstanceId, r.Count)).ToList();
         try
         {
             if (UsbHealth.ParseSelectiveSuspend(Areas.PowerFlow.Powercfg($"/query SCHEME_CURRENT {UsbHealth.UsbSubgroup} {UsbHealth.SelectiveSuspendSetting}")) is { } v)

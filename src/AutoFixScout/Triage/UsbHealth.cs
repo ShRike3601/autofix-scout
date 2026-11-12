@@ -27,6 +27,12 @@ public static class UsbHealth
     public static readonly TimeSpan Window = TimeSpan.FromDays(3);
     /// <summary>The same device instance this many times in the window counts as disconnecting.</summary>
     public const int RepeatThreshold = 5;
+
+    /// <summary>
+    /// Every start-up and wake from sleep logs one or two Kernel-PnP events per device without any real disconnect,
+    /// so a device is flagged only when it reconnects clearly more often than the computer starts or wakes.
+    /// </summary>
+    public static int ThresholdFor(int startsAndWakes) => RepeatThreshold + 2 * Math.Max(0, startsAndWakes);
     /// <summary>Hub and controller errors at or above which a finding is made.</summary>
     public const int ErrorThreshold = 3;
 

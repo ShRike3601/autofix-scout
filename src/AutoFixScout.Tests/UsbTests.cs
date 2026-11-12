@@ -135,3 +135,14 @@ public class LiveUsbTests
         Assert.NotNull(u.SelectiveSuspendAc);
     }
 }
+
+public class UsbThresholdTests
+{
+    // Regression (bench): a built-in webcam that only restarts at each start-up/wake was reported as "disconnecting".
+    [Theory]
+    [InlineData(0, 5)]
+    [InlineData(3, 11)]
+    [InlineData(-1, 5)]
+    public void Threshold_GrowsWithStartsAndWakes(int sessions, int expected) =>
+        Assert.Equal(expected, AutoFixScout.Triage.UsbHealth.ThresholdFor(sessions));
+}
