@@ -416,8 +416,10 @@ public class LiveSecurityTests
     }
 
     /// <summary>
-    /// Creates a dummy HKCU Chrome HomepageLocation, checks the probe finds it and the user action removes it, and always
-    /// deletes whatever it created. Skipped (and said so) when the bench already has browser policies or is managed.
+    /// Creates a dummy Chrome HomepageLocation policy for the current user, checks it is found and removed by the user
+    /// action, and always deletes what it created. Windows lets only administrators write HKCU\Software\Policies, so a
+    /// standard user cannot create the real value; the test then runs the same code on a scratch key of its own
+    /// (HKCU\Software\AutoFixScoutLiveTest), which is deleted afterwards.
     /// </summary>
     [Fact]
     public void BrowserPolicy_DummyHomepage_IsFoundAndRemoved_AndAlwaysCleanedUp()
@@ -425,40 +427,59 @@ public class LiveSecurityTests
         var output = Environment.GetEnvironmentVariable("AFS_LIVE");
         if (string.IsNullOrEmpty(output)) return;
         const string chrome = @"Software\Policies\Google\Chrome";
+        const string scratch = @"Software\AutoFixScoutLiveTest";
+        var lines = new List<string>();
+        void Note(string l) => lines.Add("browser policy live test: " + l);
         var before = SecurityFlow.Read();
         if (BrowserPolicies.IsManagedPc() || before.BrowserPolicyFlags.Any(x => x.Hive == "HKCU"))
         {
             File.AppendAllLines(output, new[] { "browser policy live test skipped: managed PC or HKCU browser policies already present" });
             return;
         }
-        var existed = new[] { @"Software\Policies", @"Software\Policies\Google", chrome }
-            .Select(p => { using var k = Registry.CurrentUser.OpenSubKey(p); return k is not null; }).ToArray();
+        var paths = new[] { @"Software\Policies", @"Software\Policies\Google", chrome };
+        var existed = paths.Select(p => { using var k = Registry.CurrentUser.OpenSubKey(p); return k is not null; }).ToArray();
+        var scratchExisted = false;
+        using (var k = Registry.CurrentUser.OpenSubKey(scratch)) scratchExisted = k is not null;
         var started = DateTime.Now.AddSeconds(-1);
-        var lines = new List<string>();
+        RegistryKey? root = null;
         try
         {
-            using (var k = Registry.CurrentUser.CreateSubKey(chrome))
+            var real = true;
+            try
+            {
+                using var k = Registry.CurrentUser.CreateSubKey(chrome);
                 k.SetValue("HomepageLocation", "https://dummy.invalid/afs-test");
-            var s = SecurityFlow.Read();
-            var f = SecurityTriage.Evaluate(s);
-            lines.Add("dummy flagged: " + BrowserPolicies.Summary(s.BrowserPolicyFlags));
+                root = Registry.CurrentUser;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                real = false;
+                Note("HKCU Software/Policies is not writable for this standard user (expected); using scratch key");
+                root = Registry.CurrentUser.CreateSubKey(scratch);
+                using var k = root.CreateSubKey(chrome);
+                k.SetValue("HomepageLocation", "https://dummy.invalid/afs-test");
+            }
+
+            var s = real ? SecurityFlow.Read() : new SecurityState { BrowserPolicyFlags = BrowserPolicies.Scan(root, "HKCU") };
+            Assert.Contains(s.BrowserPolicyFlags, x => x.Browser == "Chrome" && x.ValueName == "HomepageLocation");
+            var f = SecurityTriage.Evaluate(Healthy(s.BrowserPolicyFlags));
+            Note("found: " + BrowserPolicies.Summary(s.BrowserPolicyFlags));
             Assert.Contains(f, x => x.Code == FindingCode.SecurityBrowserPolicy);
             Assert.DoesNotContain("dummy.invalid", f.First(x => x.Code == FindingCode.SecurityBrowserPolicy).TechnicalDetail);
-            Assert.Contains(SecurityTriage.Ladder(s, f), r => r.ActionId == "security.remove_browser_policies_user");
+            Assert.Contains(SecurityTriage.Ladder(Healthy(s.BrowserPolicyFlags), f), r => r.ActionId == "security.remove_browser_policies_user");
 
-            var (ok, detail) = UserRepairs.RemoveBrowserPoliciesUser();
-            lines.Add($"user action: ok={ok} {detail}");
+            var (ok, detail) = real ? UserRepairs.RemoveBrowserPoliciesUser() : UserRepairs.RemoveBrowserPoliciesUser(root);
+            Note($"user action ok={ok}: {detail}");
             Assert.True(ok);
-            using (var k = Registry.CurrentUser.OpenSubKey(chrome))
-                Assert.Null(k?.GetValue("HomepageLocation"));
-            Assert.DoesNotContain(SecurityTriage.Evaluate(SecurityFlow.Read()), x => x.Code == FindingCode.SecurityBrowserPolicy);
+            using (var k = root.OpenSubKey(chrome)) Assert.Null(k?.GetValue("HomepageLocation"));
+            Assert.Empty(BrowserPolicies.Scan(root, "HKCU"));
         }
         finally
         {
             try
             {
+                if (!scratchExisted) Registry.CurrentUser.DeleteSubKeyTree(scratch, false);
                 using (var k = Registry.CurrentUser.OpenSubKey(chrome, writable: true)) k?.DeleteValue("HomepageLocation", false);
-                var paths = new[] { @"Software\Policies", @"Software\Policies\Google", chrome };
                 for (var i = 2; i >= 0; i--)
                 {
                     if (existed[i]) continue;
@@ -469,7 +490,17 @@ public class LiveSecurityTests
                     foreach (var b in Directory.GetFiles(UserRepairs.BackupDir, "browser-policies-user-*.txt").Where(b => File.GetLastWriteTime(b) >= started))
                         File.Delete(b);
             }
-            finally { File.AppendAllLines(output, lines.Append("browser policy live test: cleaned up")); }
+            catch (Exception ex) { Note("cleanup problem: " + ex.Message); }
+            finally { root?.Dispose(); File.AppendAllLines(output, lines.Append("browser policy live test: cleaned up")); }
         }
     }
+
+    private static SecurityState Healthy(IReadOnlyList<BrowserPolicies.Flag> flags) => new()
+    {
+        Antivirus = new[] { new SecurityProduct("Windows Defender", 0x61100, "windowsdefender://") },
+        DefenderRealTime = Tri.Yes, DefenderSignaturesUtc = DateTime.UtcNow,
+        FirewallProfiles = new Dictionary<string, Tri> { ["Domain"] = Tri.Yes, ["Private"] = Tri.Yes, ["Public"] = Tri.Yes },
+        FirewallService = new UpdateServiceInfo("mpssvc", "Running", "Automatic"),
+        UacEnabled = Tri.Yes, UacAdminPrompt = 5, BrowserPolicyFlags = flags,
+    };
 }

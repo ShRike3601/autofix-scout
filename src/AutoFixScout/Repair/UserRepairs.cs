@@ -26,14 +26,21 @@ public static class UserRepairs
     /// Removes the flagged browser policy values under the current user's HKCU (home page, search engine, proxy, forced
     /// extensions). Saved first as .reg-like text. Nothing is removed on a computer managed by an organization.
     /// </summary>
-    public static (bool Ok, string Detail) RemoveBrowserPoliciesUser()
+    public static (bool Ok, string Detail) RemoveBrowserPoliciesUser() => RemoveBrowserPoliciesUser(Registry.CurrentUser);
+
+    /// <summary>The same, on another base key (the live test uses a scratch key, because Windows lets only administrators write HKCU\Software\Policies).</summary>
+    internal static (bool Ok, string Detail) RemoveBrowserPoliciesUser(RegistryKey hkcu)
     {
         if (BrowserPolicies.IsManagedPc()) return (false, "this computer is managed by an organization; nothing was changed");
-        var hkcu = Registry.CurrentUser;
         var flags = BrowserPolicies.Scan(hkcu, BrowserPolicies.HiveUser);
         if (flags.Count == 0) return (true, "no browser policy values found for the current user");
         var saved = Backup("browser-policies-user", BrowserPolicies.BackupText(hkcu, flags));
-        var removed = BrowserPolicies.Remove(hkcu, flags);
+        int removed;
+        try { removed = BrowserPolicies.Remove(hkcu, flags); }
+        catch (UnauthorizedAccessException)
+        {
+            return (false, $"Windows does not allow this account to change these values; previous values saved to {saved}");
+        }
         var left = BrowserPolicies.Scan(hkcu, BrowserPolicies.HiveUser).Count;
         return (left == 0, $"removed {removed} browser policy value(s): {BrowserPolicies.Summary(flags)}; previous values saved to {saved}");
     }
