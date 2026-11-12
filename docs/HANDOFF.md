@@ -321,3 +321,19 @@ PATH, WinHTTP, Winsock, services, VC++, search index, component cleanup, firewal
 OneDrive reset and WSReset (bench has no OneDrive/Office; WSReset opens the Store window).
 UI note: "Apply fix" on an admin step leaves a UAC prompt that nobody can answer when unattended; it blocks
 screenshots until it times out. Drive admin steps through the TestBench (elevated) instead of the UI.
+
+## Roadmap (overnight part 2, from 2026-11-13 00:00 IST; owner asleep, heartbeat every 20 min)
+Rules: stop at 80% of each 5-hour window, resume after the reset (02:20 IST, then 07:20). One item at a time unless
+using worktree agents. Each item: probe + triage + tests + live test + real-UI check + HANDOFF/CAPABILITIES update.
+- [ ] R1 Drive health: MSFT_PhysicalDisk HealthStatus / Get-StorageReliabilityCounter (wear, read errors, temperature)
+      in the full check-up; "back up now" finding; never repairs hardware.
+- [ ] R2 Battery and power ("battery drains / will not sleep / will not wake"): battery wear (design vs full charge),
+      power plan, sleep settings, hibernate/fast startup, wake timers and devices allowed to wake; guided + safe fixes.
+- [ ] R3 Any device with an error (Device Manager warning) outside sound/camera/network: listed in the check-up with
+      the Windows error code meaning; rescan; driver from Windows Update only for allowed classes, otherwise guided.
+- [ ] R4 Network extras: no address from the router (169.254.x.x) -> renew the address; weak Wi-Fi signal; IP address
+      conflict; metered connection blocking updates.
+- [ ] R5 Temporary user profile ("my files and desktop are gone"): detect, explain, guided recovery; never touches profiles.
+- [ ] R6 Keyboard, mouse and touchpad: touchpad switched off, Sticky/Filter Keys on, input device errors.
+- [ ] R7 Clock settings: automatic time / time zone off or wrong.
+- [ ] R8 Admin bench run (`C:\afs-bench\jobs\01-health-long.ps1`) as soon as the AFS-Bench-Elevated task exists.
