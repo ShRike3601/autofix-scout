@@ -30,6 +30,8 @@ public class SymptomRouterTests
     [InlineData("my laptop battery drains very fast", "power")]
     [InlineData("the touchpad is not working", "input")]
     [InlineData("keyboard types wrong letters and keys stick", "input")]
+    [InlineData("after restart my desktop is empty and my files are gone", "health")]
+    [InlineData("device manager shows a yellow exclamation mark", "health")]
     [InlineData("something is wrong", "health")]
     [InlineData("", "health")]
     public void RoutesToTheRightCheck(string text, string area) => Assert.Equal(area, SymptomRouter.Best(text).Area);

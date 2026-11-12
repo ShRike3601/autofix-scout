@@ -329,11 +329,11 @@ using worktree agents. Each item: probe + triage + tests + live test + real-UI c
       in the full check-up; "back up now" finding; never repairs hardware.
 - [x] R2 Battery and power ("battery drains / will not sleep / will not wake"): battery wear (design vs full charge),
       power plan, sleep settings, hibernate/fast startup, wake timers and devices allowed to wake; guided + safe fixes.
-- [ ] R3 Any device with an error (Device Manager warning) outside sound/camera/network: listed in the check-up with
+- [x] R3 Any device with an error (Device Manager warning) outside sound/camera/network: listed in the check-up with
       the Windows error code meaning; rescan; driver from Windows Update only for allowed classes, otherwise guided.
 - [ ] R4 Network extras: no address from the router (169.254.x.x) -> renew the address; weak Wi-Fi signal; IP address
       conflict; metered connection blocking updates.
-- [ ] R5 Temporary user profile ("my files and desktop are gone"): detect, explain, guided recovery; never touches profiles.
+- [x] R5 Temporary user profile ("my files and desktop are gone"): detect, explain, guided recovery; never touches profiles.
 - [x] R6 Keyboard, mouse and touchpad: touchpad switched off, Sticky/Filter Keys on, input device errors.
 - [x] R7 Clock settings (automatic time; time zone auto-update off is normal, not flagged): automatic time / time zone off or wrong.
 - [ ] R8 Admin bench run (`C:\afs-bench\jobs\01-health-long.ps1`) as soon as the AFS-Bench-Elevated task exists.

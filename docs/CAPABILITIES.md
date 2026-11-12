@@ -36,9 +36,9 @@ Status: **Done** = built, unit-tested and checked on the test laptop (admin repa
 | Security, viruses or pop-ups | antivirus missing/off, real-time protection off, old signatures, firewall off, UAC off, SmartScreen off, hosts/proxy hijacks, suspicious startup entries | signature update, quick scan, firewall on, UAC on, Windows Security steps | Done |
 | Drive health (in the full check-up) | drive health and failure prediction reported by Windows (wear counters need admin: later) | back up first (Windows Backup), repair-service advice | Done |
 | Battery, sleep and power | battery wear, sleep never on battery, PC waking by itself (wake sources), high-performance plan on battery, Fast Startup | Balanced plan, power and battery saver settings, guided wake and Fast Startup steps | Done |
-| Any device with a warning | Device Manager errors in other classes | re-detect, guided driver steps | Planned (R3) |
+| Any device with a warning (in the full check-up) | Device Manager error codes explained in plain words (no driver, cannot start, stopped by Windows...) | re-detect devices, optional driver updates, maker's driver, USB replug; drivers never changed | Done |
 | Network extras | no address from the router, weak Wi-Fi, IP conflict, metered connection | renew address, guided | Planned (R4) |
-| Temporary user profile | "my desktop and files are gone" | explanation and guided recovery | Planned (R5) |
+| Temporary user profile (in the full check-up) | "my desktop and files are gone" (temporary profile, profile service errors) | restart and sign in again, guided recovery for a helper; profiles never touched | Done |
 | Keyboard, mouse, touchpad | touchpad switched off, Sticky/Filter/Toggle/Mouse Keys on, missing or failing input devices | touchpad on, accessibility keys off (backed up), re-detect devices, guided steps | Done |
 | Clock settings (in the full check-up) | wrong clock with "Set time automatically" off | Date and time settings step, then clock sync | Done |
 

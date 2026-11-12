@@ -58,7 +58,7 @@ public static class SymptomRouter
                   new[] { "start", "taskbar", "search", "icons", "desktop icons" }),
         ("security", new[] { "virus", "malware", "pop-ups", "popups", "pop up", "hacked", "antivirus", "firewall", "defender", "ransomware", "redirect", "hijack", "adware" },
                      new[] { "virus", "security", "unsafe", "suspicious", "spyware", "trojan", "scam" }),
-        ("health", new[] { "blue screen", "bsod", "clock is wrong", "wrong time", "certificate" },
+        ("health", new[] { "blue screen", "bsod", "files are gone", "desktop is empty", "desktop is gone", "temporary profile", "device manager", "yellow mark", "exclamation mark", "driver missing", "no driver", "clock is wrong", "wrong time", "certificate" },
                    new[] { "restart", "restarts", "reboot", "error", "errors", "broken", "weird", "strange" }),
         ("program", new[] { "keeps closing", "keeps crashing", "stopped working", "not responding", "won't open", "wont open", "will not open", "doesn't open", "does not open", "closes by itself", "app crash", "freezes" },
                     new[] { "crash", "crashes", "crashing", "closes", "freeze", "freezing", "hangs", "error message", "missing dll", ".dll", "vcruntime", "msvcp" }),
