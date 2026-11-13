@@ -164,9 +164,11 @@ public sealed class RealGraphicsProbe : IGraphicsProbe
         if (!installed) return t;
 
         t.AfterburnerRunning = Process.GetProcessesByName("MSIAfterburner").Length > 0 ? Tri.Yes : Tri.No;
-        t.AfterburnerStartsWithWindows = StartsWithWindows() ? Tri.Yes : Tri.No;
-        var profiles = new List<AfterburnerProfile>();
         var profileDir = Path.Combine(dir, "Profiles");
+        string? settings = null;
+        try { settings = File.ReadAllText(Path.Combine(profileDir, "MSIAfterburner.cfg")); } catch (Exception) { /* unknown */ }
+        t.AfterburnerStartsWithWindows = StartsWithWindows() || GraphicsParsers.AfterburnerStartsWithWindows(settings) ? Tri.Yes : Tri.No;
+        var profiles = new List<AfterburnerProfile>();
         if (Directory.Exists(profileDir))
             foreach (var f in Directory.EnumerateFiles(profileDir, "*.cfg"))
                 try { profiles.Add(GraphicsParsers.ParseAfterburnerProfile(Path.GetFileName(f), File.ReadAllText(f))); }

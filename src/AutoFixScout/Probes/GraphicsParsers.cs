@@ -91,7 +91,7 @@ public static class GraphicsParsers
                 case "memclk" or "memclkboost": if (off != 0) mem = off; if (inStartup) sMem = off; break;
                 case "corevoltage" or "corevoltageboost": if (off != 0) volt = off; if (inStartup) sVolt = off; break;
                 case "vfcurve":
-                    if (val.Length > 0 && !val.All(c => c == '0')) { curve = true; if (inStartup) sCurve = true; }
+                    if (VfCurveHasOffsets(val)) { curve = true; if (inStartup) sCurve = true; }
                     break;
             }
         }
@@ -99,6 +99,32 @@ public static class GraphicsParsers
         return startup ? new AfterburnerProfile(file, sCore, sMem, sVolt, sCurve, true)
                        : new AfterburnerProfile(file, core, mem, volt, curve, false);
     }
+
+    /// <summary>
+    /// Afterburner stores the NVIDIA voltage/frequency curve even when nothing is overclocked (checked on a real install,
+    /// 2026-11-14): hex of an 8-byte header (format, point count), then per point three floats (offset, voltage mV,
+    /// frequency MHz), then a block that is all zero at stock. A custom curve is any non-zero value other than the
+    /// voltage and frequency of each point. Unreadable data counts as no custom curve.
+    /// </summary>
+    public static bool VfCurveHasOffsets(string? hex)
+    {
+        hex = hex?.Trim();
+        if (string.IsNullOrEmpty(hex) || hex.Length % 2 != 0 || hex.Length < 16) return false;
+        byte[] b;
+        try { b = Convert.FromHexString(hex); } catch (FormatException) { return false; }
+        var count = (long)BitConverter.ToUInt32(b, 4);
+        var pointsEnd = 8 + count * 12;
+        if (count == 0 || pointsEnd > b.Length) return false;
+        for (var i = 0; i < count; i++)
+            if (Math.Abs(BitConverter.ToSingle(b, 8 + i * 12)) > 0.5f) return true;
+        for (var o = (int)pointsEnd; o + 4 <= b.Length; o += 4)
+            if (Math.Abs(BitConverter.ToSingle(b, o)) > 0.5f) return true;
+        return false;
+    }
+
+    /// <summary>"StartWithWindows=1" in the [Settings] section of Afterburner's own Profiles\MSIAfterburner.cfg.</summary>
+    public static bool AfterburnerStartsWithWindows(string? settingsText) =>
+        (settingsText ?? "").Split('\n').Any(l => l.Trim().Replace(" ", "").Equals("StartWithWindows=1", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Win32_SystemEnclosure chassis types of a desktop, tower, all-in-one or mini PC.</summary>
     public static readonly int[] DesktopChassis = { 3, 4, 5, 6, 7, 13, 15, 16, 23, 24, 34, 35, 36 };
