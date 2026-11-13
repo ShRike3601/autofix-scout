@@ -324,4 +324,7 @@ public enum FindingCode
     HealthUsbErrors,
     // Wi-Fi keeps dropping
     NetWifiDrops,
+    // Keyboard layouts
+    InputSeveralLayouts,
+    InputLayoutMismatch,
 }

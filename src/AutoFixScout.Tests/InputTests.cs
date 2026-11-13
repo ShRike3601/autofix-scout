@@ -202,3 +202,123 @@ public class LiveInputTests
         }
     }
 }
+
+public class InputLayoutTests
+{
+    private static KeyboardLayoutInfo L(string klid) => new(klid, KeyboardLayouts.FriendlyName(klid));
+
+    private static InputState State(bool focus = false, SwitchHotkey hk = SwitchHotkey.AltShift, string disp = "en-US", params string[] klids)
+    {
+        if (klids.Length == 0) klids = new[] { "00000409", "00000809" };
+        return new InputState
+        {
+            Devices = new[] { new InputDevice("K", "A", "Keyboard", 0) },
+            StickyKeysFlags = 510, FilterKeysFlags = 126, ToggleKeysFlags = 58, MouseKeysFlags = 186,
+            Layouts = klids.Select(L).ToList(), DefaultLayout = L(klids[0]), DisplayLanguage = disp,
+            LanguageHotkey = hk, LayoutHotkey = hk, TypingFocus = focus,
+        };
+    }
+
+    [Theory]
+    [InlineData("00000409", "US")]
+    [InlineData("00000809", "United Kingdom")]
+    [InlineData("00004009", "India")]
+    public void Klid_FriendlyNames(string klid, string name) => Assert.Equal(name, KeyboardLayouts.FriendlyName(klid));
+
+    [Theory]
+    [InlineData("00000409", 0x409)]
+    [InlineData("d0010409", 0x409)]
+    [InlineData("a0000809", 0x809)]
+    public void Klid_LangId(string klid, int id) => Assert.Equal(id, KeyboardLayouts.LangId(klid));
+
+    [Theory]
+    [InlineData("409")]
+    [InlineData("zzzzzzzz")]
+    [InlineData(null)]
+    public void Klid_Invalid_IsRejected(string? klid)
+    {
+        Assert.False(KeyboardLayouts.TryParseKlid(klid, out _));
+        Assert.Equal(0, KeyboardLayouts.LangId(klid ?? ""));
+    }
+
+    [Theory]
+    [InlineData("1", SwitchHotkey.AltShift)]
+    [InlineData("2", SwitchHotkey.CtrlShift)]
+    [InlineData("3", SwitchHotkey.None)]
+    [InlineData("4", SwitchHotkey.Grave)]
+    [InlineData("9", SwitchHotkey.Unknown)]
+    [InlineData(null, SwitchHotkey.Unknown)]
+    public void Hotkey_Decoding(string? v, SwitchHotkey h) => Assert.Equal(h, KeyboardLayouts.DecodeHotkey(v));
+
+    [Fact]
+    public void SeveralLayouts_WithAltShift_IsReported()
+    {
+        var f = InputTriage.Evaluate(State());
+        Assert.Contains(f, x => x.Code == FindingCode.InputSeveralLayouts);
+        Assert.DoesNotContain(f, x => x.Code == FindingCode.InputLayoutMismatch);
+    }
+
+    [Theory]
+    [InlineData(SwitchHotkey.None)]
+    [InlineData(SwitchHotkey.Grave)]
+    public void SeveralLayouts_WithoutKeyChord_IsNotReported(SwitchHotkey hk) =>
+        Assert.DoesNotContain(InputTriage.Evaluate(State(hk: hk)), x => x.Code == FindingCode.InputSeveralLayouts);
+
+    [Fact]
+    public void OneLayout_IsNotReported() =>
+        Assert.DoesNotContain(InputTriage.Evaluate(State(klids: "00000409")), x => x.Code == FindingCode.InputSeveralLayouts);
+
+    [Fact]
+    public void Mismatch_DefaultLayoutLanguageDiffersFromDisplayLanguage()
+    {
+        var f = InputTriage.Evaluate(State(hk: SwitchHotkey.None, disp: "de-DE", klids: "00000409"));
+        Assert.Contains(f, x => x.Code == FindingCode.InputLayoutMismatch);
+        Assert.DoesNotContain(InputTriage.Evaluate(State(hk: SwitchHotkey.None, disp: "en-GB", klids: "00000409")), x => x.Code == FindingCode.InputLayoutMismatch);
+    }
+
+    [Fact]
+    public void TypingFocus_PutsLayoutFindingsFirst()
+    {
+        var s = State(); s.StickyKeysFlags = 511;
+        Assert.Equal(FindingCode.StickyKeysOn, InputTriage.Evaluate(s)[0].Code);
+        s.TypingFocus = true;
+        Assert.Equal(FindingCode.InputSeveralLayouts, InputTriage.Evaluate(s)[0].Code);
+        var l = InputTriage.Ladder(s, InputTriage.Evaluate(s));
+        Assert.Equal("language_settings", l[0].Id);
+    }
+
+    [Fact]
+    public void Ladder_OffersSettingsPagesAndTip_AndSentencesFollowTheGuide()
+    {
+        foreach (var s in new[] { State(), State(true), State(hk: SwitchHotkey.None, disp: "de-DE", klids: "00000409") })
+        {
+            var f = InputTriage.Evaluate(s);
+            var l = InputTriage.Ladder(s, f);
+            Assert.Contains(l, r => r.Arg == "language");
+            foreach (var t in f.Select(x => x.PlainMessage).Concat(l.Select(r => r.Say)))
+                Assert.DoesNotMatch(@"n't|'d |'ll |\bI\b|\bwe\b|!|\bit's\b|\bthat's\b", t);
+            Assert.Equal(l.Count, l.Select(r => r.Id).Distinct().Count());
+        }
+        var both = InputTriage.Ladder(State(), InputTriage.Evaluate(State()));
+        Assert.Contains(both, r => r.Arg == "typing");
+        Assert.Contains(both, r => r.ActionId == "ui.human_step" && r.Say.Contains("Windows and Space"));
+    }
+}
+
+[Collection("Live machine")]
+public class LiveLayoutTests
+{
+    [Fact]
+    public void Read_Layouts_IsReadOnlyAndSensible()
+    {
+        var path = Environment.GetEnvironmentVariable("AFS_LIVE");
+        if (string.IsNullOrEmpty(path)) return;
+        var s = InputFlow.Read();
+        Assert.DoesNotContain(s.ProbeErrors, e => e.StartsWith("Layouts"));
+        Assert.NotEmpty(s.Layouts);
+        Assert.NotNull(s.DefaultLayout);
+        Assert.False(string.IsNullOrEmpty(s.DisplayLanguage));
+        var f = InputTriage.Evaluate(s);
+        File.AppendAllText(path, $"G3 layouts: {string.Join(", ", s.Layouts.Select(l => l.Klid + " " + l.Name))}; default {s.DefaultLayout?.Name}; display {s.DisplayLanguage}; hotkeys {s.LanguageHotkey}/{s.LayoutHotkey}; findings {string.Join(",", f.Select(x => x.Code))}\n");
+    }
+}
