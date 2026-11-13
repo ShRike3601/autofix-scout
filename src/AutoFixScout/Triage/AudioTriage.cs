@@ -372,4 +372,11 @@ public enum FindingCode
     GpuPcieLinkNarrow,
     GpuMonitorOnIntegrated,
     GpuResizableBarOff,
+    // Short load test (Stress area). A test without any slowdown uses LooksNormal.
+    StressCpuThrottles,
+    StressGpuOverheats,
+    StressGpuPowerLimited,
+    StressGpuClocksLow,
+    StressStoppedForSafety,
+    StressNotRun,
 }

@@ -105,6 +105,16 @@ public static class GraphicsTriage
         string.Join("; ", t.Profiles.Where(p => p.InStartupSection && p.HasOffsets)
             .Select(p => $"core {p.CoreClockKhz / 1000} MHz, memory {p.MemoryClockKhz / 1000} MHz, voltage {p.VoltageMv} mV{(p.CustomCurve ? ", custom curve" : "")}"));
 
+    // Rungs shared with the stress test.
+    public static Rung CoolingRung() => new("gpu_cooling", "ui.human_step", 0,
+        "Please make sure the fans of the graphics card turn and the air can flow freely. Switch the computer off, clean the dust from the card and the case fans with a soft brush or compressed air, " +
+        "and leave space around the computer. On a laptop, please use it on a hard, flat surface.");
+    public static Rung PowerCableRung() => new("gpu_power_cable", "ui.human_step", 0,
+        "Please switch the computer off and check that the power cables of the graphics card are pushed in firmly at both ends. A helper can check the power supply if the problem remains.");
+    public static Rung CleanDriverRung() => new("gpu_clean_driver", "ui.human_step", 0,
+        "Please download the latest driver for your graphics card from nvidia.com, amd.com or intel.com. In the installer, select \"Custom\" and turn on \"Perform a clean installation\". " +
+        "Windows may ask for your permission, and the screen may go black for a moment.");
+
     /// <summary>Least risky first. Nothing changes a driver; the person does every step.</summary>
     public static IReadOnlyList<Rung> Ladder(GraphicsState s, IReadOnlyList<Finding> findings)
     {
@@ -117,12 +127,9 @@ public static class GraphicsTriage
                 "Please open MSI Afterburner and select the \"Reset\" button. Then turn off \"Apply overclocking at system startup\" under \"Settings\", and select \"Apply\". " +
                 "This returns the graphics card to its factory speed, and you can set the overclock again later."));
         if (codes.Contains(FindingCode.GpuOverheating))
-            rungs.Add(new("gpu_cooling", "ui.human_step", 0,
-                "Please make sure the fans of the graphics card turn and the air can flow freely. Switch the computer off, clean the dust from the card and the case fans with a soft brush or compressed air, " +
-                "and leave space around the computer. On a laptop, please use it on a hard, flat surface."));
+            rungs.Add(CoolingRung());
         if (codes.Contains(FindingCode.GpuPowerBrake))
-            rungs.Add(new("gpu_power_cable", "ui.human_step", 0,
-                "Please switch the computer off and check that the power cables of the graphics card are pushed in firmly at both ends. A helper can check the power supply if the problem remains."));
+            rungs.Add(PowerCableRung());
         if (codes.Contains(FindingCode.GpuPcieLinkNarrow))
             rungs.Add(new("gpu_reseat", "ui.human_step", 0,
                 "Please switch the computer off, unplug it and press the graphics card firmly into its slot until the latch clicks. Check that the card sits in the top, longest slot of the motherboard."));
@@ -131,9 +138,7 @@ public static class GraphicsTriage
                 "Please switch the computer off and move the monitor cable from the back panel of the motherboard to the connector on the graphics card, " +
                 "which sits lower on the back of the computer. Then start the computer again."));
         if (codes.Contains(FindingCode.GpuDriverResets) || codes.Contains(FindingCode.GpuOverclockUnstable) || codes.Contains(FindingCode.GpuDriverOld))
-            rungs.Add(new("gpu_clean_driver", "ui.human_step", 0,
-                "Please download the latest driver for your graphics card from nvidia.com, amd.com or intel.com. In the installer, select \"Custom\" and turn on \"Perform a clean installation\". " +
-                "Windows may ask for your permission, and the screen may go black for a moment."));
+            rungs.Add(CleanDriverRung());
         if (codes.Contains(FindingCode.GpuResizableBarOff))
             rungs.Add(new("gpu_enable_rebar", "ui.human_step", 0,
                 "Resizable BAR is switched on in the BIOS. Please restart the computer and open the BIOS setup. Turn on \"Above 4G Decoding\" and \"Re-Size BAR Support\", and turn off \"CSM\". " +
