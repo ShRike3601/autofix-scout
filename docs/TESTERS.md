@@ -1,7 +1,8 @@
 # Testing AutoFix Scout
 
 Thank you for helping to test AutoFix Scout, an early version of an application that finds and resolves common
-sound, camera and internet problems on Windows. This test build is not yet digitally signed, so Windows will show a
+Windows problems: sound, camera, microphone, internet and Wi-Fi, Bluetooth, printers, the screen, keyboard and mouse,
+a slow or full computer, Windows Update, start-up, and damaged Windows files or apps. This build is not yet digitally signed, so Windows will show a
 warning before it runs.
 
 ## Requirements
