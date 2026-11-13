@@ -493,3 +493,10 @@ Core only; the UI session wires it (see the UI requests in the g9 report). Files
 - History: `SessionLog.AddSteps` now stores `step_log.detail` and writes an `undo_record` for driver changes (save point id)
   and switched-off start-up apps; `ChangeHistory.List/UndoAsync` use them. Other changes are listed with a hint only.
 - Uninstall asks (interactive only, default No) whether to delete both data folders; silent uninstall (updates) keeps them.
+- Status ~23:30 IST (usage limit hit): ALL agents merged into perf (g5..g11); 1112 tests pass; combined installer
+  compiles in CI (run 43463336447 success). UI requests sent to the UI session (docs/UI_REQUESTS_PART8.md).
+  Manual test build 0.3.0-rc1 started: run 43464265774 (workflow_dispatch input "version").
+  NEXT: (1) bench upgrade test via elevated runner (C:\afs-bench\run-job.ps1 picks jobs from C:\afs-bench\jobs):
+  silent install v0.2.0 setup, then the rc1 setup silently; expect one Uninstall entry (DisplayVersion 0.3.0-rc1),
+  one Start menu entry, no old files; then interactive uninstall data prompt by hand. (2) merge the UI session's
+  branch when it reports its hash. (3) merge perf -> main, tag v0.3.0. AutoFix Scout is currently not installed here.
