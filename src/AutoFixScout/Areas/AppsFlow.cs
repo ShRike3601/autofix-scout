@@ -33,34 +33,33 @@ public static class AppsFlow
     public static AppsState Read(AppsFocus focus = AppsFocus.All)
     {
         var s = new AppsState { Focus = focus };
-        var errors = new List<string>();
-        try
+        // The parts read separate fields, so they run side by side (the Store package list and the clock check over the
+        // network are the slow ones). Errors keep this order.
+        var parts = new List<(string? Name, Action Read)>
         {
-            s.StorePackages = ReadPackages();
-            s.StorePackagesRead = true;
-        }
-        catch (Exception ex) { errors.Add("store packages: " + ex.Message); }
-        try { s.Services = AppsTriage.ServiceNames.Select(ReadService).ToList(); }
-        catch (Exception ex) { errors.Add("services: " + ex.Message); }
-        // No internet is common when the Store fails; an unread clock is simply not judged.
-        try { s.ClockOffsetSeconds = ReadClockOffset(); }
-        catch (Exception) { }
-        try
+            ("store packages", () => { s.StorePackages = ReadPackages(); s.StorePackagesRead = true; }),
+            ("services", () => s.Services = AppsTriage.ServiceNames.Select(ReadService).ToList()),
+            // No internet is common when the Store fails; an unread clock is simply not judged.
+            (null, () => s.ClockOffsetSeconds = ReadClockOffset()),
+            ("office", () =>
+            {
+                if (OfficeClickToRun.Read() is { } c)
+                    s.Office = new OfficeInstall(c.Platform ?? "", c.Version ?? "", c.Products ?? "");
+            }),
+            ("onedrive", () =>
+            {
+                if (AppRepairs.FindOneDrive() is { } od)
+                    s.OneDrive = new OneDriveInstall(AppRepairs.IsPerUser(od), AppRepairs.OneDriveRunning());
+            }),
+        };
+        if (focus == AppsFocus.Install) parts.Add(("installer", () => s.Install = ReadInstall()));
+        var failures = new string?[parts.Count];
+        Task.WaitAll(parts.Select((p, i) => Task.Run(() =>
         {
-            if (OfficeClickToRun.Read() is { } c)
-                s.Office = new OfficeInstall(c.Platform ?? "", c.Version ?? "", c.Products ?? "");
-        }
-        catch (Exception ex) { errors.Add("office: " + ex.Message); }
-        try
-        {
-            if (AppRepairs.FindOneDrive() is { } od)
-                s.OneDrive = new OneDriveInstall(AppRepairs.IsPerUser(od), AppRepairs.OneDriveRunning());
-        }
-        catch (Exception ex) { errors.Add("onedrive: " + ex.Message); }
-        if (focus == AppsFocus.Install)
-            try { s.Install = ReadInstall(); }
-            catch (Exception ex) { errors.Add("installer: " + ex.Message); }
-        s.ProbeErrors = errors;
+            try { p.Read(); }
+            catch (Exception ex) { if (p.Name != null) failures[i] = p.Name + ": " + ex.Message; }
+        })).ToArray());
+        s.ProbeErrors = failures.Where(e => e != null).Select(e => e!).ToList();
         return s;
     }
 

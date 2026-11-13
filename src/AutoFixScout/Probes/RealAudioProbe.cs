@@ -147,16 +147,25 @@ public sealed class RealAudioProbe : IAudioProbe
 
     internal static List<AudioDeviceInfo> ReadMediaDevices()
     {
-        var drivers = new Dictionary<string, ManagementBaseObject>(StringComparer.OrdinalIgnoreCase);
-        using (var q = new ManagementObjectSearcher(
-            "SELECT DeviceID, DriverVersion, DriverDate, DriverProviderName FROM Win32_PnPSignedDriver WHERE DeviceClass = 'MEDIA'"))
+        // The two WMI queries do not depend on each other (Win32_PnPSignedDriver is the slow one), so they run side by side.
+        var driversTask = Task.Run(() =>
+        {
+            var map = new Dictionary<string, ManagementBaseObject>(StringComparer.OrdinalIgnoreCase);
+            using var q = new ManagementObjectSearcher(
+                "SELECT DeviceID, DriverVersion, DriverDate, DriverProviderName FROM Win32_PnPSignedDriver WHERE DeviceClass = 'MEDIA'");
             foreach (var d in q.Get())
-                if (d["DeviceID"] is string id) drivers[id] = d;
+                if (d["DeviceID"] is string id) map[id] = d;
+            return map;
+        });
+
+        var found = new List<ManagementBaseObject>();
+        using (var devices = new ManagementObjectSearcher(
+            "SELECT Name, DeviceID, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE PNPClass = 'MEDIA'"))
+            foreach (var dev in devices.Get()) found.Add(dev);
+        var drivers = driversTask.GetAwaiter().GetResult();
 
         var result = new List<AudioDeviceInfo>();
-        using var devices = new ManagementObjectSearcher(
-            "SELECT Name, DeviceID, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE PNPClass = 'MEDIA'");
-        foreach (var dev in devices.Get())
+        foreach (var dev in found)
         {
             var id = dev["DeviceID"] as string ?? "";
             drivers.TryGetValue(id, out var drv);

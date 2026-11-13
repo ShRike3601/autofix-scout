@@ -14,7 +14,7 @@ public sealed class SessionLog : IDisposable
           session_id TEXT PRIMARY KEY,
           started_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
           ended_at TEXT,
-          symptom TEXT NOT NULL CHECK (symptom IN ('audio','camera','network','microphone','bluetooth','printer','display','storage','update','other')),
+          symptom TEXT NOT NULL CHECK (length(symptom) BETWEEN 1 AND 40),
           outcome TEXT CHECK (outcome IN ('fixed','not_fixed','probable_hardware','abandoned','no_fault_found')),
           app_version TEXT NOT NULL,
           playbook_version TEXT NOT NULL);
@@ -35,7 +35,8 @@ public sealed class SessionLog : IDisposable
           finished_at TEXT,
           result TEXT CHECK (result IN ('success','failed','undone','skipped')),
           user_confirmed_fixed INTEGER,
-          error TEXT);
+          error TEXT,
+          detail TEXT);
         CREATE TABLE IF NOT EXISTS undo_record (
           undo_id INTEGER PRIMARY KEY AUTOINCREMENT,
           step_id INTEGER NOT NULL REFERENCES step_log(step_id),
@@ -78,17 +79,20 @@ public sealed class SessionLog : IDisposable
         MigrateSessionOutcomes();
         Exec("PRAGMA foreign_keys = ON;");
         Exec(Schema);
+        // A step_log made before the change history existed has no detail column.
+        if (Scalar("SELECT COUNT(*) FROM pragma_table_info('step_log') WHERE name = 'detail'") is 0L)
+            Exec("ALTER TABLE step_log ADD COLUMN detail TEXT;");
     }
 
     /// <summary>
     /// A session table made by an older version has CHECKs that reject newer outcomes ('no_fault_found') or problem
-    /// areas ('printer', ...). SQLite can't change a CHECK, so the table is rebuilt with its rows kept.
+    /// areas (any topic name is accepted now; older tables listed a fixed set). SQLite can't change a CHECK, so the table is rebuilt with its rows kept.
     /// Runs with foreign keys off (step_log points at session).
     /// </summary>
     private void MigrateSessionOutcomes()
     {
         var sql = Scalar("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'session'") as string;
-        if (sql is null || (sql.Contains("no_fault_found") && sql.Contains("'update'"))) return;
+        if (sql is null || (sql.Contains("no_fault_found") && sql.Contains("length(symptom)"))) return;
         Exec("PRAGMA foreign_keys = OFF;");
         Exec("BEGIN;" +
              SessionTable.Replace("EXISTS session (", "EXISTS session_new (") +
@@ -122,15 +126,53 @@ public sealed class SessionLog : IDisposable
     public void AddSteps(string sessionId, IEnumerable<StepLog> steps)
     {
         foreach (var s in steps)
+        {
             Exec("""
                 INSERT INTO step_log (session_id, playbook_step, action_id, tier, proposed_by, approved, approved_at,
-                                      started_at, finished_at, result, user_confirmed_fixed, error)
-                VALUES ($sid, $step, $action, $tier, $by, $approved, $approvedAt, $started, $finished, $result, $fixed, $error)
+                                      started_at, finished_at, result, user_confirmed_fixed, error, detail)
+                VALUES ($sid, $step, $action, $tier, $by, $approved, $approvedAt, $started, $finished, $result, $fixed, $error, $detail)
                 """,
                 ("$sid", sessionId), ("$step", s.PlaybookStep), ("$action", s.ActionId), ("$tier", s.Tier), ("$by", s.ProposedBy),
                 ("$approved", s.Approved ? 1 : 0), ("$approvedAt", Iso(s.ApprovedAt)), ("$started", Iso(s.StartedAt)),
                 ("$finished", Iso(s.FinishedAt)), ("$result", s.Result?.ToString().ToLowerInvariant()),
-                ("$fixed", s.UserConfirmedFixed is { } f ? (f ? 1 : 0) : null), ("$error", s.Error));
+                ("$fixed", s.UserConfirmedFixed is { } f ? (f ? 1 : 0) : null), ("$error", s.Error), ("$detail", s.Detail));
+            // A change that can be put back gets an undo_record (see ChangeHistory).
+            if (s.Approved && s.Result == StepResult.Success && ChangeHistory.UndoFor(s.ActionId, s.Detail) is { } undo)
+                Exec("INSERT INTO undo_record (step_id, kind, payload) VALUES (last_insert_rowid(), $kind, $payload)",
+                    ("$kind", undo.Kind), ("$payload", undo.Payload));
+        }
+    }
+
+    /// <summary>One approved, successful step with its undo record (if any), for <see cref="ChangeHistory"/>.</summary>
+    public sealed record ChangeRow(long StepId, DateTime WhenUtc, string ActionId, string? Detail, string Result,
+        long? UndoId, string? UndoKind, string? UndoPayload, bool UndoApplied);
+
+    /// <summary>Steps that ran with the person's approval and succeeded (or were undone later), newest first.</summary>
+    public IReadOnlyList<ChangeRow> ChangeRows()
+    {
+        using var cmd = new SqliteCommand("""
+            SELECT s.step_id, COALESCE(s.finished_at, s.started_at, s.approved_at), s.action_id, s.detail, s.result,
+                   u.undo_id, u.kind, u.payload, u.applied
+            FROM step_log s LEFT JOIN undo_record u ON u.step_id = s.step_id
+            WHERE s.approved = 1 AND s.result IN ('success', 'undone')
+            ORDER BY COALESCE(s.finished_at, s.started_at, s.approved_at) DESC, s.step_id DESC
+            """, _db);
+        using var r = cmd.ExecuteReader();
+        var list = new List<ChangeRow>();
+        while (r.Read())
+            list.Add(new ChangeRow(r.GetInt64(0),
+                r.IsDBNull(1) ? DateTime.MinValue : DateTime.Parse(r.GetString(1), null, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal),
+                r.GetString(2), r.IsDBNull(3) ? null : r.GetString(3), r.GetString(4),
+                r.IsDBNull(5) ? null : r.GetInt64(5), r.IsDBNull(6) ? null : r.GetString(6), r.IsDBNull(7) ? null : r.GetString(7),
+                !r.IsDBNull(8) && r.GetInt64(8) != 0));
+        return list;
+    }
+
+    /// <summary>Records that a change was put back.</summary>
+    public void MarkUndone(long stepId)
+    {
+        Exec("UPDATE undo_record SET applied = 1, applied_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE step_id = $id", ("$id", stepId));
+        Exec("UPDATE step_log SET result = 'undone' WHERE step_id = $id", ("$id", stepId));
     }
 
     public void End(string sessionId, Outcome outcome) =>

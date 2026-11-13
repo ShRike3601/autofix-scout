@@ -34,7 +34,7 @@ public static class ShellFlow
         var errors = new List<string>();
         try
         {
-            var h = new RealHealthProbe().Read();
+            var h = RealHealthProbe.ReadEventLogs();
             s.ShellCrashes = HealthTriage.ShellCrashes(h);
             errors.AddRange(h.ProbeErrors.Where(e => e.StartsWith("event log", StringComparison.Ordinal)));
         }

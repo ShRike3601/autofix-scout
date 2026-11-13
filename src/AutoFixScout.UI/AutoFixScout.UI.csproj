@@ -10,14 +10,15 @@
     <LangVersion>latest</LangVersion>
     <!-- Packaging for portable installer -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!-- English only: drops the localized resource folders of the packages from the install -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- Faster start: precompiled code (applies to dotnet publish -r ...). Tiered PGO re-optimizes hot code after start. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <TieredPGO>true</TieredPGO>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="../AutoFixScout/AutoFixScout.csproj" />
-    <!-- Data binding and converters -->
-    <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
-    <!-- Styling -->
-    <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.39" />
   </ItemGroup>
 
   <ItemGroup>

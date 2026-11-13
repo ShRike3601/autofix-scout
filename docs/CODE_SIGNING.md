@@ -24,11 +24,15 @@ SignPath.
 ## Privacy policy
 
 This program will not transfer any information to other networked systems unless specifically requested by the user
-or the person installing or operating it.
+or the person installing or operating it, except the version check described below, which can be turned off.
 
 The only network connections it makes are: Microsoft's connection test address (`www.msftconnecttest.com`) and a DNS
 lookup of it, to check whether the internet works, and, only when the user chooses that repair, a download of the
-Microsoft Visual C++ runtime installer from `aka.ms`. No personal data, device data or usage data is sent.
+Microsoft Visual C++ runtime installer from `aka.ms`. In addition, once when the program starts (and at most every six
+hours) it contacts `api.github.com` to ask for the latest release of this project, so that it can offer an update;
+the request carries only the program name `AutoFixScout` as user agent. The setup file is downloaded from `github.com`
+only when the user selects "Update", and its size and SHA-256 checksum are verified before it is started. The user can
+turn the version check off in the settings ("Check for updates"). No personal data, device data or usage data is sent.
 
 ## System changes
 

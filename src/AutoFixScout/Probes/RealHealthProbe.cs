@@ -22,12 +22,10 @@ public sealed class RealHealthProbe : IHealthProbe
     public HealthState Read()
     {
         var s = new HealthState();
-        var errors = new List<string>();
-        void Part(string name, Action read)
-        {
-            try { read(); }
-            catch (Exception ex) { errors.Add($"{name}: {ex.Message}"); }
-        }
+        // Every part reads its own fields of s and touches nothing else, so they run side by side (the slowest are
+        // the clock check over the network, Get-AppxPackage and the WMI/event log reads). Errors keep the order below.
+        var parts = new List<(string Name, Action Read)>();
+        void Part(string name, Action read) => parts.Add((name, read));
 
         Part("event log (programs)", () => ReadAppEvents(s));
         Part("event log (system)", () => ReadSystemEvents(s));
@@ -57,6 +55,24 @@ public sealed class RealHealthProbe : IHealthProbe
         Part("low memory events", () => s.LowMemoryEvents = Query("System", "Provider[@Name='Microsoft-Windows-Resource-Exhaustion-Detector'] and EventID=2004").Count());
         Part("USB devices", () => s.Usb = ReadUsb());
 
+        var errors = new string?[parts.Count];
+        Task.WaitAll(parts.Select((p, i) => Task.Run(() =>
+        {
+            try { p.Read(); }
+            catch (Exception ex) { errors[i] = $"{p.Name}: {ex.Message}"; }
+        })).ToArray());
+
+        s.ProbeErrors = errors.Where(e => e != null).Select(e => e!).ToList();
+        return s;
+    }
+
+    /// <summary>Only the two event log parts of <see cref="Read"/> (used by the Start menu / taskbar check, which needs nothing else).</summary>
+    public static HealthState ReadEventLogs()
+    {
+        var s = new HealthState();
+        var errors = new List<string>();
+        try { ReadAppEvents(s); } catch (Exception ex) { errors.Add($"event log (programs): {ex.Message}"); }
+        try { ReadSystemEvents(s); } catch (Exception ex) { errors.Add($"event log (system): {ex.Message}"); }
         s.ProbeErrors = errors;
         return s;
     }
@@ -122,6 +138,15 @@ public sealed class RealHealthProbe : IHealthProbe
     /// <summary>The event stores the HRESULT as a signed number (-2147009278) or text; returns "0x80073d02".</summary>
     public static string HexCode(string? value) =>
         int.TryParse(value, out var n) ? $"0x{unchecked((uint)n):x8}" : (value ?? "").Trim().ToLowerInvariant();
+
+    /// <summary>
+    /// Blue screens, unexpected shutdowns (Kernel-Power 41) and uncorrected hardware errors (WHEA) in the last 14 days,
+    /// counted the same way as the full check-up. Shared with the performance check; read-only.
+    /// </summary>
+    public static (int BlueScreens, int UnexpectedShutdowns, int HardwareErrors) ReadInstabilitySignals() => (
+        Query("System", "(Provider[@Name='Microsoft-Windows-WER-SystemErrorReporting'] or Provider[@Name='BugCheck']) and EventID=1001").Count(),
+        Query("System", "Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=41").Count(),
+        Query("System", "Provider[@Name='Microsoft-Windows-WHEA-Logger'] and (Level=1 or Level=2)").Count());
 
     private static void ReadSystemEvents(HealthState s)
     {
@@ -257,7 +282,10 @@ public sealed class RealHealthProbe : IHealthProbe
     private static readonly System.Text.RegularExpressions.Regex LiveKernelCode =
         new(@"\bP1\s*:\s*(141|117)\b", System.Text.RegularExpressions.RegexOptions.Compiled);
 
-    private static void ReadGraphicsResets(HealthState s)
+    private static void ReadGraphicsResets(HealthState s) => s.GraphicsResets = CountGraphicsResets();
+
+    /// <summary>Graphics driver resets in the last 14 days (Display 4101, LiveKernelEvent 141 or 117). Shared with the graphics check.</summary>
+    public static int CountGraphicsResets()
     {
         var n = Query("System", "Provider[@Name='Display'] and EventID=4101").Count();
         foreach (var e in Query("Application", "Provider[@Name='Windows Error Reporting'] and EventID=1001"))
@@ -267,7 +295,7 @@ public sealed class RealHealthProbe : IHealthProbe
             if (text.Length == 0) text = string.Join(" ", e.Properties.Select(p => p.Value?.ToString() ?? ""));
             if (text.Contains("LiveKernelEvent", StringComparison.OrdinalIgnoreCase) && LiveKernelCode.IsMatch(text)) n++;
         }
-        s.GraphicsResets = n;
+        return n;
     }
 
     // ---- USB ----

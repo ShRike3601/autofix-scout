@@ -27,6 +27,7 @@ public static partial class SymptomRouter
         ["printer"] = "Printers, the print queue and the print service.",
         ["scanner"] = "Scanners, the scanning service and the printer settings they share.",
         ["display"] = "Screens and projectors, brightness and the display adapter.",
+        ["graphics"] = "The graphics card, its driver, temperature, link to the motherboard and overclocking tools such as MSI Afterburner.",
         ["shell"] = "The Start menu, the taskbar, search and the parts of Windows that draw them.",
         ["store"] = "The Microsoft Store, its services and app downloads.",
         ["office"] = "Word, Excel, Outlook and the Office repair tool.",
@@ -36,6 +37,7 @@ public static partial class SymptomRouter
         ["input"] = "The keyboard, mouse and touchpad, and keyboard accessibility settings.",
         ["install"] = "Programs that fail to install, the Windows Installer service and a waiting restart.",
         ["notifications"] = "Notifications, Do not disturb and the apps allowed to show notifications.",
+        ["performance"] = "Processor speed limits from heat or power, the power plan, memory speed, the BIOS and signs of unstable hardware.",
         ["health"] = "The whole computer: crashes, drives, services, updates, settings and recent changes.",
     };
 

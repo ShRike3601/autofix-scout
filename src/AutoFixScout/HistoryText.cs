@@ -6,8 +6,10 @@ public static class HistoryText
     public static string Symptom(string s) => s switch
     {
         "audio" => "Sound", "camera" => "Camera", "network" => "Internet connection", "microphone" => "Microphone",
-        "bluetooth" => "Bluetooth", "printer" => "Printer", "display" => "Screen", "storage" => "Slow or full computer",
-        "update" => "Windows Update", _ => "Other check",
+        "bluetooth" => "Bluetooth", "printer" => "Printer", "display" => "Screen", "performance" => "Computer speed", "graphics" => "Graphics card", "storage" => "Slow or full computer",
+        "update" => "Windows Update", "stress" => "Short load test", "health" => "Windows health", "shell" => "Start menu and taskbar",
+        "apps" => "Apps and programs", "security" => "Windows security", "power" => "Battery and power", "input" => "Keyboard, mouse and touchpad",
+        _ => "Other check",
     };
 
     public static string Outcome(string? o) => o switch
