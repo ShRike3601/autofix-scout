@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version for a manual test build, e.g. 0.3.0-rc1 (no release is published)"
+        required: false
 
 jobs:
   build:
@@ -20,7 +24,7 @@ jobs:
       # as a plain project reference it would be framework-dependent and fail on PCs without .NET.
       - name: Publish win-x64 and win-arm64
         run: |
-          $version = if ("${{ github.ref }}" -like 'refs/tags/v*') { "${{ github.ref_name }}".TrimStart('v') } else { "0.0.${{ github.run_number }}-dev" }
+          $version = if ("${{ github.ref }}" -like 'refs/tags/v*') { "${{ github.ref_name }}".TrimStart('v') } elseif ("${{ inputs.version }}" -ne "") { "${{ inputs.version }}" } else { "0.0.${{ github.run_number }}-dev" }
           foreach ($rid in 'win-x64', 'win-arm64') {
             $out = "publish/$rid"
             dotnet publish src/AutoFixScout.UI/AutoFixScout.UI.csproj -c Release -r $rid --self-contained true -o $out "-p:Version=$version"
@@ -39,7 +43,7 @@ jobs:
       - name: Build installer
         id: setup
         run: |
-          $version = if ("${{ github.ref }}" -like 'refs/tags/v*') { "${{ github.ref_name }}".TrimStart('v') } else { "0.0.${{ github.run_number }}-dev" }
+          $version = if ("${{ github.ref }}" -like 'refs/tags/v*') { "${{ github.ref_name }}".TrimStart('v') } elseif ("${{ inputs.version }}" -ne "") { "${{ inputs.version }}" } else { "0.0.${{ github.run_number }}-dev" }
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (!(Test-Path $iscc)) { choco install innosetup -y --no-progress; if ($LASTEXITCODE) { exit 1 } }
           & $iscc /Q "/DAppVersion=$version" "/DSourceX64=$PWD\publish\win-x64" "/DSourceArm64=$PWD\publish\win-arm64" "/DOutDir=$PWD\dist" installer\AutoFixScout.iss
