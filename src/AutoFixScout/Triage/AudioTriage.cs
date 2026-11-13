@@ -361,4 +361,15 @@ public enum FindingCode
     PerfRamBelowRated,
     PerfRamSingleChannel,
     PerfLowRam,
+    // Graphics card (Graphics area)
+    GpuOverheating,
+    GpuOverclockUnstable,
+    GpuOverclockActive,
+    GpuOverclockToolInstalled,
+    GpuDriverResets,
+    GpuDriverOld,
+    GpuPowerBrake,
+    GpuPcieLinkNarrow,
+    GpuMonitorOnIntegrated,
+    GpuResizableBarOff,
 }
