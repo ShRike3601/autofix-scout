@@ -31,6 +31,7 @@ public static partial class SymptomRouter
         ["scanner"] = new("scanner", "Scanner not working", "This sounds like a problem with the scanner."),
         ["install"] = new("install", "A program will not install", "This sounds like a problem with installing a program."),
         ["notifications"] = new("notifications", "Notifications are missing", "This sounds like a problem with notifications."),
+        ["performance"] = new("performance", "Computer or games running slowly", "This sounds like a computer that has become slow, or games that stutter."),
         ["health"] = new("health", "Full computer check-up", "AutoFix Scout will check the whole computer for common software problems."),
     };
 
@@ -67,6 +68,8 @@ public static partial class SymptomRouter
                    new[] { "restart", "restarts", "reboot", "error", "errors", "broken", "weird", "strange" }),
         ("program", new[] { "keeps closing", "keeps crashing", "stopped working", "not responding", "won't open", "wont open", "will not open", "doesn't open", "does not open", "closes by itself", "app crash", "freezes" },
                     new[] { "crash", "crashes", "crashing", "closes", "freeze", "freezing", "hangs", "error message", "missing dll", ".dll", "vcruntime", "msvcp" }),
+        ("performance", new[] { "slow games", "games stutter", "game stutter", "stuttering", "fps drop", "low fps", "performance drop", "performance dropped", "got slow", "suddenly slow", "game lag", "lag in games", "lagging in games", "overheating", "too hot", "fans loud", "loud fan", "fan is loud", "fan noise", "fans are loud" },
+                        new[] { "stutter", "fps", "throttle", "throttling", "overheat", "game", "games", "gaming", "framerate" }),
         ("storage", new[] { "running slow", "very slow", "is slow", "disk full", "out of space", "low disk", "takes long to start", "slow startup" },
                     new[] { "slow", "sluggish", "lag", "lagging", "space", "storage", "full", "disk", "memory", "startup" }),
         ("update", new[] { "windows update", "update failed", "updates fail", "update error", "update stuck", "cannot update", "can't update" },

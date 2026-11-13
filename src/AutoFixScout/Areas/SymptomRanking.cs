@@ -36,6 +36,7 @@ public static partial class SymptomRouter
         ["input"] = "The keyboard, mouse and touchpad, and keyboard accessibility settings.",
         ["install"] = "Programs that fail to install, the Windows Installer service and a waiting restart.",
         ["notifications"] = "Notifications, Do not disturb and the apps allowed to show notifications.",
+        ["performance"] = "Processor speed limits from heat or power, the power plan, memory speed, the BIOS and signs of unstable hardware.",
         ["health"] = "The whole computer: crashes, drives, services, updates, settings and recent changes.",
     };
 

@@ -123,6 +123,15 @@ public sealed class RealHealthProbe : IHealthProbe
     public static string HexCode(string? value) =>
         int.TryParse(value, out var n) ? $"0x{unchecked((uint)n):x8}" : (value ?? "").Trim().ToLowerInvariant();
 
+    /// <summary>
+    /// Blue screens, unexpected shutdowns (Kernel-Power 41) and uncorrected hardware errors (WHEA) in the last 14 days,
+    /// counted the same way as the full check-up. Shared with the performance check; read-only.
+    /// </summary>
+    public static (int BlueScreens, int UnexpectedShutdowns, int HardwareErrors) ReadInstabilitySignals() => (
+        Query("System", "(Provider[@Name='Microsoft-Windows-WER-SystemErrorReporting'] or Provider[@Name='BugCheck']) and EventID=1001").Count(),
+        Query("System", "Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=41").Count(),
+        Query("System", "Provider[@Name='Microsoft-Windows-WHEA-Logger'] and (Level=1 or Level=2)").Count());
+
     private static void ReadSystemEvents(HealthState s)
     {
         s.BlueScreens = Query("System", "(Provider[@Name='Microsoft-Windows-WER-SystemErrorReporting'] or Provider[@Name='BugCheck']) and EventID=1001").Count();
