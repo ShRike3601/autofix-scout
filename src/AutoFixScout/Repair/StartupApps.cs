@@ -44,6 +44,9 @@ public static class StartupApps
         return b;
     }
 
+    /// <summary>The 12 bytes Task Manager writes when an entry is switched on again: 02 00 00 00 and no time.</summary>
+    public static byte[] EnabledValue() => new byte[] { 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
     // ---- what may be offered (pure) ----
 
     private static readonly string[] SecurityWords =
@@ -211,5 +214,19 @@ public static class StartupApps
         approved.SetValue(valueName, DisabledValue(DateTime.UtcNow), RegistryValueKind.Binary);
         var prior = before is null ? "no value (enabled)" : Convert.ToHexString(before);
         return (true, $"startup entry '{name}' disabled in StartupApproved\\{approvedName}; before: {prior}");
+    }
+
+    /// <summary>
+    /// Switches an entry that startup.disable turned off back on, exactly as Task Manager does. Only the two places
+    /// startup.disable writes to are accepted, and only a value that exists is changed.
+    /// </summary>
+    public static (bool Ok, string Detail) Enable(string name, string approvedName)
+    {
+        if (!IsValidName(name) || approvedName is not ("Run" or "StartupFolder")) return (false, "startup.enable: invalid entry, nothing changed");
+        using var approved = Registry.CurrentUser.OpenSubKey(ApprovedKey + approvedName, writable: true);
+        var valueName = approved?.GetValueNames().FirstOrDefault(v => v.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (approved is null || valueName is null) return (true, $"startup entry '{name}' is already enabled");
+        approved.SetValue(valueName, EnabledValue(), RegistryValueKind.Binary);
+        return (true, $"startup entry '{name}' enabled in StartupApproved\\{approvedName}");
     }
 }

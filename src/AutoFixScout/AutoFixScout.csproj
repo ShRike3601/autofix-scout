@@ -19,4 +19,9 @@
   <ItemGroup>
     <InternalsVisibleTo Include="AutoFixScout.Tests" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Built-in "What is new" text, used when the GitHub release notes could not be fetched. -->
+    <EmbeddedResource Include="../../docs/WHATS_NEW.md" LogicalName="WHATS_NEW.md" />
+  </ItemGroup>
 </Project>

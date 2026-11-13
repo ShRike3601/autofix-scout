@@ -24,7 +24,10 @@ The full list is in [docs/CAPABILITIES.md](docs/CAPABILITIES.md).
 AutoFix Scout runs entirely on your computer. It has no account, no telemetry and no advertising, and it sends no
 information about you or your computer anywhere. To test the internet connection it contacts Microsoft's connection
 test address (`www.msftconnecttest.com`), the same one Windows itself uses. When you choose to repair the Microsoft
-Visual C++ runtime, it downloads Microsoft's installer from `aka.ms`. Its history, reports and undo data are stored
+Visual C++ runtime, it downloads Microsoft's installer from `aka.ms`. Once when it starts (and at most every six
+hours) it contacts `api.github.com` to ask whether a newer version has been released; this request contains no
+personal or device data. The new version is downloaded from `github.com` only when you select "Update". The check can
+be turned off in the settings ("Check for updates"). Its history, reports and undo data are stored
 only on the computer (`%LOCALAPPDATA%\AutoFixScout` and `%ProgramData%\AutoFixScout`).
 
 ## Code signing policy

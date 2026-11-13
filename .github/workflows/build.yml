@@ -40,6 +40,10 @@ jobs:
           if (!(Test-Path $iscc)) { choco install innosetup -y --no-progress; if ($LASTEXITCODE) { exit 1 } }
           & $iscc /Q "/DAppVersion=$version" "/DSourceX64=$PWD\publish\win-x64" "/DSourceArm64=$PWD\publish\win-arm64" "/DOutDir=$PWD\dist" installer\AutoFixScout.iss
           if ($LASTEXITCODE) { exit 1 }
+          # The app checks this SHA-256 after downloading an update (UpdateService).
+          $setup = "dist/AutoFixScout-Setup-$version.exe"
+          $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLowerInvariant()
+          [System.IO.File]::WriteAllText("$PWD/$setup.sha256", "$hash  AutoFixScout-Setup-$version.exe`n")
           "version=$version" >> $env:GITHUB_OUTPUT
           Get-ChildItem dist | Format-Table Name, Length
       - uses: actions/upload-artifact@v7
@@ -61,5 +65,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $pre = if ("${{ github.ref_name }}" -like "*-*") { "--prerelease" } else { "--latest" }
-          gh release create "${{ github.ref_name }}" dist/*.exe $pre --title "AutoFix Scout ${{ steps.setup.outputs.version }}" --notes-file docs/TESTERS.md
+          # The text above the first "---" is what the app shows as "What's new"; the testing guide stays below it.
+          $notes = (Get-Content docs/WHATS_NEW.md -Raw) + "`n---`n`n" + (Get-Content docs/TESTERS.md -Raw)
+          Set-Content -Path release-notes.md -Value $notes -Encoding utf8
+          gh release create "${{ github.ref_name }}" dist/*.exe dist/*.sha256 $pre --title "AutoFix Scout ${{ steps.setup.outputs.version }}" --notes-file release-notes.md
           if ($LASTEXITCODE) { exit 1 }

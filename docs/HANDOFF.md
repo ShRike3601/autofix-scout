@@ -469,3 +469,18 @@ Branch `perf` (from main 9f5f3f5) collects the work; agents work in C:\afs-wt\g5
   (needs privacy note), "What's new" after an update, "Did this fix it?" feedback kept locally and added to the
   helper report, changes history with Undo buttons, watcher toast "Wi-Fi reconnected", optional weekly check-up
   with a toast only when something is wrong, uninstall option to also delete AutoFix Scout data.
+
+## Quality of life (branch g9-qol)
+Core only; the UI session wires it (see the UI requests in the g9 report). Files: `src/AutoFixScout/Updates/*`
+(`UpdateService`, `AppVersion`, `AppSettings`, `UpdateState`, `WhatsNew`, `ReleaseNotes`), `ChangeHistory.cs`,
+`docs/WHATS_NEW.md` (embedded resource, built-in "What's new" text; the release workflow also puts it above the first
+`---` of the GitHub release notes, which is what the app shows).
+- Files in `%LOCALAPPDATA%\AutoFixScout`: `settings.json` (`CheckForUpdates`, default true; `OfferUpdatesToDevBuilds`,
+  default false), `update.json` (last check time, last seen version, newest release found), `updates\` (downloaded setup).
+- Update flow: `CheckAsync` (api.github.com, 5 s, at most once per start and per 6 h) -> person clicks ->
+  `DownloadAsync` (size from the asset, SHA-256 from `AutoFixScout-Setup-<v>.exe.sha256` when present; build.yml writes and
+  uploads it) -> `StartSetup` (`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /RELAUNCH=1`, runas) -> app exits. The setup
+  restarts the app only with `/RELAUNCH=1`. Open item: an Authenticode check of the downloaded setup once releases are signed.
+- History: `SessionLog.AddSteps` now stores `step_log.detail` and writes an `undo_record` for driver changes (save point id)
+  and switched-off start-up apps; `ChangeHistory.List/UndoAsync` use them. Other changes are listed with a hint only.
+- Uninstall asks (interactive only, default No) whether to delete both data folders; silent uninstall (updates) keeps them.
