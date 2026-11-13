@@ -61,3 +61,12 @@ Filename: "{app}\AutoFixScout.UI.exe"; Description: "Start AutoFix Scout now"; F
 
 ; Uninstall leaves %LOCALAPPDATA%\AutoFixScout (session log, reports) and C:\ProgramData\AutoFixScout (driver save
 ; points) on purpose: a save point may still be needed to put a driver back.
+
+; The optional Wi-Fi watcher (AutoFixScout.Watch.exe, in the same folder as the app) is switched on by the person inside AutoFix
+; Scout, which writes a per-user Run value. Uninstalling stops the process and removes that value. Inno runs this for the account
+; that runs the uninstaller; a value left in another account only points at a missing file and does nothing.
+[Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "AutoFixScout Wi-Fi watcher"; Flags: uninsdeletevalue dontcreatekey
+
+[UninstallRun]
+Filename: "{sys}\taskkill.exe"; Parameters: "/im AutoFixScout.Watch.exe /f"; Flags: runhidden skipifdoesntexist; RunOnceId: "StopWifiWatcher"

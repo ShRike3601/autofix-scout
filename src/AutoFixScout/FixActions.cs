@@ -135,6 +135,11 @@ public static class FixActions
                     return await Task.Run(Repair.InputRepairs.TouchpadOn);
                 case "input.accessibility_keys_off":
                     return await Task.Run(Repair.InputRepairs.AccessibilityKeysOff);
+                case "network.wifi_watch_on":
+                    // The person's own Run key and a process of their own; no admin. Reversible with wifi_watch_off.
+                    return await Task.Run(Watching.WifiWatcherSetup.TurnOn);
+                case "network.wifi_watch_off":
+                    return await Task.Run(Watching.WifiWatcherSetup.TurnOff);
                 case "storage.empty_recycle_bin":
                     return await Task.Run(Areas.StorageCleanup.EmptyRecycleBin);
                 default:

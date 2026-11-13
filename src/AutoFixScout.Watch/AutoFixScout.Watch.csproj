@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- WinExe: no console window. No UI either: it runs quietly as the signed-in person, without administrator rights. -->
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>AutoFixScout.Watch</AssemblyName>
+    <RootNamespace>AutoFixScout.Watching</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Diagnostics.EventLog" Version="8.0.0" />
+    <!-- Same code as the app, so both agree on what a drop is and what the file holds. -->
+    <Compile Include="../AutoFixScout/Probes/WifiDrops.cs" Link="Shared/WifiDrops.cs" />
+    <Compile Include="../AutoFixScout/Watch/WifiWatchLogic.cs" Link="Shared/WifiWatchLogic.cs" />
+    <Compile Include="../AutoFixScout/Watch/WifiWatchStore.cs" Link="Shared/WifiWatchStore.cs" />
+    <Compile Include="../AutoFixScout/Watch/WifiNetsh.cs" Link="Shared/WifiNetsh.cs" />
+  </ItemGroup>
+
+</Project>

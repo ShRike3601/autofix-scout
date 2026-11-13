@@ -77,7 +77,8 @@ public static class NetworkTriage
                 (d.SignInFailures > 0 ? " Windows could not always sign in to the network again by itself." : "") +
                 (OldWifiDriver(s) ? $" The Wi-Fi driver is from {s.WifiDriverDate:MMMM yyyy}, which is old." : ""),
                 $"{d.Describe()}; sign-in failures {d.SignInFailures}; power saving may turn the adapter off: {s.WifiPowerSavingMayTurnOff}; " +
-                $"driver {s.WifiDriverVersion} ({s.WifiDriverDate:yyyy-MM-dd}); enterprise {s.WifiEnterprise}; tuning pending: {string.Join(", ", s.WifiTuningPending)}"));
+                $"driver {s.WifiDriverVersion} ({s.WifiDriverDate:yyyy-MM-dd}); enterprise {s.WifiEnterprise}; tuning pending: {string.Join(", ", s.WifiTuningPending)}; Wi-Fi watcher {s.WifiWatcher}" +
+                (s.WifiWatch is { } w ? $"; the watcher reconnected {w.ReconnectedByWatcher} times ({w.Drops} drops recorded in {w.Days} days)" : "")));
         if (s.Metered == Tri.Yes)
             list.Add(F(FindingCode.NetMetered, "Your connection is set as a \"Metered connection\", so Windows Update and OneDrive may pause.", "connection cost is fixed or variable"));
         return list;
@@ -173,6 +174,13 @@ public static class NetworkTriage
                             "Please save your network sign-in: press Windows+R, type ncpa.cpl and press Enter. Right-click \"Wi-Fi\", select \"Status\", then \"Wireless Properties\". " +
                             "On the \"Security\" tab, select \"Advanced settings\", tick \"Specify authentication mode\", choose \"User authentication\", select \"Save credentials\" " +
                             "and enter the user name and password for this network."));
+                    // Opt-in helper from the bench case: Windows did not always reconnect by itself and the owner had to do it by hand.
+                    if (s.WifiWatcher == Tri.No)
+                        rungs.Add(new("wifi_watch", "network.wifi_watch_on", 1,
+                            "AutoFix Scout can switch on the Wi-Fi watcher, a small helper without a window. It starts with Windows and reconnects your Wi-Fi automatically " +
+                            "when Windows does not do so within about 20 seconds. It reconnects only to saved networks that you have used before, and it sends nothing anywhere. " +
+                            "It keeps only a count of the disconnects, never the name of a network. You can switch it off at any time in AutoFix Scout " +
+                            "or in the Windows \"Settings\" under \"Apps\" and \"Startup\". Windows will not ask for permission."));
                     // Same bench case: an old driver on a busy enterprise network also needed these adapter settings.
                     if (s.WifiTuningPending.Count > 0 && s.WifiInstanceId != null && (s.WifiEnterprise == Tri.Yes || OldWifiDriver(s)))
                         rungs.Add(new("wifi_stability", "network.wifi_stability", 1,
