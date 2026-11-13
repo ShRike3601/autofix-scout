@@ -64,12 +64,11 @@ public class CallSoundTests
     }
 
     [Fact]
-    public void NewCodes_AreAtTheEndOfTheEnum()
+    public void NewCodes_AreAppendedAfterTheOlderOnes()
     {
-        var all = Enum.GetValues<FindingCode>();
-        Assert.Equal(FindingCode.SoundCallDeviceDifferent, all[^1]);
-        Assert.Equal(FindingCode.SoundDuckingDuringCalls, all[^2]);
-        Assert.Equal(FindingCode.NetWifiDrops, all[^3]);
+        // Appended, never inserted: older codes keep their numbers (other branches may append after these).
+        Assert.True(FindingCode.SoundDuckingDuringCalls > FindingCode.NetWifiDrops);
+        Assert.Equal((int)FindingCode.SoundDuckingDuringCalls + 1, (int)FindingCode.SoundCallDeviceDifferent);
     }
 
     [Fact]
