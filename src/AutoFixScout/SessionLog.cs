@@ -14,7 +14,7 @@ public sealed class SessionLog : IDisposable
           session_id TEXT PRIMARY KEY,
           started_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
           ended_at TEXT,
-          symptom TEXT NOT NULL CHECK (symptom IN ('audio','camera','network','microphone','bluetooth','printer','display','storage','update','other')),
+          symptom TEXT NOT NULL CHECK (length(symptom) BETWEEN 1 AND 40),
           outcome TEXT CHECK (outcome IN ('fixed','not_fixed','probable_hardware','abandoned','no_fault_found')),
           app_version TEXT NOT NULL,
           playbook_version TEXT NOT NULL);
@@ -86,13 +86,13 @@ public sealed class SessionLog : IDisposable
 
     /// <summary>
     /// A session table made by an older version has CHECKs that reject newer outcomes ('no_fault_found') or problem
-    /// areas ('printer', ...). SQLite can't change a CHECK, so the table is rebuilt with its rows kept.
+    /// areas (any topic name is accepted now; older tables listed a fixed set). SQLite can't change a CHECK, so the table is rebuilt with its rows kept.
     /// Runs with foreign keys off (step_log points at session).
     /// </summary>
     private void MigrateSessionOutcomes()
     {
         var sql = Scalar("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'session'") as string;
-        if (sql is null || (sql.Contains("no_fault_found") && sql.Contains("'update'"))) return;
+        if (sql is null || (sql.Contains("no_fault_found") && sql.Contains("length(symptom)"))) return;
         Exec("PRAGMA foreign_keys = OFF;");
         Exec("BEGIN;" +
              SessionTable.Replace("EXISTS session (", "EXISTS session_new (") +
