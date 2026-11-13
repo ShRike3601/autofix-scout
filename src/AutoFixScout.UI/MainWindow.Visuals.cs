@@ -149,6 +149,8 @@ public partial class MainWindow
             "update" => "Windows Update",
             "printer" => "Printer and scanner",
             "display" => "Screen and display",
+            "performance" => "Computer speed",
+            "graphics" => "Graphics card",
             _ => null,
         };
     }
@@ -406,6 +408,8 @@ public partial class MainWindow
         [
             new(0xE83F, "Battery, sleep and power", "Battery drains quickly, will not charge, or the computer will not sleep or wake.", OnPowerClicked),
             new(0xEDA2, "Slow or full computer", "Slow start-up, slow in use, or the disk is nearly full.", OnStorageClicked),
+            new(0xEC4A, "Computer or games running slowly", "Games stutter, the computer got slow, or the fans are loud.", OnPerfClicked),
+            new(0xE7FC, "Games stutter or crash", "Graphics card, driver and overclock check.", OnGraphicsClicked),
         ]),
         new(0xE71D, "Apps and programs", "Programs closing, installs, Microsoft Store, Office, OneDrive",
         [

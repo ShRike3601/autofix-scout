@@ -97,7 +97,7 @@ public partial class MainWindow : Window, IFixHost
     {
         SetTopic(topic);
         Journey(Stage.Check);
-        var sessionId = StartSession(topic switch { "sound" => "audio", "health" or "shell" or "apps" or "security" or "power" or "input" => "other", _ => topic });
+        var sessionId = StartSession(topic switch { "sound" => "audio", "health" or "shell" or "apps" or "security" or "power" or "input" or "performance" or "graphics" => "other", _ => topic });
         try
         {
             ShowBusy("Checking your computer", scan: true);
@@ -448,6 +448,14 @@ private async void OnInstallClicked(object sender, RoutedEventArgs e) => await R
             () => AskAsync(Areas.InputFlow.TestQuestion));
 
     /// <summary>The same check with the keyboard layout findings first (the person reported wrong characters).</summary>
+    private async void OnPerfClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.PerfFlow.Topic, Areas.PerfFlow.What, Areas.PerfFlow.DiagnoseAsync,
+            () => AskAsync(Areas.PerfFlow.TestQuestion));
+
+    private async void OnGraphicsClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.GraphicsFlow.Topic, Areas.GraphicsFlow.What, Areas.GraphicsFlow.DiagnoseAsync,
+            () => AskAsync(Areas.GraphicsFlow.TestQuestion));
+
     private async void OnTypingClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.InputFlow.Topic, Areas.InputFlow.What, () => Areas.InputFlow.DiagnoseAsync(typingFocus: true),
             () => AskAsync(Areas.InputFlow.TestQuestion));
