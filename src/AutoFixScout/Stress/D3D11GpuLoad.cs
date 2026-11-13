@@ -117,7 +117,7 @@ void main(uint3 id : SV_DispatchThreadID)
                 var spin = 0;
                 while (!_stop)
                 {
-                    var r = ctx.GetData(_query, out int done);
+                    var r = ctx.GetData(_query!, out int done);
                     if (r && done != 0) break;
                     Thread.Sleep(spin++ < 20 ? 0 : 1);
                 }
