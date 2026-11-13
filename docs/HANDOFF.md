@@ -417,3 +417,5 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
   targets, backs up, restarts the adapter, restores automatically if no internet within 4 minutes (exit 4); 3 = already
   tuned. Verified on the bench: no-op exit 3, bad arg 2, and a real run (original values restored first) exit 0 after
   7 s with backup written. No UI changes were needed (no new tile).
+- Part 6 status: G1 display and G4 call ducking merged; G2 slow start-up and G3 keyboard layout are WIP on branches
+  g2-boot / g3-layout (agents stopped by the owner, WIP committed, unreviewed, not merged).
