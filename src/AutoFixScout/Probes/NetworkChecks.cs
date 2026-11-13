@@ -66,7 +66,16 @@ public static class NetworkChecks
             for (var ev = r.ReadEvent(); ev != null; ev = r.ReadEvent()) using (ev) transitions++;
         }
         catch (EventLogException) { }
-        return WifiDrops.Count(events) with { SleepsAndShutdowns = transitions };
+        // Event 12013: an enterprise (802.1X) sign-in failed, e.g. because Windows has no saved sign-in to reconnect with.
+        var signIn = 0;
+        try
+        {
+            var q = $"*[System[EventID=12013 and TimeCreated[timediff(@SystemTime) <= {(long)TimeSpan.FromDays(WifiDrops.Days).TotalMilliseconds}]]]";
+            using var r = new EventLogReader(new EventLogQuery("Microsoft-Windows-WLAN-AutoConfig/Operational", PathType.LogName, q));
+            for (var ev = r.ReadEvent(); ev != null; ev = r.ReadEvent()) using (ev) signIn++;
+        }
+        catch (EventLogException) { }
+        return WifiDrops.Count(events) with { SleepsAndShutdowns = transitions, SignInFailures = signIn };
     }
 
     /// <summary>Whether Windows may turn the adapter with this connection GUID off to save power (class key PnPCapabilities). Unknown when no key matches.</summary>

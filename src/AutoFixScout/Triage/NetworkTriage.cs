@@ -69,7 +69,8 @@ public static class NetworkTriage
             list.Add(F(FindingCode.NetWeakWifi, $"Your Wi-Fi signal is weak ({pct} percent).", $"signal quality {pct}%"));
         if (s.WifiDrops is { Unintentional: >= WifiDrops.Threshold } d)
             list.Add(F(FindingCode.NetWifiDrops,
-                $"Your Wi-Fi has disconnected {d.Unintentional} times in the last {WifiDrops.Days} days without being switched off by a person.",
+                $"Your Wi-Fi has disconnected {d.Unintentional} times in the last {WifiDrops.Days} days without being switched off by a person." +
+                (d.SignInFailures > 0 ? " Windows could not always sign in to the network again by itself." : ""),
                 $"{d.Describe()}; power saving may turn the adapter off: {s.WifiPowerSavingMayTurnOff}"));
         if (s.Metered == Tri.Yes)
             list.Add(F(FindingCode.NetMetered, "Your connection is set as a \"Metered connection\", so Windows Update and OneDrive may pause.", "connection cost is fixed or variable"));
@@ -158,6 +159,14 @@ public static class NetworkTriage
                     rungs.Add(RestartRouter);
                     break;
                 case FindingCode.NetWifiDrops:
+                    // Found on the bench (university WPA2-Enterprise): without a saved sign-in, every short drop became a
+                    // long outage because Windows could not sign in again by itself (event 12013). Saving it fixed that.
+                    if (s.WifiDrops is { SignInFailures: > 0 })
+                        rungs.Add(new("wifi_save_signin", "ui.human_step", 0,
+                            "Windows could not sign in to this Wi-Fi network again by itself after it disconnected, so each short drop lasts much longer. " +
+                            "Please save your network sign-in: press Windows+R, type ncpa.cpl and press Enter. Right-click \"Wi-Fi\", select \"Status\", then \"Wireless Properties\". " +
+                            "On the \"Security\" tab, select \"Advanced settings\", tick \"Specify authentication mode\", choose \"User authentication\", select \"Save credentials\" " +
+                            "and enter the user name and password for this network."));
                     if (s.WifiPowerSavingMayTurnOff != Tri.No)
                         rungs.Add(new("wifi_power_saving", "ui.human_step", 0,
                             "Windows may be turning your Wi-Fi adapter off to save power. Please open \"Device Manager\", open \"Network adapters\", " +

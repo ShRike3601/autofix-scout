@@ -405,3 +405,9 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
       layout active than the display language suggests, the Alt+Shift / Windows+Space switch hotkeys; guided steps.
 - [ ] G4 Sound gets quieter during calls (Sound area): communications "ducking" setting (reduce other sounds by 80%/50%/
       mute), different default device for communications; non-admin switch to "Do nothing" with a backup.
+- 2026-11-13 15:25 bench Wi-Fi fix (owner's university WPA2-Enterprise network kept dropping on this laptop only):
+  cause 1 = Intel AX201 driver 22.70.0.6 (2021) "disconnected by the driver"; cause 2 = no saved 802.1X sign-in, so
+  every drop became a long outage (event 12013 "UI could not be displayed"). Owner saved the sign-in; adapter set to
+  802.11ac, roaming Medium-low, No SMPS, prefer 5 GHz (backup C:\afs-bench\out\wifi-advanced-backup.csv). The Wi-Fi
+  drops check now counts 12013 and offers "save your network sign-in" first. Next: newer Intel driver (owner's OK needed
+  to download it).
