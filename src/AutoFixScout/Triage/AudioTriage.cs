@@ -324,4 +324,6 @@ public enum FindingCode
     HealthUsbErrors,
     // Wi-Fi keeps dropping
     NetWifiDrops,
+    // Slow start-up (Slow or full computer)
+    StorageSlowStartup,
 }

@@ -49,6 +49,12 @@ public sealed class StorageState
     public IReadOnlyList<StartupEntry>? StartupEntries { get; set; }
     /// <summary>Busiest programs that are not part of Windows, by processor and by memory; null = could not be read.</summary>
     public IReadOnlyList<ProcessUsage>? TopProcesses { get; set; }
+    /// <summary>Boots of the last 30 days (Diagnostics-Performance event 100), newest first; null = the log could not be read (Unknown), empty = no boot recorded.</summary>
+    public IReadOnlyList<BootRecord>? BootTimes { get; set; }
+    /// <summary>Apps, drivers and services Windows named as slowing start-up, slowest first; null = Unknown.</summary>
+    public IReadOnlyList<SlowStartupItem>? SlowStartupItems { get; set; }
+    /// <summary>Fast Startup switch; null = Unknown.</summary>
+    public bool? FastStartup { get; set; }
     public TimeSpan? Uptime { get; set; }
     public int? MemoryLoadPercent { get; set; }
     /// <summary>Disks and storage controllers with a problem code; null = the device list could not be read.</summary>
