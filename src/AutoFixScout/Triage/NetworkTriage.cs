@@ -67,6 +67,10 @@ public static class NetworkTriage
             list.Add(F(FindingCode.NetIpConflict, "Another device on your network recently used the same address as your computer.", "Tcpip event 4199 in the last 24 hours"));
         if (s.WifiSignalPercent is < NetworkChecks.WeakSignalPercent and var pct)
             list.Add(F(FindingCode.NetWeakWifi, $"Your Wi-Fi signal is weak ({pct} percent).", $"signal quality {pct}%"));
+        if (s.WifiDrops is { Unintentional: >= WifiDrops.Threshold } d)
+            list.Add(F(FindingCode.NetWifiDrops,
+                $"Your Wi-Fi has disconnected {d.Unintentional} times in the last {WifiDrops.Days} days without being switched off by a person.",
+                $"{d.Describe()}; power saving may turn the adapter off: {s.WifiPowerSavingMayTurnOff}"));
         if (s.Metered == Tri.Yes)
             list.Add(F(FindingCode.NetMetered, "Your connection is set as a \"Metered connection\", so Windows Update and OneDrive may pause.", "connection cost is fixed or variable"));
         return list;
@@ -151,6 +155,20 @@ public static class NetworkTriage
                         rungs.Add(new("use_5ghz", "ui.open_settings_page", 0,
                             "Your Wi-Fi adapter supports the 5 GHz band, which is often faster at short range. " +
                             "AutoFix Scout will open the \"Wi-Fi\" settings. If your router offers a 5 GHz network, please select it and connect.", "wifi"));
+                    rungs.Add(RestartRouter);
+                    break;
+                case FindingCode.NetWifiDrops:
+                    if (s.WifiPowerSavingMayTurnOff != Tri.No)
+                        rungs.Add(new("wifi_power_saving", "ui.human_step", 0,
+                            "Windows may be turning your Wi-Fi adapter off to save power. Please open \"Device Manager\", open \"Network adapters\", " +
+                            "double-click your Wi-Fi adapter, choose the \"Power Management\" tab and clear \"Allow the computer to turn off this device to save power\". " +
+                            "Windows may ask for permission, because this change needs an administrator."));
+                    rungs.Add(new("wifi_distance_band", "ui.human_step", 0,
+                        "Please move closer to your router, or move the router to a more open place. If your router offers both a 2.4 GHz and a 5 GHz network, " +
+                        "try the other one: 5 GHz is faster at short range, 2.4 GHz reaches further through walls."));
+                    rungs.Add(new("wifi_driver_update", "ui.open_settings_page", 0,
+                        "A newer Wi-Fi driver may fix the disconnects. AutoFix Scout will open \"Windows Update\". " +
+                        "Please choose \"Advanced options\", then \"Optional updates\", and install any driver update listed for your Wi-Fi adapter.", "windowsupdate"));
                     rungs.Add(RestartRouter);
                     break;
                 case FindingCode.NetMetered:

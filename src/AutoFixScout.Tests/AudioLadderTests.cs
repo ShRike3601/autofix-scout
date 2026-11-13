@@ -14,7 +14,7 @@ public class AudioLadderTests
 
     [Fact]
     public void Muted_UnmuteFirst_ThenRestart() =>
-        Assert.Equal(new[] { "unmute", "restart_services" },
+        Assert.Equal(new[] { "unmute", "restart_services", "audio_enhancements" },
             Ladder(new() { Services = Running, Endpoints = new[] { Speakers }, DefaultMuted = Tri.Yes, DefaultVolumePercent = 50 }));
 
     [Fact]

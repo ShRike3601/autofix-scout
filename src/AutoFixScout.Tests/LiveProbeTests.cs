@@ -26,12 +26,20 @@ public class LiveProbeTests
             $"winsock 3rd party: {string.Join("; ", s.ThirdPartyWinsock)}; path missing: {string.Join("; ", s.MissingPathEntries)}; reboot {s.RebootPending}" };
         lines.AddRange(f.Select(x => $"FINDING {x.Code}: {x.PlainMessage} [{x.TechnicalDetail}]"));
         lines.AddRange(HealthTriage.Ladder(s, f).Select(r => $"RUNG {r.Id} {r.ActionId}({r.Arg})"));
+        lines.Add($"recent changes: {s.RecentChanges.Count} (programs {s.RecentChanges.Count(c => c.Kind == RecentChangeKind.Program)}, updates {s.RecentChanges.Count(c => c.Kind == RecentChangeKind.Update)}, drivers {s.RecentChanges.Count(c => c.Kind == RecentChangeKind.Driver)}); restore points {s.RestorePointsKnown}/{s.RestorePoints.Count}; graphics resets {s.GraphicsResets}");
         lines.Add("devices: " + string.Join("; ", s.DeviceProblems.Select(d => $"{d.PnpClass} code={d.Code}")) + "; temp profile: " + s.TempProfile);
+        lines.Add("stop codes: " + string.Join(", ", s.StopCodes.Select(c => $"{StopCodes.Hex(c.Code)} x{c.Count}")) + $"; pagefile auto={s.PageFile?.Automatic} ram={s.PageFile?.TotalRamMb} MB allocated={s.PageFile?.AllocatedMb} MB settings={s.PageFile?.Settings.Count}; low memory events {s.LowMemoryEvents}");
         File.WriteAllLines(output, lines);
         Assert.DoesNotContain(s.ProbeErrors, e => e.StartsWith("device errors") || e.StartsWith("user profile"));
         Assert.NotNull(s.DeviceProblems);
         Assert.NotEmpty(s.Drives);
         Assert.All(s.Drives, d => Assert.False(d.Failing || d.Warning));
+        Assert.DoesNotContain(s.ProbeErrors, e => e.StartsWith("recent changes") || e.StartsWith("restore points") || e.StartsWith("graphics resets"));
+        Assert.DoesNotContain(s.ProbeErrors, e => e.StartsWith("blue screen causes") || e.StartsWith("virtual memory") || e.StartsWith("low memory events"));
+        Assert.NotNull(s.PageFile);
+        Assert.NotNull(s.PageFile!.Automatic);
+        Assert.True(s.PageFile.TotalRamMb > 0);
+        Assert.True(s.StopCodes.Sum(c => c.Count) <= s.BlueScreens);
         Assert.Empty(s.ProbeErrors);
     }
 }
@@ -128,6 +136,7 @@ public class LiveShellTests
     {
         if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AFS_LIVE"))) return;
         var s = AutoFixScout.Areas.ShellFlow.Read();
+        Assert.DoesNotContain(s.ProbeErrors, e => e.StartsWith("recent changes") || e.StartsWith("restore points") || e.StartsWith("graphics resets"));
         Assert.Empty(s.ProbeErrors);
         Assert.Contains(s.Packages, p => p.Name == "Microsoft.Windows.StartMenuExperienceHost" && p.Status == "Ok");
         var (ok, detail) = await FixActions.RunAsync(new Rung("t", "shell.restart_start_menu", 0, ""));
@@ -171,6 +180,83 @@ public class LiveStartupTests
             run.DeleteValue(Name, false);
             using var approved = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(AutoFixScout.Repair.StartupApps.ApprovedKey + "Run", true);
             approved?.DeleteValue(Name, false);
+        }
+    }
+}
+
+/// <summary>Reads the big space users on the real machine (AFS_LIVE set). Read-only; Unknown parts are allowed.</summary>
+[Collection("Live machine")]
+public class LiveBigSpaceTests
+{
+    [Fact]
+    public void BigUsers_ReadWithoutErrors_AndNeverListFileNames()
+    {
+        var output = Environment.GetEnvironmentVariable("AFS_LIVE");
+        if (string.IsNullOrEmpty(output)) return;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var s = new RealStorageProbe().Read();
+        string P(string n, SpaceItem? i) => $"{n}: {(i is null ? "Unknown" : StorageTriage.SizeOf(i))}";
+        var lines = new List<string>
+        {
+            $"probe took {sw.Elapsed.TotalSeconds:0.0} s", P("windows.old", s.WindowsOld), P("hiberfil", s.HiberFile), P("downloads", s.Downloads),
+            $"old downloads: {s.DownloadsOldCount?.ToString() ?? "Unknown"}", P("delivery optimization", s.DeliveryOptimization),
+            $"recycle bin: {s.RecycleBinBytes?.ToString() ?? "Unknown"}",
+            "profile folders: " + (s.BigProfileFolders is null ? "Unknown" : string.Join(", ", s.BigProfileFolders.Select(x => StorageTriage.SizeOf(new SpaceItem(x.Bytes, x.AtLeast))))),
+        };
+        File.WriteAllLines(output, lines);
+        Assert.Empty(s.ProbeErrors);
+        Assert.NotNull(s.HiberFile ?? new SpaceItem(0, false)); // may be Unknown, never throws
+        if (s.BigProfileFolders is { } p)
+        {
+            Assert.True(p.Count <= 3);
+            // Folder names only: a name with a file extension or a path separator would be a file name or path.
+            Assert.All(p, x => Assert.DoesNotContain(@"\", x.Name));
+        }
+        // Even a forced low-space evaluation never puts a path or file name in the plain message or details.
+        s.FreeBytes = StorageTriage.CriticalBytes - 1;
+        s.ProbeErrors = new List<string>();
+        foreach (var f in StorageTriage.Evaluate(s).Where(x => x.Code == FindingCode.StorageBigUsers))
+            Assert.DoesNotMatch(@"[A-Za-z]:\|\.\w{2,4}\b(?!\W*(old|sys))", f.PlainMessage);
+    }
+}
+
+/// <summary>Regression: the page-file action once used "\.\root\cimv2" (missing a backslash) and failed with "Invalid parameter".</summary>
+[Collection("Live machine")]
+public class LivePageFileTests
+{
+    [Fact]
+    public void PageFileAuto_ReadsWmi_AndDoesNothingWhenAlreadyAutomatic()
+    {
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AFS_LIVE"))) return;
+        using var cs = new System.Management.ManagementObjectSearcher("SELECT AutomaticManagedPagefile FROM Win32_ComputerSystem");
+        var automatic = cs.Get().Cast<System.Management.ManagementObject>().First()["AutomaticManagedPagefile"] is true;
+        if (!automatic) return; // never change a real page file from a test
+        Assert.Equal(3, AutoFixScout.Executor.Repairs.PageFileAuto());
+    }
+}
+
+/// <summary>shell.notifications_on on the real machine (AFS_LIVE set); the original ToastEnabled value (or absence) is always restored.</summary>
+[Collection("Live machine")] // one at a time: they change and restore the same settings
+public class LiveNotificationTests
+{
+    [Fact]
+    public async Task NotificationsOn_SetsToastEnabled_AndRestoresOriginal()
+    {
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AFS_LIVE"))) return;
+        using var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(AutoFixScout.Repair.NotificationRepairs.PushKey, true);
+        var original = k.GetValue("ToastEnabled");
+        var kind = original is null ? Microsoft.Win32.RegistryValueKind.DWord : k.GetValueKind("ToastEnabled");
+        try
+        {
+            k.SetValue("ToastEnabled", 0, Microsoft.Win32.RegistryValueKind.DWord);
+            var (ok, detail) = await FixActions.RunAsync(new Rung("t", "shell.notifications_on", 0, ""));
+            Assert.True(ok, detail);
+            Assert.Equal(1, k.GetValue("ToastEnabled"));
+        }
+        finally
+        {
+            if (original is null) k.DeleteValue("ToastEnabled", false);
+            else k.SetValue("ToastEnabled", original, kind);
         }
     }
 }

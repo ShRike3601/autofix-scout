@@ -34,6 +34,15 @@ public sealed class StorageState
     /// <summary>C:\Windows\Temp, read only (usually unreadable without admin, then null).</summary>
     public long? WindowsTempBytes { get; set; }
     public long? RecycleBinBytes { get; set; }
+    /// <summary>Big space users, each read on its own; null = Unknown (denied or not readable). AtLeast = a lower bound.</summary>
+    public SpaceItem? WindowsOld { get; set; }
+    public SpaceItem? HiberFile { get; set; }
+    public SpaceItem? Downloads { get; set; }
+    /// <summary>Files in Downloads not changed for 90 days or more.</summary>
+    public int? DownloadsOldCount { get; set; }
+    public SpaceItem? DeliveryOptimization { get; set; }
+    /// <summary>The three largest folders directly in the profile (sizes and folder names only).</summary>
+    public IReadOnlyList<ProfileFolder>? BigProfileFolders { get; set; }
     /// <summary>Enabled entries in the Run keys and Startup folders.</summary>
     public int? StartupAppCount { get; set; }
     /// <summary>Every Run and Startup folder entry with its "Startup apps" state; null = could not be read.</summary>

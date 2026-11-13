@@ -36,6 +36,12 @@ public sealed class SecurityState
     public int? DefenderQuickScanAgeDays { get; set; }
     public string? DefenderNote { get; set; }
 
+    /// <summary>Threats found in the last 30 days (names and counts only). Null = could not be read (Unknown).</summary>
+    public IReadOnlyList<ThreatRecord>? Threats { get; set; }
+    /// <summary>Where the threat history came from: "wmi", "eventlog" or null.</summary>
+    public string? ThreatSource { get; set; }
+    public string? ThreatNote { get; set; }
+
     /// <summary>Windows Defender Firewall per profile ("Domain", "Private", "Public"): Yes = on, No = off.</summary>
     public IReadOnlyDictionary<string, Tri> FirewallProfiles { get; set; } = new Dictionary<string, Tri>();
     public UpdateServiceInfo? FirewallService { get; set; }
@@ -53,6 +59,11 @@ public sealed class SecurityState
     /// <summary>Hosts file and proxy, read by <see cref="RealHealthProbe.ReadHostsAndProxy"/>.</summary>
     public HealthState Network { get; set; } = new();
     public IReadOnlyList<SuspiciousStartup> SuspiciousStartups { get; set; } = new List<SuspiciousStartup>();
+
+    /// <summary>Hijack-type browser policies found under HKLM and HKCU (read only).</summary>
+    internal IReadOnlyList<BrowserPolicies.Flag> BrowserPolicyFlags { get; set; } = new List<BrowserPolicies.Flag>();
+    /// <summary>The computer belongs to a domain or Azure AD: browser policies are then expected, and are not removed.</summary>
+    public bool ManagedPc { get; set; }
 
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
 }
@@ -124,6 +135,14 @@ public static class SecurityTriage
         else if (active.Any(a => a.IsMicrosoft) && s.DefenderRealTime == Tri.No)
             f.Add(F(FindingCode.SecurityRealTimeOff, "Real-time protection in Microsoft Defender is turned off.", "MSFT_MpComputerStatus RealTimeProtectionEnabled=False"));
 
+        var activeThreats = ThreatHistory.ActiveThreats(s.Threats);
+        if (activeThreats.Count > 0)
+            f.Add(F(FindingCode.SecurityThreatActive,
+                activeThreats.Count == 1
+                    ? $"Microsoft Defender found a threat that has not been removed: {ThreatHistory.Names(activeThreats)}."
+                    : $"Microsoft Defender found {activeThreats.Count} threats that have not been removed: {ThreatHistory.Names(activeThreats)}.",
+                $"active threats: {activeThreats.Count}; source {s.ThreatSource}"));
+
         if (SignaturesOld(s) is { } old)
             f.Add(F(FindingCode.SecuritySignaturesOld,
                 $"The virus definitions of \"{old.Name}\" are out of date, so new threats may not be recognized.", old.Detail));
@@ -154,12 +173,36 @@ public static class SecurityTriage
                 $"A program that starts with Windows runs from a temporary or shared folder and has a random-looking name: {Names(s.SuspiciousStartups)}. It may be unwanted software.",
                 string.Join("; ", s.SuspiciousStartups.Select(e => $"{e.Location} {e.Name} -> {e.File}"))));
 
-        if (f.Count > 0) return f;
-        return new[] { F(FindingCode.LooksNormal,
+        if (s.BrowserPolicyFlags.Count > 0)
+        {
+            var browsers = string.Join(", ", s.BrowserPolicyFlags.Select(x => x.Browser).Distinct());
+            if (s.ManagedPc)
+                f.Add(F(FindingCode.SecurityBrowserPolicyManaged,
+                    $"This computer is managed by an organization, and the settings of {browsers} include rules set by that organization. This is normal on a work or school computer, so AutoFix Scout leaves them unchanged.",
+                    BrowserPolicies.Summary(s.BrowserPolicyFlags)));
+            else
+                f.Add(F(FindingCode.SecurityBrowserPolicy,
+                    $"A program has taken control of browser settings in {browsers}, such as the home page, the search engine, the proxy server or added extensions. The browser may show \"Managed by your organization\".",
+                    BrowserPolicies.Summary(s.BrowserPolicyFlags)));
+        }
+
+        var removed = ThreatHistory.RemovedCount(s.Threats);
+        var removedFinding = removed > 0
+            ? F(FindingCode.SecurityThreatsRemoved,
+                removed == 1 ? "Microsoft Defender found and removed 1 threat in the last 30 days." : $"Microsoft Defender found and removed {removed} threats in the last 30 days.",
+                $"removed threats: {removed}; source {s.ThreatSource}")
+            : null;
+        if (f.Count > 0)
+        {
+            if (removedFinding is not null) f.Add(removedFinding);
+            return f;
+        }
+        var normal = F(FindingCode.LooksNormal,
             s.ProbeErrors.Count > 0
                 ? "No security problem was found in the parts that could be checked. AutoFix Scout can still scan the computer for unwanted software."
                 : "No security problem was found. AutoFix Scout can still scan the computer for unwanted software.",
-            $"antivirus: {Products(s.Antivirus)}; errors: {string.Join("; ", s.ProbeErrors)}") };
+            $"antivirus: {Products(s.Antivirus)}; errors: {string.Join("; ", s.ProbeErrors)}");
+        return removedFinding is null ? new[] { normal } : new[] { removedFinding, normal };
     }
 
     /// <summary>The active antivirus whose definitions are too old: Defender by its own date, others by Security Center's flag.</summary>
@@ -188,6 +231,18 @@ public static class SecurityTriage
         if (codes.Contains(FindingCode.ProbeIncomplete)) return r;
         var defender = DefenderInCharge(s);
         var other = ActiveAntivirus(s).FirstOrDefault(a => !a.IsMicrosoft);
+        var threatActive = codes.Contains(FindingCode.SecurityThreatActive);
+
+        if (threatActive && defender)
+        {
+            r.Add(new("review_protection_history", "ui.open_settings_page", 0,
+                "AutoFix Scout will open \"Windows Security\". Please select \"Virus & threat protection\", then \"Protection history\", and follow the action that Microsoft Defender recommends for each threat.",
+                "windowsdefender"));
+            r.Add(new("full_scan", "security.full_scan", 0,
+                "AutoFix Scout can ask Microsoft Defender to run a full scan of the computer. This can take an hour or more, and you can keep working."));
+        }
+        else if (threatActive && other is not null)
+            r.Add(new("full_scan_other", "ui.human_step", 0, $"Please open your antivirus program \"{other.Name}\" and start a full scan."));
 
         if (codes.Contains(FindingCode.SecurityRealTimeOff) || codes.Contains(FindingCode.SecurityNoAntivirus))
             r.Add(new("turn_on_realtime", "ui.open_settings_page", 0,
@@ -228,10 +283,20 @@ public static class SecurityTriage
                 $"AutoFix Scout will open \"Startup apps\". If you do not recognize {Names(s.SuspiciousStartups)}, please switch it off. Nothing is deleted, and you can switch it on again at any time.",
                 "startupapps"));
 
-        if (defender)
+        if (codes.Contains(FindingCode.SecurityBrowserPolicy))
+        {
+            // One admin step for both hives: Windows lets a normal process only read HKCU\Software\Policies.
+            r.Add(Admin("remove_browser_policies", "security.remove_browser_policies",
+                "AutoFix Scout can remove the browser rules that a program added (home page, search engine, proxy server and extensions). The previous values are saved first."));
+            r.Add(new("check_browser_policy", "ui.human_step", 0,
+                "Please close all browser windows and open the browser again. Then type chrome://policy (Chrome), edge://policy (Edge) or about:policies (Firefox) in the address bar and check that no rule is listed. " +
+                "If a rule is still listed, select \"Reload policies\" on that page."));
+        }
+
+        if (defender && !threatActive)
             r.Add(new("quick_scan", "security.quick_scan", 0,
                 "AutoFix Scout can ask Microsoft Defender to run a quick scan for unwanted software. This takes a few minutes, and you can keep working."));
-        else if (other is not null)
+        else if (other is not null && !threatActive)
             r.Add(new("scan_other_antivirus", "ui.human_step", 0, $"Please open your antivirus program \"{other.Name}\" and start a full scan."));
 
         if (codes.Contains(FindingCode.SecurityUacOff))
@@ -241,14 +306,23 @@ public static class SecurityTriage
             r.Add(new("restart_after_uac", "ui.human_step", 0,
                 "Please save your work and restart the computer: select \"Start\", then \"Power\", then \"Restart\". After the restart, please open AutoFix Scout again."));
         }
+
+        if (threatActive && defender)
+            r.Add(new("offline_scan", "ui.human_step", 0,
+                "If the threat remains, please select \"Scan options\" in \"Virus & threat protection\", then \"Microsoft Defender Offline scan\", and \"Scan now\". " +
+                "The computer restarts for this scan, so please save your work first. AutoFix Scout does not start it."));
         return r;
     }
 
     public static string? NotFixedHint(IReadOnlyList<Finding> after)
     {
         var codes = after.Select(x => x.Code).ToHashSet();
+        if (codes.Contains(FindingCode.SecurityThreatActive))
+            return "Microsoft Defender still lists a threat as not removed. Please follow the action shown in \"Protection history\". If it remains, \"Microsoft Defender Offline scan\" can remove it before Windows starts, and the person helping you can start it in \"Windows Security\", \"Virus & threat protection\", \"Scan options\".";
         if (codes.Contains(FindingCode.SecurityUacOff))
             return "User Account Control is turned back on only after a restart. Please restart the computer and run the check again.";
+        if (codes.Contains(FindingCode.SecurityBrowserPolicy))
+            return "Browser rules that come back after they were removed are put back by a program on this computer. A scan for unwanted software is the next step, and the person helping you can check the installed programs for ones you do not recognize.";
         if (codes.Contains(FindingCode.SecurityRealTimeOff) || codes.Contains(FindingCode.SecuritySmartScreenOff))
             return "If a protection setting cannot be turned on, or turns itself off again, it may be managed by an organization or changed by unwanted software. " +
                    "The person helping you can run \"Microsoft Defender Offline scan\" from \"Windows Security\", \"Virus & threat protection\", \"Scan options\".";
@@ -261,6 +335,7 @@ public static class SecurityTriage
     {
         FindingCode.SecurityNoAntivirus, FindingCode.SecurityRealTimeOff, FindingCode.SecuritySignaturesOld, FindingCode.SecurityFirewallOff,
         FindingCode.SecuritySmartScreenOff, FindingCode.HealthHostsHijacked, FindingCode.HealthDeadProxy, FindingCode.HealthDeadSystemProxy,
+        FindingCode.SecurityBrowserPolicy,
     };
 
     public static bool Resolved(IReadOnlyList<Finding> before, IReadOnlyList<Finding> after) =>

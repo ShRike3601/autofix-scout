@@ -72,6 +72,18 @@ public sealed class RealNetworkProbe : INetworkProbe
             }
             catch (Exception ex) { errors.Add($"Wi-Fi signal: {ex.Message}"); }
         }
+        var wifiAdapter = state.Adapters.Where(a => a.IsWireless).OrderByDescending(a => a.Connected).FirstOrDefault();
+        if (wifiAdapter != null)
+        {
+            try { state.WifiDrops = NetworkChecks.ReadWifiDrops(); }
+            catch (Exception ex) { errors.Add($"Wi-Fi events: {ex.Message}"); }
+            try
+            {
+                var wguid = ReadAdapterGuid(wifiAdapter.InstanceId);
+                if (wguid != null) state.WifiPowerSavingMayTurnOff = NetworkChecks.ReadWifiPowerSaving(wguid);
+            }
+            catch (Exception ex) { errors.Add($"Wi-Fi power setting: {ex.Message}"); }
+        }
         try { state.IpConflictRecent = NetworkChecks.ReadRecentIpConflict(); }
         catch (Exception ex) { errors.Add($"Event log: {ex.Message}"); }
         try { state.Metered = NetworkChecks.ReadMetered(connected.IsWireless); }

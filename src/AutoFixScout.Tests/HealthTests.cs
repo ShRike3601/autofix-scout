@@ -352,4 +352,257 @@ public class HealthTests
         Assert.All(l, r => Assert.True(r.Tier <= 1));
         Assert.True(HealthTriage.ProbablyHardware(s));
     }
+
+    private static RecentChange Change(RecentChangeKind k, string name, int daysAgo) => new(k, name, DateTime.UtcNow.AddDays(-daysAgo));
+
+    [Fact]
+    public void RecentChanges_AloneAreNotAFinding()
+    {
+        var s = Healthy();
+        s.RecentChanges = new[] { Change(RecentChangeKind.Program, "Sample Tool", 1) };
+        Assert.Equal(FindingCode.LooksNormal, Run(s).F[0].Code);
+        s.RebootPending = Tri.Yes; // a pending restart is the result of a change, not a second problem
+        Assert.DoesNotContain(Run(s).F, x => x.Code == FindingCode.HealthRecentChanges);
+    }
+
+    [Fact]
+    public void RecentChanges_AreListedWhenAnotherProblemExists()
+    {
+        var s = Healthy();
+        s.BlueScreens = 1;
+        s.RecentChanges = new[] { Change(RecentChangeKind.Program, "Sample Tool", 1), Change(RecentChangeKind.Update, "Sample Update KB1", 2) };
+        s.RestorePointsKnown = Tri.Unknown;
+        var (f, l) = Run(s);
+        var c = f.Single(x => x.Code == FindingCode.HealthRecentChanges);
+        Assert.Contains("programs or updates were installed shortly before the problems started", c.PlainMessage);
+        Assert.Contains("Sample Tool", c.TechnicalDetail);
+        Assert.Contains(l, r => r.Id == "uninstall_recent_program" && r.Arg == "apps");
+        Assert.Contains(l, r => r.Id == "uninstall_recent_update" && r.Arg == "updatehistory");
+        Assert.Contains(l, r => r.Id == "system_restore" && r.ActionId == "ui.human_step" && r.Say.Contains("rstrui.exe"));
+    }
+
+    [Fact]
+    public void RestorePoint_OnlyOfferedWhenUnknownOrOlderThanTheFirstChange()
+    {
+        var s = Healthy();
+        s.BlueScreens = 1;
+        s.RecentChanges = new[] { Change(RecentChangeKind.Driver, "SampleDriver", 3) };
+        s.RestorePointsKnown = Tri.Yes;
+        s.RestorePoints = new[] { DateTime.UtcNow.AddDays(-1) };
+        Assert.DoesNotContain(Run(s).L, r => r.Id == "system_restore");
+        s.RestorePoints = new[] { DateTime.UtcNow.AddDays(-1), DateTime.UtcNow.AddDays(-10) };
+        Assert.Contains(Run(s).L, r => r.Id == "system_restore");
+        Assert.DoesNotContain(Run(s).L, r => r.Id is "uninstall_recent_program" or "uninstall_recent_update");
+    }
+
+    [Fact]
+    public void GraphicsResets_GiveDriverStepsAndAreHardwareOnlyWhenVeryFrequent()
+    {
+        var s = Healthy();
+        s.GraphicsResets = 3;
+        var (f, l) = Run(s);
+        Assert.Equal(FindingCode.HealthGraphicsResets, f[0].Code);
+        Assert.Contains("3 times", f[0].PlainMessage);
+        Assert.Contains(l, r => r.Id == "graphics_reset_updates" && r.Arg == "windowsupdate");
+        Assert.Contains(l, r => r.Id == "graphics_reset_maker" && r.ActionId == "ui.human_step" && r.Say.Contains("NVIDIA"));
+        Assert.False(HealthTriage.ProbablyHardware(s));
+        s.GraphicsResets = 20;
+        Assert.True(HealthTriage.ProbablyHardware(s));
+    }
+
+    [Theory]
+    [InlineData("20261109", true)]
+    [InlineData("2026-11-09", false)]
+    [InlineData("", false)]
+    [InlineData("20261399", false)]
+    public void InstallDates_AreParsed(string v, bool ok) => Assert.Equal(ok, RealHealthProbe.ParseInstallDate(v).HasValue);
+
+    [Fact]
+    public void RecentChangeAndGraphicsText_FollowTheWritingGuide()
+    {
+        var s = Healthy();
+        s.BlueScreens = 1; s.GraphicsResets = 25;
+        s.RecentChanges = new[] { Change(RecentChangeKind.Program, "Sample Tool", 1), Change(RecentChangeKind.Update, "Sample Update", 2), Change(RecentChangeKind.Driver, "SampleDriver", 2) };
+        var (f, l) = Run(s);
+        foreach (var t in f.Select(x => x.PlainMessage).Concat(l.Select(r => r.Say)))
+            Assert.DoesNotMatch(@"n't|'d |'ll |\bI\b|\bwe\b|!|\bit's\b|\bthat's\b", t);
+        Assert.Equal(l.Count, l.Select(r => r.Id).Distinct().Count());
+        Assert.All(l, r => Assert.True(r.Tier <= 1));
+    }
+
+    // ---- blue-screen causes and virtual memory ----
+
+    [Theory]
+    [InlineData("The bugcheck was: 0x0000001a (0x0000000000041790, 0xfffffa8000c3d6f0, 0x000000000000ffff, 0x0000000000000000). A dump was saved in: C:\\Windows\\MEMORY.DMP.", 0x1Au)]
+    [InlineData("0x00000124 (0x0000000000000000, 0xffffd30a1b2c3d40, 0x00000000bf800000, 0x0000000000000124)", 0x124u)]
+    [InlineData("0x000000d1", 0xD1u)]
+    [InlineData("0x1a", 0x1Au)]
+    public void StopCodes_AreParsedFromTextAndParameters(string text, uint expected) => Assert.Equal(expected, StopCodes.Parse(text));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("The computer has rebooted from a bugcheck.")]
+    [InlineData("0xZZ")]
+    public void StopCodes_NoCodeGivesNull(string? text) => Assert.Null(StopCodes.Parse(text));
+
+    [Fact]
+    public void StopCodes_AreCountedMostFrequentFirst()
+    {
+        var c = StopCodes.Count(new uint[] { 0x1A, 0xD1, 0xD1, 0x1A, 0xD1 });
+        Assert.Equal(0xD1u, c[0].Code);
+        Assert.Equal(3, c[0].Count);
+        Assert.Equal(2, c[1].Count);
+    }
+
+    [Theory]
+    [InlineData(0x1Au, StopCategory.Memory)]
+    [InlineData(0x50u, StopCategory.Memory)]
+    [InlineData(0x19u, StopCategory.Memory)]
+    [InlineData(0x3Bu, StopCategory.Driver)]
+    [InlineData(0x7Eu, StopCategory.Driver)]
+    [InlineData(0x0Au, StopCategory.Driver)]
+    [InlineData(0xD1u, StopCategory.Driver)]
+    [InlineData(0xC2u, StopCategory.Driver)]
+    [InlineData(0x133u, StopCategory.Driver)]
+    [InlineData(0x139u, StopCategory.Driver)]
+    [InlineData(0x9Fu, StopCategory.Driver)]
+    [InlineData(0x116u, StopCategory.Graphics)]
+    [InlineData(0x117u, StopCategory.Graphics)]
+    [InlineData(0x7Au, StopCategory.Storage)]
+    [InlineData(0x154u, StopCategory.Storage)]
+    [InlineData(0xF4u, StopCategory.Storage)]
+    [InlineData(0x124u, StopCategory.Other)]
+    [InlineData(0xEFu, StopCategory.Other)]
+    public void StopCodes_CommonCodesHaveAMeaning(uint code, StopCategory category)
+    {
+        var m = StopCodes.Meaning(code);
+        Assert.NotNull(m);
+        Assert.Equal(category, m!.Category);
+        Assert.DoesNotMatch(@"n't|'d |'ll |\bI\b|\bwe\b|!|\bit's\b|\bthat's\b", m.Explanation);
+    }
+
+    [Fact]
+    public void StopCodes_UnknownCodeHasNoMeaning_AndOnly124IsHardware()
+    {
+        Assert.Null(StopCodes.Meaning(0xDEADu));
+        Assert.True(StopCodes.IsHardware(0x124));
+        Assert.False(StopCodes.IsHardware(0x1A));
+    }
+
+    [Fact]
+    public void BlueScreen_NamesTheMostFrequentCode()
+    {
+        var s = Healthy();
+        s.BlueScreens = 3;
+        s.StopCodes = new[] { new StopCodeCount(0x1A, 2), new StopCodeCount(0xD1, 1) };
+        var (f, l) = Run(s);
+        Assert.Equal(FindingCode.HealthBlueScreens, f[0].Code);
+        Assert.Contains("0x1A", f[0].PlainMessage);
+        Assert.Contains("memory", f[0].PlainMessage);
+        Assert.Contains("0xD1", f[0].TechnicalDetail);
+        var diag = Assert.Single(l, r => r.Id == "memory_diagnostic");
+        Assert.Equal("ui.human_step", diag.ActionId);
+        Assert.Contains("mdsched.exe", diag.Say);
+        Assert.Contains(l, r => r.Id == "bluescreen_driver_updates" && r.Arg == "windowsupdate");
+        Assert.Contains(l, r => r.Id == "bluescreen_driver_maker");
+        Assert.DoesNotContain(l, r => r.ActionId == "disk.scan");
+    }
+
+    [Fact]
+    public void BlueScreen_WithoutCodes_KeepsTheShortText_AndStorageCodesGiveDiskScan()
+    {
+        var s = Healthy();
+        s.BlueScreens = 1;
+        var (f, l) = Run(s);
+        Assert.DoesNotContain("stop code", f[0].PlainMessage);
+        Assert.DoesNotContain(l, r => r.Id == "memory_diagnostic");
+        s.StopCodes = new[] { new StopCodeCount(0x7A, 1) };
+        Assert.Contains(Run(s).L, r => r.ActionId == "disk.scan" && r.Arg == "C");
+        s.StopCodes = new[] { new StopCodeCount(0x116, 1) };
+        Assert.Contains(Run(s).L, r => r.Id == "bluescreen_driver_updates" && r.Say.Contains("display driver"));
+    }
+
+    [Fact]
+    public void BlueScreen_Code124_IsProbablyHardware()
+    {
+        var s = Healthy();
+        s.BlueScreens = 1;
+        s.StopCodes = new[] { new StopCodeCount(0x124, 1) };
+        Assert.True(HealthTriage.ProbablyHardware(s));
+        s.StopCodes = new[] { new StopCodeCount(0x1A, 1) };
+        Assert.False(HealthTriage.ProbablyHardware(s));
+    }
+
+    private static PageFileState Pf(bool? auto, params long[] allocatedMb) =>
+        new(auto, 16384, Array.Empty<PageFileSetting>(), allocatedMb.Select((a, i) => new PageFileUse($"C:\\pagefile{i}.sys", a, 10)).ToList());
+
+    [Theory]
+    [InlineData(false, new long[0], true)]
+    [InlineData(false, new long[] { 512 }, true)]
+    [InlineData(false, new long[] { 512, 256 }, true)]
+    [InlineData(false, new long[] { 1024 }, false)]
+    [InlineData(false, new long[] { 4096 }, false)]
+    [InlineData(true, new long[0], false)]
+    [InlineData(true, new long[] { 256 }, false)]
+    public void PageFile_FindingOnlyWhenManualAndTooSmall(bool auto, long[] sizes, bool expected)
+    {
+        var s = Healthy();
+        s.PageFile = Pf(auto, sizes);
+        Assert.Equal(expected, Run(s).F.Any(x => x.Code == FindingCode.HealthPageFileTooSmall));
+    }
+
+    [Fact]
+    public void PageFile_Unreadable_GivesNoFinding()
+    {
+        var s = Healthy();
+        Assert.DoesNotContain(Run(s).F, x => x.Code == FindingCode.HealthPageFileTooSmall);
+        s.PageFile = Pf(null);
+        Assert.DoesNotContain(Run(s).F, x => x.Code == FindingCode.HealthPageFileTooSmall);
+    }
+
+    [Fact]
+    public void PageFile_Finding_UsesLowMemoryEventsAsEvidence_AndGivesRungs()
+    {
+        var s = Healthy();
+        s.PageFile = Pf(false);
+        var (f, l) = Run(s);
+        Assert.Contains("switched off", f[0].PlainMessage);
+        Assert.DoesNotContain("low virtual memory", f[0].PlainMessage);
+        s.LowMemoryEvents = 2;
+        s.PageFile = Pf(false, 300);
+        (f, l) = Run(s);
+        Assert.Contains("300 MB", f[0].PlainMessage);
+        Assert.Contains("low virtual memory twice", f[0].PlainMessage);
+        var fix = Assert.Single(l, r => r.ActionId == "system.pagefile_auto");
+        Assert.Equal("system", fix.Arg);
+        Assert.Equal(1, fix.Tier);
+        Assert.Contains("restarts", fix.Say);
+        Assert.Contains("Windows will ask for your permission.", fix.Say);
+        Assert.Contains("system.pagefile_auto", FixActions.ElevatedActions);
+        Assert.Contains(l.SkipWhile(r => r.Id != fix.Id), r => r.Id == "restart_after_pagefile" && r.ActionId == "ui.human_step");
+        Assert.Contains(HealthTriage.Rechecked, c => c == FindingCode.HealthPageFileTooSmall);
+    }
+
+    [Theory]
+    [InlineData("system.pagefile_auto", "C:\\")]
+    [InlineData("system.pagefile_auto", "System")]
+    [InlineData("system.pagefile_auto", "other")]
+    [InlineData("system.pagefile_auto", "")]
+    public void Executor_PageFileAction_RejectsAnythingButSystem(string action, string arg) =>
+        Assert.Equal(2, ExecutorProgram.Main(new[] { action, arg }));
+
+    [Fact]
+    public void BlueScreenAndPageFileText_FollowTheWritingGuide()
+    {
+        var s = Healthy();
+        s.BlueScreens = 6; s.LowMemoryEvents = 1;
+        s.StopCodes = new[] { new StopCodeCount(0x1A, 2), new StopCodeCount(0xD1, 2), new StopCodeCount(0x116, 1), new StopCodeCount(0x7A, 1), new StopCodeCount(0x124, 1) };
+        s.PageFile = Pf(false, 200);
+        var (f, l) = Run(s);
+        foreach (var t in f.Select(x => x.PlainMessage).Concat(l.Select(r => r.Say)))
+            Assert.DoesNotMatch(@"n't|'d |'ll |\bI\b|\bwe\b|!|\bit's\b|\bthat's\b", t);
+        Assert.Equal(l.Count, l.Select(r => r.Id).Distinct().Count());
+        Assert.All(l.Where(r => r.Tier == 1), r => Assert.EndsWith("Windows will ask for your permission.", r.Say));
+    }
 }

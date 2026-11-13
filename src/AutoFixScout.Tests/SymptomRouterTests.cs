@@ -32,6 +32,9 @@ public class SymptomRouterTests
     [InlineData("keyboard types wrong letters and keys stick", "input")]
     [InlineData("after restart my desktop is empty and my files are gone", "health")]
     [InlineData("device manager shows a yellow exclamation mark", "health")]
+    [InlineData("my scanner is not working", "scanner")]
+    [InlineData("the program will not install, error 1603", "install")]
+    [InlineData("I am not getting notifications from Teams", "notifications")]
     [InlineData("something is wrong", "health")]
     [InlineData("", "health")]
     public void RoutesToTheRightCheck(string text, string area) => Assert.Equal(area, SymptomRouter.Best(text).Area);

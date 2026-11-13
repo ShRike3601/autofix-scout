@@ -121,6 +121,19 @@ public static partial class AudioTriage
             }
         }
 
+        // Rule 9b: per-app sound (Volume mixer), only when the device itself is fine so the device findings keep priority.
+        if (findings.Count == 0)
+        {
+            foreach (var app in state.Sessions.Where(s => s.Muted).DistinctBy(s => s.Label))
+                findings.Add(new Finding(FindingCode.AppSoundMuted,
+                    $"Sound is muted for \"{app.Label}\" in the Volume mixer.",
+                    $"Session '{app.Process}': muted, level {app.VolumePercent}%, {(app.Active ? "active" : "inactive")}"));
+            foreach (var app in state.Sessions.Where(s => !s.Muted && s.VolumePercent < AppSound.LowPercent).DistinctBy(s => s.Label))
+                findings.Add(new Finding(FindingCode.AppSoundVeryLow,
+                    $"Sound is set very low for \"{app.Label}\" in the Volume mixer.",
+                    $"Session '{app.Process}': level {app.VolumePercent}%, {(app.Active ? "active" : "inactive")}"));
+        }
+
         // Rule 10: LooksNormal ONLY if no other findings AND no Unknown values
         var hasOtherFindings = findings.Count > 0;
         var hasUnknownMuteOrVolume = state.DefaultMuted == Tri.Unknown || (state.DefaultVolumePercent.HasValue && state.DefaultVolumePercent.Value == 0); // Treat 0 as potentially unknown/neutral
@@ -276,4 +289,39 @@ public enum FindingCode
     NetWeakWifi,
     NetIpConflict,
     NetMetered,
+    // Big space users on a low or full system drive
+    StorageBigUsers,
+    // Per-app sound (Volume mixer)
+    AppSoundMuted,
+    AppSoundVeryLow,
+    // Recent changes and graphics driver resets
+    HealthRecentChanges,
+    HealthGraphicsResets,
+    // Security: browser policies
+    SecurityBrowserPolicy,
+    SecurityBrowserPolicyManaged,
+    // Per-app privacy choices (Microphone and Camera)
+    MicAppDenied,
+    CameraAppDenied,
+    // Scanners (Printer area)
+    ScannerServiceOff,
+    ScannerDeviceError,
+    // Blue-screen causes and virtual memory
+    HealthPageFileTooSmall,
+    // Security: threats found by Microsoft Defender
+    SecurityThreatActive,
+    SecurityThreatsRemoved,
+    // Missing notifications (Start menu and taskbar area)
+    NotificationsOff,
+    AppNotificationsOff,
+    DoNotDisturbOn,
+    // Programs will not install (Windows Installer)
+    InstallerServiceOff,
+    InstallFailures,
+    InstallBlockedByRestart,
+    // USB devices disconnecting (full check-up)
+    HealthUsbDisconnects,
+    HealthUsbErrors,
+    // Wi-Fi keeps dropping
+    NetWifiDrops,
 }

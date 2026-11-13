@@ -16,7 +16,7 @@ public static class FixActions
         "service.restart", "device.disable_enable", "device.enable", "network.reset_dns", "network.renew_address", "device.rescan", "service.set_manual", "printer.clear_queue", "printer.set_online",
         "repair.dism", "repair.sfc", "time.resync", "network.reset_winhttp_proxy", "network.clean_hosts", "service.restore_default",
         "system.repair_path", "network.reset_winsock", "update.reset_components", "search.rebuild_index", "runtime.install_vcredist", "disk.scan",
-        "storage.cleanup_components", "office.quick_repair", "security.firewall_on", "security.uac_on",
+        "storage.cleanup_components", "office.quick_repair", "security.firewall_on", "security.uac_on", "security.remove_browser_policies", "system.pagefile_auto",
     };
 
     public static async Task<(bool Ok, string Detail)> RunAsync(Rung rung)
@@ -30,6 +30,7 @@ public static class FixActions
                     var uri = rung.Arg switch
                     {
                         "sound" => "ms-settings:sound",
+                        "volume_mixer" => "ms-settings:apps-volume",
                         "camera" => "ms-settings:privacy-webcam",
                         "airplane" => "ms-settings:network-airplanemode",
                         "wifi" => "ms-settings:network-wifi",
@@ -41,8 +42,10 @@ public static class FixActions
                         "microphone" => "ms-settings:privacy-microphone",
                         "sound_devices" => "ms-settings:sound-devices",
                         "printers" => "ms-settings:printers",
+                        "scanners" => "ms-settings:printers",
                         "display" => "ms-settings:display",
                         "apps" => "ms-settings:appsfeatures",
+                        "updatehistory" => "ms-settings:windowsupdate-history",
                         "backup" => "ms-settings:backup",
                         "dateandtime" => "ms-settings:dateandtime",
                         "bluetooth" => "ms-settings:bluetooth",
@@ -51,6 +54,7 @@ public static class FixActions
                         "touchpad" => "ms-settings:devices-touchpad",
                         "keyboard_access" => "ms-settings:easeofaccess-keyboard",
                         "mouse" => "ms-settings:mousetouchpad",
+                        "notifications" => "ms-settings:notifications",
                         "windowsdefender" => "windowsdefender:",
                         "windowsdefender_appbrowser" => "windowsdefender://appbrowser",
                         _ => throw new ArgumentException(rung.Arg),
@@ -61,6 +65,8 @@ public static class FixActions
                     return (true, "person was asked to do it");
                 case "audio.unmute_and_set_volume":
                     return (true, Unmute());
+                case "audio.unmute_app":
+                    return await Task.Run(() => AppSound.Unmute(rung.Arg));
                 case "audio.unmute_microphone":
                     return (true, Unmute(DataFlow.Capture, Role.Communications));
                 case "network.flush_dns":
@@ -95,6 +101,8 @@ public static class FixActions
                 case "power.balanced_plan":
                     // Fixed Balanced GUID; powercfg /setactive works for the signed-in user without admin.
                     return await Task.Run(() => RunFixed("powercfg.exe", "/setactive " + PowerTriage.BalancedGuid));
+                case "shell.notifications_on":
+                    return await Task.Run(Repair.NotificationRepairs.NotificationsOn);
                 case "shell.restart_start_menu":
                     return await Task.Run(Repair.UserRepairs.RestartStartMenu);
                 case "shell.restart_explorer":
@@ -107,8 +115,12 @@ public static class FixActions
                 case "security.update_signatures":
                     // MpCmdRun with fixed arguments; Defender allows this without admin rights.
                     return await Task.Run(Repair.UserRepairs.UpdateDefenderSignatures);
+                case "security.remove_browser_policies_user":
+                    return await Task.Run(Repair.UserRepairs.RemoveBrowserPoliciesUser);
                 case "security.quick_scan":
                     return await Task.Run(Repair.UserRepairs.DefenderQuickScan);
+                case "security.full_scan":
+                    return await Task.Run(Repair.UserRepairs.DefenderFullScan);
                 case "input.touchpad_on":
                     return await Task.Run(Repair.InputRepairs.TouchpadOn);
                 case "input.accessibility_keys_off":

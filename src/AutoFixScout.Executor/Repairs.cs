@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Management;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.ServiceProcess;
@@ -151,6 +152,27 @@ public static class Repairs
     }
 
     // ---- security ----
+    /// <summary>
+    /// security.remove_browser_policies: removes the flagged browser policy values under HKLM and HKCU (the list is computed here,
+    /// from <see cref="BrowserPolicies"/>; nothing is taken as input). The values are saved first. A computer that belongs
+    /// to a domain or Azure AD is managed by an organization, so nothing is removed there (3). 3 = nothing flagged.
+    /// </summary>
+    public static int RemoveBrowserPolicies()
+    {
+        if (BrowserPolicies.IsManagedPc()) return 3;
+        // HKCU\Software\Policies is read-only for the person's normal (non-elevated) process, so both hives are cleaned here.
+        // The executor runs elevated as the same user, so CurrentUser is the person's own hive.
+        using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+        using var hkcu = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Registry64);
+        var machine = BrowserPolicies.Scan(hklm, BrowserPolicies.HiveMachine);
+        var user = BrowserPolicies.Scan(hkcu, BrowserPolicies.HiveUser);
+        if (machine.Count + user.Count == 0) return 3;
+        Backup("browser-policies", BrowserPolicies.BackupText(hklm, machine) + BrowserPolicies.BackupText(hkcu, user));
+        BrowserPolicies.Remove(hklm, machine);
+        BrowserPolicies.Remove(hkcu, user);
+        return BrowserPolicies.Scan(hklm, BrowserPolicies.HiveMachine).Count + BrowserPolicies.Scan(hkcu, BrowserPolicies.HiveUser).Count == 0 ? 0 : 1;
+    }
+
 
     private const string FirewallPolicy = @"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy";
 
@@ -257,6 +279,36 @@ public static class Repairs
         k.SetValue("Path", SystemPath.Repair(raw, root), RegistryValueKind.ExpandString);
         SendMessageTimeout((IntPtr)0xffff, 0x001A /* WM_SETTINGCHANGE */, IntPtr.Zero, "Environment", 0x0002, 5000, out _);
         return 0;
+    }
+
+    /// <summary>
+    /// system.pagefile_auto: lets Windows manage the page file size (Win32_ComputerSystem.AutomaticManagedPagefile = true).
+    /// The current settings are saved first. Takes effect after a restart. 3 = already automatic.
+    /// </summary>
+    public static int PageFileAuto()
+    {
+        var scope = new ManagementScope(@"\\.\root\cimv2", new ConnectionOptions { EnablePrivileges = true });
+        scope.Connect();
+        using var q = new ManagementObjectSearcher(scope, new ObjectQuery("SELECT * FROM Win32_ComputerSystem"));
+        foreach (ManagementObject cs in q.Get())
+            using (cs)
+            {
+                if (cs["AutomaticManagedPagefile"] is true) return 3;
+                var text = new StringBuilder();
+                text.Append($"AutomaticManagedPagefile={cs["AutomaticManagedPagefile"]}\n");
+                using (var s = new ManagementObjectSearcher(scope, new ObjectQuery("SELECT Name, InitialSize, MaximumSize FROM Win32_PageFileSetting")))
+                    foreach (ManagementObject o in s.Get())
+                        using (o) text.Append($"Setting {o["Name"]} InitialSize={o["InitialSize"]} MaximumSize={o["MaximumSize"]}\n");
+                using (var u = new ManagementObjectSearcher(scope, new ObjectQuery("SELECT Name, AllocatedBaseSize, CurrentUsage FROM Win32_PageFileUsage")))
+                    foreach (ManagementObject o in u.Get())
+                        using (o) text.Append($"Usage {o["Name"]} AllocatedBaseSize={o["AllocatedBaseSize"]} CurrentUsage={o["CurrentUsage"]}\n");
+                RestorePoint("system.pagefile_auto");
+                Backup("pagefile", text.ToString());
+                cs["AutomaticManagedPagefile"] = true;
+                cs.Put();
+                return 0;
+            }
+        return 1;
     }
 
     // ---- Windows Update, search ----

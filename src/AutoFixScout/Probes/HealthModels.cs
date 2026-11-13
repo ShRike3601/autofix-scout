@@ -1,3 +1,4 @@
+using AutoFixScout.Triage;
 using AutoFixScout.Repair;
 
 namespace AutoFixScout.Probes;
@@ -22,6 +23,12 @@ public sealed class HealthState
     /// <summary>Programs that stopped responding (event 1002), by name, in the last 14 days.</summary>
     public IReadOnlyDictionary<string, int> Hangs { get; set; } = new Dictionary<string, int>();
     public int BlueScreens { get; set; }
+    /// <summary>Stop codes of the blue screens in the last 14 days, most frequent first (empty when none could be read).</summary>
+    public IReadOnlyList<StopCodeCount> StopCodes { get; set; } = new List<StopCodeCount>();
+    /// <summary>The page file (virtual memory) settings and size; null = could not be read.</summary>
+    public PageFileState? PageFile { get; set; }
+    /// <summary>Resource-Exhaustion-Detector event 2004 ("low virtual memory") in the last 14 days.</summary>
+    public int LowMemoryEvents { get; set; }
     public int UnexpectedShutdowns { get; set; }
     /// <summary>Disk and file-system errors (disk 7/51/153, Ntfs 55/98) in the last 14 days.</summary>
     public int DiskErrors { get; set; }
@@ -69,6 +76,17 @@ public sealed class HealthState
     /// <summary>The program the person said is the one with the problem (from "A program keeps closing"); null = not asked.</summary>
     public string? ChosenApp { get; set; }
 
+    /// <summary>Programs, Windows updates and drivers installed in the last 7 days, newest first.</summary>
+    public IReadOnlyList<RecentChange> RecentChanges { get; set; } = new List<RecentChange>();
+    /// <summary>Dates (UTC) of System Restore points. Unknown = not readable without administrator rights.</summary>
+    public Tri RestorePointsKnown { get; set; } = Tri.Unknown;
+    public IReadOnlyList<DateTime> RestorePoints { get; set; } = new List<DateTime>();
+    /// <summary>Graphics driver resets in the last 14 days (Display event 4101, LiveKernelEvent 141 or 117).</summary>
+    public int GraphicsResets { get; set; }
+
+    /// <summary>USB disconnects, hub errors and selective suspend (last 3 days); null = could not be read.</summary>
+    public UsbState? Usb { get; set; }
+
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
 }
 
@@ -85,3 +103,22 @@ public sealed record PhysicalDriveInfo(string Name, string MediaType, string Hea
 }
 
 public interface IHealthProbe { HealthState Read(); }
+
+public enum RecentChangeKind { Program, Update, Driver }
+
+/// <summary>Something installed in the last week. WhenUtc is the install date (programs record the day only).</summary>
+public sealed record RecentChange(RecentChangeKind Kind, string Name, DateTime WhenUtc);
+
+/// <summary>Page file as Windows reports it. Sizes in MB. Automatic = null when it could not be read.</summary>
+public sealed record PageFileState(bool? Automatic, long TotalRamMb, IReadOnlyList<PageFileSetting> Settings, IReadOnlyList<PageFileUse> Usage)
+{
+    /// <summary>Total size of the page files that exist now.</summary>
+    public long AllocatedMb => Usage.Sum(u => u.AllocatedMb);
+    public bool Exists => Usage.Count > 0;
+}
+
+/// <summary>Win32_PageFileSetting: the size the person set by hand (0 = system chooses).</summary>
+public sealed record PageFileSetting(string Name, long InitialMb, long MaximumMb);
+
+/// <summary>Win32_PageFileUsage: a page file that exists, its size and how much is in use.</summary>
+public sealed record PageFileUse(string Name, long AllocatedMb, long CurrentUsageMb);

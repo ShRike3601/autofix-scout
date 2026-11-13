@@ -358,3 +358,65 @@ Status 2026-11-13 ~00:45 IST: power area (R2) merged (436 tests); NOT yet in the
 - 2026-11-13 00:33 long admin bench: VC++ install (signed download), Update reset (old folder kept as SoftwareDistribution.afs-<stamp>), chkdsk /scan, DISM RestoreHealth (9.4 min), SFC (1.7 min; it FOUND and repaired corrupt files on the bench), component cleanup (4 min): all PASS. Update services back to normal.
 - R4 network extras: agent hit the usage limit mid-way; its work is in worktree C:\afs-wt\net-extras (branch net-extras). After the 02:20 reset: finish it (or resume the agent), review, test, merge.
 - Roadmap part 2 complete (R1-R8). UI is being reworked in a separate Claude session (owner, 2026-11-13): do not edit src/AutoFixScout.UI from this session; expect a merge from that work.
+
+## Roadmap (part 3, from 2026-11-13 ~01:30 IST)
+No UI edits in this session (another session reworks the UI). New checks go into existing areas so they are reachable now.
+- [x] Q1 Browser hijack by policy (Security area): Chrome/Edge/Firefox policies a home PC should not have (forced extensions,
+      forced homepage/search engine, "managed by your organization"), plus browser proxy settings. Fix: remove those policy
+      values with a backup (HKCU without admin, HKLM through the executor with a fixed list of policy names).
+- [x] Q2 "What changed before the problem started" (check-up): programs, Windows updates and drivers installed in the last
+      7 days (Uninstall registry keys, Win32_QuickFixEngineering, driver install events) shown in the finding detail and
+      a guided "uninstall the recent update/program" step; System Restore as a last-resort guided step when a restore
+      point exists from before the change (never run automatically).
+- [x] Q3 Graphics driver resets and freezes (check-up): Display event 4101 (TDR) and LiveKernelEvent 141/117 counts ->
+      graphics driver finding; guided driver update via Windows Update optional updates / maker's site.
+- [x] Q4 Sound: one app muted or at zero in the Volume Mixer (per-app session volume), audio enhancements causing
+      distortion (guided). Fix: unmute that app's session (non-admin, NAudio session API).
+- [x] Q5 Big space users (Slow or full computer): Windows.old, hibernation file, Downloads folder size, Delivery
+      Optimization cache, old Windows Update cleanup; safe cleanups only (Storage Sense / component cleanup), guided
+      for personal folders (never delete personal files).
+Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This session works in C:\afs-wt\overnight (branch overnight); agents in C:\afs-wt\<name>.
+- Q1 admin path verified on hardware (2026-11-13 03:55): dummy HKCU Chrome HomepageLocation removed by the elevated executor (exit 0), bad arg rejected (2), cleaned up.
+
+## Roadmap (part 4, from 2026-11-13 ~04:00 IST)
+- [x] P1 Per-app privacy (Microphone and Camera areas): one app (Teams, Zoom, a browser) denied microphone or camera
+      access while the global switch is on (HKCU ConsentStore\<capability>\<app or NonPackaged\path> Value=Deny);
+      guided Settings step naming the app; no silent changes to privacy choices.
+- [x] P2 Blue-screen causes (check-up): read the stop code of recent blue screens (event 1001 BugCheck parameters /
+      WER) and explain common ones in plain words (memory, driver, storage, graphics); offer Windows Memory Diagnostic
+      as a guided step for memory-type codes; point to the driver for driver-type codes.
+- [x] P3 Virtual memory (check-up): page file disabled or far too small for the installed memory -> "low memory" crashes;
+      fix through the executor: let Windows manage the page file size (backup of the old setting; restart needed).
+- [x] P4 Threats found by Microsoft Defender (Security): recent detections (MSFT_MpThreatDetection) and whether they were
+      removed; guided "Protection history" step; full scan offer.
+- [x] P5 Scanner and camera import (Printer area): Windows Image Acquisition service (stisvc) off; scanner device errors.
+- P5: OnScannerClicked (MainWindow.xaml.cs) runs the printer flow with ScanFocus; the search box routes "scanner" there. The home tile is added by the UI session.
+- P3 bug found on hardware: system.pagefile_auto used WMI path "\.\root\cimv2" (missing "\") -> "Invalid parameter"; fixed, LivePageFileTests guards it; elevated re-run: exit 3 (already automatic), bad arg 2.
+- Idea from the UI session, owner has NOT decided: SymptomRouter could return a confidence plus the next 1-2 candidates and "no good match", so the UI can offer "closest checks". Do not start unless the owner asks.
+
+## Roadmap (part 5, queued 2026-11-13 ~04:40 IST; start after the next usage reset, agents on Sonnet in worktrees)
+- [x] F1 Wi-Fi keeps dropping (internet check): frequent disconnects (WLAN-AutoConfig 8003/8001 counts), adapter
+      power saving ("Allow the computer to turn off this device"), roaming aggressiveness; guided steps; never change
+      the network live in tests.
+- [x] F2 Programs will not install (Store/apps area): Windows Installer service (msiserver) disabled, MsiInstaller
+      failure events (11708/1033 with error codes explained), pending restart blocking installs, low space; fixes:
+      service default, restart guide, clear the user's temp (exists).
+- [x] F3 Notifications missing (Start menu/taskbar area): notifications switched off globally or per app, Do not
+      disturb / Focus on, notification banners off; guided Settings steps naming the app; non-admin switch back on for the
+      global toggle if it can be done safely.
+- [x] F4 USB devices disconnecting (check-up): Kernel-PnP / USB hub errors and frequent device add/remove events, USB
+      selective suspend on battery; guided power setting step, replug/hub advice.
+- F2/F3 entries: OnInstallClicked (Apps, Install focus) and OnNotificationsClicked (Shell, notification focus) in MainWindow.xaml.cs; search routes 'install' and 'notifications'. Tiles: UI session. Bench note: the full check-up/install focus reports a pending restart, most likely from tonight's SFC repair; a restart clears it.
+- F1/F4 found on the bench: the USB check first read the System log (no Kernel-PnP device events there: 0 vs 671) and then, with real data, flagged the built-in webcam because devices log events at every start-up/wake; fixed (Kernel-PnP Configuration log; threshold grows with starts and wakes). Wi-Fi drops subtract sleeps/shutdowns. The bench's Wi-Fi drops finding (about 28 in 3 days) is real: earlier test runs switched the adapter off and on.
+- Roadmap part 5 complete.
+- 2026-11-13 13:10: SymptomRouter.Rank (closest checks, confidence, Covers line, NoGoodMatch) added for the UI session's choice screen (owner approved via that session); commit 2f366cf.
+
+## Roadmap (part 6, from 2026-11-13 ~13:15 IST)
+- [ ] G1 Screen looks wrong (Display area): resolution below the screen's native one, refresh rate below the best supported
+      (e.g. 60 Hz on a 144 Hz screen), unusual scaling causing blurry text; guided Settings steps (no silent display changes).
+- [ ] G2 Slow start-up (Slow or full computer): boot and sign-in durations (Diagnostics-Performance event 100 where
+      readable, else start-up app count and Fast Startup state), with the slowest start-up items when Windows names them.
+- [ ] G3 Keyboard types the wrong characters (Keyboard area): several input languages/layouts installed, a different
+      layout active than the display language suggests, the Alt+Shift / Windows+Space switch hotkeys; guided steps.
+- [ ] G4 Sound gets quieter during calls (Sound area): communications "ducking" setting (reduce other sounds by 80%/50%/
+      mute), different default device for communications; non-admin switch to "Do nothing" with a backup.

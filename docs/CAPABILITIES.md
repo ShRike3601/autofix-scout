@@ -41,6 +41,24 @@ Status: **Done** = built, unit-tested and checked on the test laptop (every admi
 | Temporary user profile (in the full check-up) | "my desktop and files are gone" (temporary profile, profile service errors) | restart and sign in again, guided recovery for a helper; profiles never touched | Done |
 | Keyboard, mouse, touchpad | touchpad switched off, Sticky/Filter/Toggle/Mouse Keys on, missing or failing input devices | touchpad on, accessibility keys off (backed up), re-detect devices, guided steps | Done |
 | Clock settings (in the full check-up) | wrong clock with "Set time automatically" off | Date and time settings step, then clock sync | Done |
+| Browser taken over by policies ("managed by your organization") | forced extensions, homepage, search engine, browser proxy | remove the policy values (backed up, admin step covers both machine and own-account rules) | Done |
+| What changed before the problem | programs, updates and drivers installed in the last 7 days | uninstall guidance, System Restore as a last resort (guided) | Done |
+| Graphics driver resets | display driver resets and freezes | driver update guidance | Done |
+| One app has no sound | app muted or at zero in the Volume mixer, audio enhancements | unmute that app, guided | Done |
+| What fills the drive | Windows.old, hibernation file, Downloads, update caches | Storage Sense, component cleanup, guided (personal files never deleted) | Done |
+| One app cannot use the microphone or camera | per-app privacy switch off for Teams, Zoom, a browser... | guided Settings step naming the app | Done |
+| Blue-screen causes | stop codes explained (memory, driver, storage, graphics) | memory test (guided), driver steps, disk scan | Done |
+| Virtual memory | page file missing or too small | let Windows manage the page file (admin, restart) | Done |
+| Threats found by Microsoft Defender | recent detections, active or removed | Protection history, full scan, Defender Offline (guided) | Done |
+| Scanner | image acquisition service off, scanner errors | restore service, re-detect, guided | Done |
+| Wi-Fi keeps dropping | frequent disconnects (sleep and shutdown excluded), adapter power saving | guided | Done |
+| Programs will not install | Windows Installer off, install failures explained, restart pending | service default, guided | Done |
+| Notifications missing | notifications or app notifications off, Do not disturb on | guided, switch back on | Done |
+| USB devices disconnecting | USB errors and frequent reconnects (beyond starts and wakes), selective suspend | guided | Done |
+| Screen looks wrong | resolution below native, low refresh rate, unusual scaling | guided | Planned (G1) |
+| Slow start-up | boot and sign-in time, slow start-up items | guided, startup apps | Planned (G2) |
+| Keyboard types wrong characters | wrong or several keyboard layouts, switch hotkeys | guided | Planned (G3) |
+| Sound gets quieter during calls | communications ducking, separate call device | switch ducking off (backed up), guided | Planned (G4) |
 
 ## Safety rules the code enforces
 - The UI never runs elevated; the executor accepts only allowlisted action ids with fixed or validated arguments.

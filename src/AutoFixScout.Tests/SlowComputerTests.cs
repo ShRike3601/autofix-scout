@@ -248,6 +248,74 @@ public class SlowComputerTests
         Assert.Null(approved?.GetValue(name));
     }
 
+    // ---- big space users ----
+
+    private static StorageState Full()
+    {
+        var s = Healthy();
+        s.FreeBytes = 5 * GB;
+        s.WindowsOld = new SpaceItem(12 * GB, true);
+        s.HiberFile = new SpaceItem(6 * GB, false);
+        s.Downloads = new SpaceItem(3 * GB, false);
+        s.DownloadsOldCount = 40;
+        s.DeliveryOptimization = new SpaceItem(2 * GB, false);
+        s.BigProfileFolders = new[] { new ProfileFolder("Videos", 20 * GB, false) };
+        return s;
+    }
+
+    [Fact]
+    public void Size_Formatting()
+    {
+        Assert.Equal("1.5 GB", StorageTriage.Size(3 * GB / 2));
+        Assert.Equal("1 MB", StorageTriage.Size(10));
+        Assert.Equal("at least 12.0 GB", StorageTriage.SizeOf(new SpaceItem(12 * GB, true)));
+        Assert.Equal("6.0 GB", StorageTriage.SizeOf(new SpaceItem(6 * GB, false)));
+    }
+
+    [Fact]
+    public void BigUsers_OnlyWhenDriveIsLowOrCritical()
+    {
+        var s = Full();
+        s.FreeBytes = 120 * GB;
+        Assert.DoesNotContain(StorageTriage.Evaluate(s), x => x.Code == FindingCode.StorageBigUsers);
+        var (f, l) = Run(Full());
+        var big = Assert.Single(f, x => x.Code == FindingCode.StorageBigUsers);
+        Assert.Contains("Windows.old", big.PlainMessage);
+        Assert.Contains("at least 12.0 GB", big.PlainMessage);
+        Assert.Contains(f, x => x.Code == FindingCode.SystemDriveCritical);
+        // Existing order kept: the space finding stays first, the new one comes after the existing ones.
+        Assert.True(f.ToList().FindIndex(x => x.Code == FindingCode.SystemDriveCritical) < f.ToList().FindIndex(x => x.Code == FindingCode.StorageBigUsers));
+        Assert.Contains(l, r => r.Id == "cleanup_components");
+        var settings = Assert.Single(l, r => r.Id == "storage_settings");
+        Assert.Equal("storagesense", settings.Arg);
+        Assert.Contains("previous Windows installation", settings.Say);
+        Assert.Contains("hibernation", Assert.Single(l, r => r.Id == "hibernation_info").Say);
+        Assert.Equal("ui.human_step", Assert.Single(l, r => r.Id == "review_downloads").ActionId);
+        Assert.DoesNotContain(l, r => r.ActionId.Contains("hibern") || r.ActionId.Contains("download"));
+    }
+
+    [Fact]
+    public void BigUsers_UnknownPartsAreSkipped_AndSmallOnesIgnored()
+    {
+        var s = Full();
+        s.WindowsOld = null; s.DeliveryOptimization = null; s.Downloads = new SpaceItem(10, false);
+        var (f, l) = Run(s);
+        Assert.Contains("hibernation file", Assert.Single(f, x => x.Code == FindingCode.StorageBigUsers).PlainMessage);
+        Assert.DoesNotContain(l, r => r.Id == "review_downloads");
+        s.HiberFile = null;
+        Assert.DoesNotContain(StorageTriage.Evaluate(s), x => x.Code == FindingCode.StorageBigUsers);
+    }
+
+    [Fact]
+    public void Rungs_HaveUniqueIds()
+    {
+        foreach (var st in StyleStates().Append(Full()))
+        {
+            var (_, l) = Run(st);
+            Assert.Equal(l.Count, l.Select(r => r.Id).Distinct().Count());
+        }
+    }
+
     /// <summary>States that produce every slow-computer finding and rung (also scanned by WritingStyleTests).</summary>
     public static IEnumerable<StorageState> StyleStates()
     {
@@ -264,7 +332,7 @@ public class SlowComputerTests
         var one = Healthy();
         one.StartupEntries = new[] { User("Steam", @"C:\Steam\steam.exe") };
         one.StartupAppCount = 1;
-        return new[] { s, one };
+        return new[] { s, one, Full() };
     }
 
     [Fact]

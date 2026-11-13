@@ -57,7 +57,38 @@ public static class StorageTriage
         "AutoFix Scout will open the \"Storage\" settings. Please select \"Temporary files\" or \"Cleanup recommendations\" " +
         "to see what else Windows can remove safely.";
 
+
+    private const string OldWindowsSay =
+        " The previous Windows installation and the update download cache are listed there, and Windows removes them safely. " +
+        "After they are removed, it is no longer possible to go back to the earlier version of Windows.";
     private static Finding F(FindingCode code, string plain, string detail) => new(code, plain, detail);
+
+    /// <summary>Each big space user above this is worth naming when the drive is low or critical.</summary>
+    public const long BigUserBytes = 1L << 30;
+
+    public static string SizeOf(SpaceItem i) => (i.AtLeast ? "at least " : "") + Size(i.Bytes);
+
+    /// <summary>Big space users that could be reclaimed, largest first. Unknown parts are left out.</summary>
+    public static IReadOnlyList<(string Key, string Label, SpaceItem Item)> BigUsers(StorageState s)
+    {
+        var all = new List<(string, string, SpaceItem?)>
+        {
+            ("windows_old", "the previous Windows installation (\"Windows.old\")", s.WindowsOld),
+            ("delivery_optimization", "the Windows update download cache (\"Delivery Optimization\")", s.DeliveryOptimization),
+            ("hiberfil", "the hibernation file", s.HiberFile),
+            ("downloads", "the \"Downloads\" folder", s.Downloads),
+        };
+        return all.Where(x => x.Item3 is { } i && i.Bytes >= BigUserBytes)
+                  .Select(x => (x.Item1, x.Item2, x.Item3!)).OrderByDescending(x => x.Item3.Bytes).ToList();
+    }
+
+    private static string BigDetail(StorageState s)
+    {
+        string P(string n, SpaceItem? i) => $"{n}={(i is null ? "unknown" : SizeOf(i))}";
+        return string.Join("; ", P("windows.old", s.WindowsOld), P("hiberfil", s.HiberFile), P("downloads", s.Downloads) +
+                   (s.DownloadsOldCount is { } c ? $" ({c} files older than 90 days)" : ""), P("deliveryOptimization", s.DeliveryOptimization),
+                   "profile folders=" + (s.BigProfileFolders is { } p ? string.Join(", ", p.Select(x => $"{x.Name} {SizeOf(new SpaceItem(x.Bytes, x.AtLeast))}")) : "unknown"));
+    }
 
     /// <summary>Below 10% or 10 GB free is low, below 3% or 2 GB is critical (whichever is reached first).</summary>
     public static SpaceLevel Space(long? free, long? total)
@@ -116,6 +147,10 @@ public static class StorageTriage
         if (s.Uptime > LongUptime)
             f.Add(F(FindingCode.LongUptime, $"The computer has not been restarted for {(int)s.Uptime.Value.TotalDays} days.", $"uptime {s.Uptime.Value.TotalHours:0} h"));
 
+        if ((space == SpaceLevel.Critical || space == SpaceLevel.Low) && BigUsers(s) is { Count: > 0 } big)
+            f.Add(F(FindingCode.StorageBigUsers,
+                $"The biggest item that can be reclaimed is {big[0].Label}, which uses {SizeOf(big[0].Item)}.", BigDetail(s)));
+
         if (f.Count > 0) return f;
 
         // Fail closed: nothing found in what could not be read is not "fine".
@@ -144,6 +179,7 @@ public static class StorageTriage
                     $"The program \"{p.Name}\" is using a large part of the {what} in this computer. " +
                     $"Please save your work in \"{p.Name}\", then close it. AutoFix Scout never closes programs itself, so that no work is lost."));
 
+        var oldWin = codes.Contains(FindingCode.StorageBigUsers) && BigUsers(s).Any(b => b.Key is "windows_old" or "delivery_optimization");
         var junk = codes.Contains(FindingCode.SystemDriveCritical) || codes.Contains(FindingCode.SystemDriveLow)
                    || codes.Contains(FindingCode.LargeTempFiles);
         if (junk && s.ReclaimableTempBytes >= WorthCleaning)
@@ -161,7 +197,23 @@ public static class StorageTriage
                 "This can take 10 to 30 minutes and cannot be undone. Your files and apps are not affected. " +
                 "Windows will ask for your permission.", "system"));
         if (junk)
-            rungs.Add(new("storage_settings", "ui.open_settings_page", 0, StorageSenseSay, "storagesense"));
+            rungs.Add(new("storage_settings", "ui.open_settings_page", 0, oldWin ? StorageSenseSay + OldWindowsSay : StorageSenseSay, "storagesense"));
+
+        if (codes.Contains(FindingCode.StorageBigUsers))
+        {
+            var big = BigUsers(s);
+            if (big.Any(b => b.Key == "hiberfil"))
+                rungs.Add(new("hibernation_info", "ui.human_step", 0,
+                    $"Windows keeps a hibernation file that uses {SizeOf(s.HiberFile!)} of space, because hibernation saves the open work to the drive. " +
+                    "AutoFix Scout does not turn hibernation off. If hibernation is not needed, the person helping you can turn it off with a helper. " +
+                    "The space is then freed, and Fast Startup is turned off as well."));
+            if (big.Any(b => b.Key == "downloads"))
+                rungs.Add(new("review_downloads", "ui.human_step", 0,
+                    $"The \"Downloads\" folder uses {SizeOf(s.Downloads!)}" +
+                    (s.DownloadsOldCount is > 0 ? $", and {s.DownloadsOldCount} of its files have not been changed for more than 90 days" : "") + ". " +
+                    "Please open the \"Downloads\" folder and review these files yourself. Installers and old documents can often be removed. " +
+                    "AutoFix Scout never deletes your personal files."));
+        }
 
         var offers = StartupOffers(s);
         for (var i = 0; i < offers.Count; i++)

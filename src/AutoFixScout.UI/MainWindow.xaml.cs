@@ -354,10 +354,13 @@ public partial class MainWindow : Window, IFixHost
             "input" => OnInputClicked,
             "office" => OnOfficeClicked,
             "onedrive" => OnOneDriveClicked,
+            "install" => OnInstallClicked,
+            "notifications" => OnNotificationsClicked,
             "program" => OnProgramClosingClicked,
             "storage" => OnStorageClicked,
             "update" => OnUpdateClicked,
             "printer" => OnPrinterClicked,
+            "scanner" => OnScannerClicked,
             "display" => OnDisplayClicked,
             _ => OnHealthClicked,
         };
@@ -429,6 +432,7 @@ public partial class MainWindow : Window, IFixHost
     private async void OnStoreClicked(object sender, RoutedEventArgs e) => await RunAppsAsync(AppsFocus.Store);
     private async void OnOfficeClicked(object sender, RoutedEventArgs e) => await RunAppsAsync(AppsFocus.Office);
     private async void OnOneDriveClicked(object sender, RoutedEventArgs e) => await RunAppsAsync(AppsFocus.OneDrive);
+private async void OnInstallClicked(object sender, RoutedEventArgs e) => await RunAppsAsync(AppsFocus.Install);    private async void OnNotificationsClicked(object sender, RoutedEventArgs e) =>        await RunFlowAsync(Areas.ShellFlow.Topic, "notifications", () => Areas.ShellFlow.DiagnoseAsync(notificationFocus: true),            () => AskAsync(Areas.ShellFlow.NotificationTestQuestion));
 
     private async void OnSecurityClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.SecurityFlow.Topic, Areas.SecurityFlow.What, Areas.SecurityFlow.DiagnoseAsync,
@@ -462,8 +466,9 @@ public partial class MainWindow : Window, IFixHost
             async () => await AutoCheckAsync(Areas.UpdateFlow.AutoTestAsync) && await AskAsync(Areas.UpdateFlow.TestQuestion));
 
     private async void OnPrinterClicked(object sender, RoutedEventArgs e) =>
-        await RunFlowAsync(Areas.PrinterFlow.Topic, Areas.PrinterFlow.What, Areas.PrinterFlow.DiagnoseAsync,
+        await RunFlowAsync(Areas.PrinterFlow.Topic, Areas.PrinterFlow.What, () => Areas.PrinterFlow.DiagnoseAsync(),
             () => AskAsync(Areas.PrinterFlow.TestQuestion));
+private async void OnScannerClicked(object sender, RoutedEventArgs e) =>        await RunFlowAsync(Areas.PrinterFlow.Topic, "scanner", () => Areas.PrinterFlow.DiagnoseAsync(scanFocus: true),            () => AskAsync(Areas.PrinterFlow.ScanTestQuestion));
 
     private async void OnDisplayClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.DisplayFlow.Topic, Areas.DisplayFlow.What, Areas.DisplayFlow.DiagnoseAsync,

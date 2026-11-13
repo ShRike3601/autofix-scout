@@ -40,6 +40,16 @@ public sealed class PrinterState
     public IReadOnlyList<PrinterInfo> Printers { get; set; } = new List<PrinterInfo>();
     public IReadOnlyList<PrintJobInfo> Jobs { get; set; } = new List<PrintJobInfo>();
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
+
+    /// <summary>Windows Image Acquisition service (stisvc); null = not read.</summary>
+    public UpdateServiceInfo? WiaService { get; set; }
+    /// <summary>Shell Hardware Detection service (ShellHWDetection); null = not read.</summary>
+    public UpdateServiceInfo? ShellHardwareService { get; set; }
+    public IReadOnlyList<ScannerDevice> Scanners { get; set; } = new List<ScannerDevice>();
+    /// <summary>Errors reading the scanner part only. The printer part is not affected; scanner findings are skipped.</summary>
+    public IReadOnlyList<string> ScannerErrors { get; set; } = new List<string>();
+    /// <summary>Set by the UI when the person's problem is scanning: scanner findings then come before printer findings.</summary>
+    public bool ScanFocus { get; set; }
 }
 
 public interface IPrinterProbe { PrinterState Read(); }
@@ -49,9 +59,20 @@ public static class PrinterRules
     private static readonly string[] VirtualNames = { "print to pdf", "xps document writer", "onenote", "fax", "pdf" };
     private static readonly string[] VirtualPorts = { "PORTPROMPT:", "SHRFAX:", "nul:", "FILE:" };
 
+    /// <summary>A webcam or camera listed in the Image class: not a scanner.</summary>
+    public static bool IsCamera(string name, string? service) =>
+        name.Contains("camera", StringComparison.OrdinalIgnoreCase) || name.Contains("webcam", StringComparison.OrdinalIgnoreCase)
+        || (service != null && (service.Equals("usbvideo", StringComparison.OrdinalIgnoreCase) || service.Equals("FrameServer", StringComparison.OrdinalIgnoreCase)));
+
     /// <summary>Printers that make a file or a fax instead of paper (Microsoft Print to PDF, OneNote, Fax, XPS).</summary>
     public static bool IsVirtual(string name, string? port) =>
         VirtualNames.Any(n => name.Contains(n, StringComparison.OrdinalIgnoreCase))
         || (port != null && (VirtualPorts.Any(p => port.Equals(p, StringComparison.OrdinalIgnoreCase))
                              || port.StartsWith("Microsoft.Office.OneNote", StringComparison.OrdinalIgnoreCase)));
+}
+
+/// <summary>A scanner (or other still-image device) from Win32_PnPEntity, class Image; cameras and webcams are left out. ErrorCode 0 = no problem.</summary>
+public sealed record ScannerDevice(string Name, string DeviceId, int ErrorCode)
+{
+    public bool HasProblem => !DeviceErrors.IsNoise(ErrorCode);
 }

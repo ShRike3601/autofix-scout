@@ -104,8 +104,11 @@ public static class HealthTriage
             f.Add(F(FindingCode.HealthShellCrashing, "Parts of Windows itself, such as the taskbar, the Start menu or search, have closed unexpectedly.",
                 string.Join("; ", shell.Select(c => $"{c.App} x{c.Count} ({c.Module}, {c.ExceptionCode})"))));
         if (s.BlueScreens > 0)
-            f.Add(F(FindingCode.HealthBlueScreens, $"Windows has stopped with an error screen (a \"blue screen\") {Times(s.BlueScreens)} in the last two weeks.",
-                $"bugchecks: {s.BlueScreens}, unexpected shutdowns: {s.UnexpectedShutdowns}"));
+            f.Add(F(FindingCode.HealthBlueScreens, $"Windows has stopped with an error screen (a \"blue screen\") {Times(s.BlueScreens)} in the last two weeks.{BlueScreenCause(s)}",
+                $"bugchecks: {s.BlueScreens}, unexpected shutdowns: {s.UnexpectedShutdowns}" +
+                (s.StopCodes.Count > 0 ? "; stop codes: " + string.Join(", ", s.StopCodes.Select(c => $"{StopCodes.Hex(c.Code)}{(StopCodes.Meaning(c.Code) is { } m ? " " + m.Name : "")} x{c.Count}")) : "")));
+        if (PageFileTooSmall(s))
+            f.Add(F(FindingCode.HealthPageFileTooSmall, PageFileSentence(s), PageFileDetail(s)));
         var programs = ProgramCrashes(s);
         if (programs.Count > 0)
             f.Add(F(FindingCode.HealthProgramCrashing, $"\"{programs[0].App}\" has closed unexpectedly {Times(programs[0].Count)} in the last two weeks. {CauseSentence(programs[0].Cause)}",
@@ -121,12 +124,96 @@ public static class HealthTriage
                 $"WindowsUpdateClient event 20: {s.UpdateFailures}"));
         if (s.RebootPending == Tri.Yes)
             f.Add(F(FindingCode.HealthRestartPending, "Windows is waiting for a restart to finish installing changes.", "RebootRequired/RebootPending key present"));
+        if (s.GraphicsResets > 0)
+            f.Add(F(FindingCode.HealthGraphicsResets, $"The graphics driver has stopped responding and been reset {Times(s.GraphicsResets)} in the last two weeks. This can cause black or flickering screens and closing programs.",
+                $"Display 4101 and LiveKernelEvent 141/117 in 14 days: {s.GraphicsResets}"));
+        if (s.Usb is { } usb)
+        {
+            if (usb.Churn.Count > 0)
+            {
+                var names = usb.Churn.Select(c => c.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                f.Add(F(FindingCode.HealthUsbDisconnects,
+                    $"The USB device \"{names[0]}\" has connected and disconnected {Times(usb.Churn[0].Count)} in the last three days." +
+                    (names.Count > 1 ? $" {names.Count - 1} other USB {(names.Count == 2 ? "device has" : "devices have")} done the same." : "") +
+                    " A loose cable, a weak port or an unpowered hub is a common cause.",
+                    string.Join("; ", usb.Churn.Select(c => $"{c.Name} class={(c.PnpClass.Length > 0 ? c.PnpClass : "unknown")} events={c.Count}"))));
+            }
+            if (usb.HubErrors >= UsbHealth.ErrorThreshold)
+                f.Add(F(FindingCode.HealthUsbErrors,
+                    $"Windows has recorded {usb.HubErrors} errors from the USB ports or hubs in the last three days, which points to a USB device or cable that does not connect reliably.",
+                    $"USB hub and controller errors and warnings in 3 days: {usb.HubErrors}; device events: {usb.PnpEvents}"));
+        }
+        // Recent changes are only a lead when something else is wrong; a restart that is waiting is the result of a change, not a problem.
+        if (s.RecentChanges.Count > 0 && f.Any(x => x.Code != FindingCode.HealthRestartPending))
+            f.Add(F(FindingCode.HealthRecentChanges, RecentChangesSentence(s),
+                string.Join("; ", s.RecentChanges.Take(15).Select(c => $"{c.Kind} \"{c.Name}\" {c.WhenUtc:yyyy-MM-dd}"))));
 
         if (f.Count > 0) return f;
         if (s.ProbeErrors.Count > 0)
             return new[] { F(FindingCode.ProbeIncomplete, "AutoFix Scout could not complete the check.", string.Join("; ", s.ProbeErrors)) };
         return new[] { F(FindingCode.LooksNormal, "No common software problems were found. AutoFix Scout can still check the Windows system files for damage.",
             $"crashes={s.Crashes.Sum(c => c.Count)}, clock offset={s.ClockOffsetSeconds:0} s") };
+    }
+
+    private static string RecentChangesSentence(HealthState s)
+    {
+        var kinds = s.RecentChanges.Select(c => c.Kind).Distinct().ToList();
+        var what = kinds.Contains(RecentChangeKind.Program) || kinds.Contains(RecentChangeKind.Update)
+            ? (kinds.Contains(RecentChangeKind.Program) && kinds.Contains(RecentChangeKind.Update) ? "programs or updates" : kinds.Contains(RecentChangeKind.Program) ? "programs" : "updates")
+            : "drivers";
+        return $"Some {what} were installed shortly before the problems started. They may be the cause.";
+    }
+
+    private static bool HasKind(HealthState s, RecentChangeKind k) => s.RecentChanges.Any(c => c.Kind == k);
+
+    private static void AddRecentChangeRungs(HealthState s, List<Rung> r)
+    {
+        if (s.RecentChanges.Where(c => c.Kind == RecentChangeKind.Program).OrderByDescending(c => c.WhenUtc).FirstOrDefault() is { } prog)
+            r.Add(new("uninstall_recent_program", "ui.open_settings_page", 0,
+                $"AutoFix Scout will open \"Installed apps\". The program \"{prog.Name}\" was installed recently. If you do not need it, select the three dots next to it, and select \"Uninstall\". Then restart the computer and check whether the problem remains.",
+                "apps"));
+        if (HasKind(s, RecentChangeKind.Update))
+            r.Add(new("uninstall_recent_update", "ui.open_settings_page", 0,
+                "AutoFix Scout will open \"Update history\". Please scroll down to \"Uninstall updates\", and remove the most recent update. Then restart the computer and check whether the problem remains. Windows may install the update again later.",
+                "updatehistory"));
+        var first = s.RecentChanges.Min(c => c.WhenUtc);
+        var olderPoint = s.RestorePointsKnown == Tri.Yes && s.RestorePoints.Any(p => p < first);
+        if (s.RestorePointsKnown == Tri.Unknown || olderPoint)
+            r.Add(new("system_restore", "ui.human_step", 0,
+                "As a last resort, System Restore can return Windows to an earlier time. Please press the Windows key and R together, type \"rstrui.exe\", and select \"OK\". " +
+                "Choose a restore point from before the problems started, and follow the steps. Your documents and photos are not removed, but programs installed after that time are. AutoFix Scout does not start System Restore."));
+    }
+
+    /// <summary>The most frequent stop code, explained; empty when no code could be read or it is not a common one.</summary>
+    private static string BlueScreenCause(HealthState s)
+    {
+        if (s.StopCodes.Count == 0) return "";
+        var top = s.StopCodes[0];
+        return StopCodes.Meaning(top.Code) is { } m
+            ? $" The most frequent stop code was {StopCodes.Hex(top.Code)} ({m.Name}). {m.Explanation}"
+            : $" The most frequent stop code was {StopCodes.Hex(top.Code)}.";
+    }
+
+    public const long PageFileMinimumMb = 1024;
+
+    /// <summary>No page file at all, or less than 1 GB, while Windows is not managing it (fail closed when it could not be read).</summary>
+    public static bool PageFileTooSmall(HealthState s) =>
+        s.PageFile is { Automatic: false } p && (!p.Exists || p.AllocatedMb < PageFileMinimumMb);
+
+    private static string PageFileSentence(HealthState s)
+    {
+        var p = s.PageFile!;
+        var what = !p.Exists ? "The page file (virtual memory) is switched off." : $"The page file (virtual memory) is only {p.AllocatedMb} MB.";
+        var evidence = s.LowMemoryEvents > 0 ? $" Windows has also warned about low virtual memory {Times(s.LowMemoryEvents)} in the last two weeks." : "";
+        return what + " Programs can close or fail to start when the computer runs short of memory." + evidence;
+    }
+
+    private static string PageFileDetail(HealthState s)
+    {
+        var p = s.PageFile!;
+        return $"automatic={p.Automatic}; RAM {p.TotalRamMb} MB; allocated {p.AllocatedMb} MB; " +
+               $"settings: {(p.Settings.Count == 0 ? "none" : string.Join(", ", p.Settings.Select(x => $"{x.Name} {x.InitialMb}-{x.MaximumMb} MB")))}; " +
+               $"usage: {(p.Usage.Count == 0 ? "none" : string.Join(", ", p.Usage.Select(x => $"{x.Name} {x.AllocatedMb} MB (in use {x.CurrentUsageMb} MB)")))}; low virtual memory events: {s.LowMemoryEvents}";
     }
 
     private static string Times(int n) => n == 1 ? "once" : n == 2 ? "twice" : $"{n} times";
@@ -250,13 +337,68 @@ public static class HealthTriage
         }
         if (codes.Contains(FindingCode.HealthStoreAppsDamaged) || codes.Contains(FindingCode.HealthServicesFailing) || codes.Contains(FindingCode.HealthBlueScreens))
             systemRepair = true;
-        if (codes.Contains(FindingCode.HealthDiskErrors))
+        var causes = codes.Contains(FindingCode.HealthBlueScreens)
+            ? s.StopCodes.Take(3).Select(c => StopCodes.Meaning(c.Code)?.Category).Where(c => c is not null).Select(c => c!.Value).Distinct().ToList()
+            : new List<StopCategory>();
+        if (codes.Contains(FindingCode.HealthDiskErrors) || causes.Contains(StopCategory.Storage))
             r.Add(Admin("scan_disk", "disk.scan", "AutoFix Scout can ask Windows to scan the drive for file system errors while you keep working.", "C"));
+        if (causes.Contains(StopCategory.Memory))
+            r.Add(new("memory_diagnostic", "ui.human_step", 0,
+                "Faulty memory (RAM) can cause these blue screens. Please save your work, then press the Windows key and R together, type \"mdsched.exe\", and select \"OK\". " +
+                "Choose \"Restart now and check for problems\". The computer restarts, and the Windows Memory Diagnostic test takes several minutes. " +
+                "Windows shows the result after it starts again. AutoFix Scout does not start the Windows Memory Diagnostic."));
+        if (causes.Contains(StopCategory.Graphics) || causes.Contains(StopCategory.Driver))
+            r.Add(new("bluescreen_driver_updates", "ui.open_settings_page", 0,
+                "AutoFix Scout will open \"Windows Update\". Please select \"Check for updates\", then \"Advanced options\", then \"Optional updates\", then \"Driver updates\", and install any driver offered" +
+                (causes.Contains(StopCategory.Graphics) ? ", in particular a display driver." : "."), "windowsupdate"));
+        if (causes.Contains(StopCategory.Driver))
+            r.Add(new("bluescreen_driver_maker", "ui.human_step", 0,
+                "If Windows Update offers no driver, please open the support web site of the computer's maker, search for the model, and download the newest drivers for Windows, starting with the chipset, storage and network drivers. " +
+                "Run the installers, then restart the computer. AutoFix Scout does not install drivers from other sources."));
+        if (codes.Contains(FindingCode.HealthPageFileTooSmall))
+        {
+            r.Add(Admin("pagefile_automatic", "system.pagefile_auto",
+                "AutoFix Scout can let Windows manage the size of the page file (virtual memory) itself. The current settings are saved first. The change takes effect after the computer restarts."));
+            r.Add(new("restart_after_pagefile", "ui.human_step", 0,
+                "Please save your work and restart the computer: select \"Start\", then \"Power\", then \"Restart\". The new page file size is used after the restart."));
+        }
+        if (codes.Contains(FindingCode.HealthGraphicsResets))
+        {
+            r.Add(new("graphics_reset_updates", "ui.open_settings_page", 0,
+                "AutoFix Scout will open \"Windows Update\". Please select \"Check for updates\", then \"Advanced options\", then \"Optional updates\", then \"Driver updates\", and install any display driver offered.",
+                "windowsupdate"));
+            r.Add(new("graphics_reset_maker", "ui.human_step", 0,
+                "If Windows Update offers no display driver, please get the newest graphics driver from the support web site of the computer's maker, or from the web site of NVIDIA, AMD or Intel, depending on the graphics card. " +
+                "Run the installer, then restart the computer. AutoFix Scout does not install drivers from other sources."));
+        }
+        if (codes.Contains(FindingCode.HealthUsbDisconnects) || codes.Contains(FindingCode.HealthUsbErrors))
+            AddUsbRungs(s, r);
+        if (codes.Contains(FindingCode.HealthRecentChanges))
+            AddRecentChangeRungs(s, r);
         if (systemRepair) { r.Add(Dism); r.Add(Sfc); }
         if (codes.Contains(FindingCode.HealthRestartPending))
             r.Add(new("restart_pc", "ui.human_step", 0,
                 "Windows needs a restart to finish installing changes. Please save your work, then select \"Start\", then \"Power\", then \"Restart\". After the restart, please open AutoFix Scout again."));
         return r;
+    }
+
+    /// <summary>Human steps, the selective suspend setting (guided, never changed by AutoFix Scout), a driver update, and a hardware rescan.</summary>
+    private static void AddUsbRungs(HealthState s, List<Rung> r)
+    {
+        r.Add(new("usb_port_cable", "ui.human_step", 0,
+            "Please unplug the USB device, wait ten seconds, and plug it into a different USB port directly on the computer. Avoid USB hubs that have no power supply of their own, " +
+            "and try a different cable, because a damaged or loose cable is a common cause of a device that keeps disconnecting."));
+        if (s.Usb?.SelectiveSuspendOn == true)
+            r.Add(new("usb_selective_suspend_off", "ui.human_step", 0,
+                "USB selective suspend lets Windows switch off a USB port to save power, which can make a device disconnect. To turn it off, open the Windows search, type \"Control Panel\", open \"Hardware and Sound\", \"Power Options\", " +
+                "select \"Change plan settings\" for the plan in use, then \"Change advanced power settings\". Open \"USB settings\", then \"USB selective suspend setting\", and set it to \"Disabled\". Windows may ask for your permission."));
+        r.Add(new("usb_driver_updates", "ui.open_settings_page", 0,
+            "AutoFix Scout will open \"Windows Update\". Please select \"Check for updates\", then \"Advanced options\", then \"Optional updates\", and install any chipset or USB driver offered.",
+            "windowsupdate"));
+        if (!r.Any(x => x.Id == "rescan"))
+            r.Add(new("rescan", "device.rescan", 1,
+                "AutoFix Scout can ask Windows to search for hardware changes again. " +
+                "This is the same as \"Scan for hardware changes\" in \"Device Manager\". Windows will ask for your permission.", "devices"));
     }
 
     /// <summary>Scan for hardware changes (any class, nothing is changed), then guided steps only: no driver of any device is switched or changed.</summary>
@@ -288,7 +430,7 @@ public static class HealthTriage
     };
 
     /// <summary>Hardware and disk errors are the only findings that point at hardware.</summary>
-    public static bool ProbablyHardware(HealthState s) => s.HardwareErrors > 0 || s.DiskErrors >= 5 || s.Drives.Any(d => d.Failing);
+    public static bool ProbablyHardware(HealthState s) => s.HardwareErrors > 0 || s.DiskErrors >= 5 || s.GraphicsResets >= 20 || s.Drives.Any(d => d.Failing) || s.StopCodes.Any(c => StopCodes.IsHardware(c.Code));
 
     public static string? NotFixedHint(IReadOnlyList<Finding> after)
     {
@@ -310,6 +452,7 @@ public static class HealthTriage
     {
         FindingCode.HealthClockWrong, FindingCode.HealthDeadProxy, FindingCode.HealthDeadSystemProxy, FindingCode.HealthHostsHijacked,
         FindingCode.HealthServiceOff, FindingCode.HealthPathDamaged, FindingCode.HealthTempMissing, FindingCode.HealthStoreAppsDamaged,
+        FindingCode.HealthPageFileTooSmall,
     };
 
     public static bool Resolved(IReadOnlyList<Finding> before, IReadOnlyList<Finding> after) =>

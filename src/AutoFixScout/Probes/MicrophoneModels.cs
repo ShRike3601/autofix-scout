@@ -28,6 +28,8 @@ public sealed class MicrophoneState
     public Tri AppAccess { get; set; } = Tri.Unknown;
     /// <summary>"Let desktop apps access your microphone" (Zoom, browsers, Teams classic).</summary>
     public Tri DesktopAppAccess { get; set; } = Tri.Unknown;
+    /// <summary>Friendly names of apps with their own choice set to "Deny" (Settings > Privacy > Microphone, per app).</summary>
+    public IReadOnlyList<string> DeniedApps { get; set; } = new List<string>();
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
 }
 

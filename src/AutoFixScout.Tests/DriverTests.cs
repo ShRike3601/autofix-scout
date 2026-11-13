@@ -142,7 +142,7 @@ public class DriverLadderTests
             Devices = new[] { new AudioDeviceInfo("Realtek Audio", @"HDAUDIO\X\1", 10, null, null, null, Recent()) },
         };
         var ladder = AudioLadder.For(s, AudioTriage.Evaluate(s));
-        Assert.Equal(new[] { "restart_services", "toggle_device", "rollback_driver", "windows_update_driver" }, ladder.Select(r => r.Id));
+        Assert.Equal(new[] { "restart_services", "toggle_device", "audio_enhancements", "rollback_driver", "windows_update_driver" }, ladder.Select(r => r.Id));
         Assert.All(ladder.Where(r => r.Tier == 2), r => Assert.Contains("save point", r.Say));
     }
 

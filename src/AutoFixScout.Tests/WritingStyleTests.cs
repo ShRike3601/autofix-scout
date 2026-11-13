@@ -102,6 +102,9 @@ public class WritingStyleTests
         var weak = Online(Tri.Yes, Tri.Yes, Tri.Yes);
         weak.WifiSignalPercent = 30;
         yield return weak;
+        var drops = Online(Tri.Yes, Tri.Yes, Tri.Yes);
+        drops.WifiDrops = new WifiDropStats(9, 12, 1, 3, 4, 1); drops.WifiPowerSavingMayTurnOff = Tri.Yes;
+        yield return drops;
     }
 
     /// <summary>Every finding message, rung sentence and "not fixed" hint the triage classes produce for the states above.</summary>
@@ -133,6 +136,12 @@ public class WritingStyleTests
             texts.AddRange(f.Select(x => x.PlainMessage));
             texts.AddRange(StorageTriage.Ladder(s, f).Select(r => r.Say));
             if (StorageTriage.NotFixedHint(f) is { } hint) texts.Add(hint);
+        }
+        foreach (var s in ScannerTests.Styled())
+        {
+            var f = PrinterTriage.Evaluate(s);
+            texts.AddRange(f.Select(x => x.PlainMessage));
+            texts.AddRange(PrinterTriage.Ladder(s, f).Select(r => r.Say));
         }
         texts.Add(Rescan.Rung("audio", "sound device").Say);
         texts.Add(DriverRules.Rollback("sound", "Realtek Audio", "X", Recent())!.Say);

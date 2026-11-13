@@ -1,3 +1,4 @@
+using AutoFixScout.Triage;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Net.Http;
@@ -48,6 +49,13 @@ public sealed class RealHealthProbe : IHealthProbe
         Part("drives", () => s.Drives = ReadDrives());
         Part("device errors", () => s.DeviceProblems = ReadDeviceProblems());
         Part("user profile", () => ReadProfile(s));
+        Part("recent changes", () => ReadRecentChanges(s));
+        Part("restore points", () => ReadRestorePoints(s));
+        Part("graphics resets", () => ReadGraphicsResets(s));
+        Part("blue screen causes", () => ReadStopCodes(s));
+        Part("virtual memory", () => s.PageFile = ReadPageFile());
+        Part("low memory events", () => s.LowMemoryEvents = Query("System", "Provider[@Name='Microsoft-Windows-Resource-Exhaustion-Detector'] and EventID=2004").Count());
+        Part("USB devices", () => s.Usb = ReadUsb());
 
         s.ProbeErrors = errors;
         return s;
@@ -131,6 +139,175 @@ public sealed class RealHealthProbe : IHealthProbe
     }
 
 
+
+    private static void ReadStopCodes(HealthState s)
+    {
+        var codes = new List<uint>();
+        foreach (var e in Query("System", "(Provider[@Name='Microsoft-Windows-WER-SystemErrorReporting'] or Provider[@Name='BugCheck']) and EventID=1001"))
+        {
+            var code = StopCodes.Parse(Prop(e, 0));
+            if (code is null)
+            {
+                string text;
+                try { text = e.FormatDescription() ?? ""; } catch (Exception) { text = ""; }
+                code = StopCodes.Parse(text);
+            }
+            if (code is { } c) codes.Add(c);
+        }
+        s.StopCodes = StopCodes.Count(codes);
+    }
+
+    private static long ToLong(object? v) => v is null ? 0 : Convert.ToInt64(v);
+
+    /// <summary>Automatic management, the manual settings, the page files that exist, and the installed memory (read-only WMI).</summary>
+    private static PageFileState ReadPageFile()
+    {
+        bool? automatic = null;
+        long ramMb = 0;
+        using (var q = new System.Management.ManagementObjectSearcher("SELECT AutomaticManagedPagefile, TotalPhysicalMemory FROM Win32_ComputerSystem"))
+            foreach (System.Management.ManagementObject o in q.Get())
+                using (o)
+                {
+                    if (o["AutomaticManagedPagefile"] is bool b) automatic = b;
+                    ramMb = ToLong(o["TotalPhysicalMemory"]) / 1048576;
+                }
+        var settings = new List<PageFileSetting>();
+        using (var q = new System.Management.ManagementObjectSearcher("SELECT Name, InitialSize, MaximumSize FROM Win32_PageFileSetting"))
+            foreach (System.Management.ManagementObject o in q.Get())
+                using (o)
+                    settings.Add(new(o["Name"] as string ?? "", ToLong(o["InitialSize"]), ToLong(o["MaximumSize"])));
+        var usage = new List<PageFileUse>();
+        using (var q = new System.Management.ManagementObjectSearcher("SELECT Name, AllocatedBaseSize, CurrentUsage FROM Win32_PageFileUsage"))
+            foreach (System.Management.ManagementObject o in q.Get())
+                using (o)
+                    usage.Add(new(o["Name"] as string ?? "", ToLong(o["AllocatedBaseSize"]), ToLong(o["CurrentUsage"])));
+        return new PageFileState(automatic, ramMb, settings, usage);
+    }
+
+    // ---- recent changes and graphics resets ----
+
+    public static readonly TimeSpan ChangeWindow = TimeSpan.FromDays(7);
+
+    private static IEnumerable<EventRecord> QueryWindow(string log, string filter, TimeSpan window, int max = 500)
+    {
+        var since = $"TimeCreated[timediff(@SystemTime) <= {(long)window.TotalMilliseconds}]";
+        using var reader = new EventLogReader(new EventLogQuery(log, PathType.LogName, $"*[System[{filter} and {since}]]"));
+        for (var i = 0; i < max && reader.ReadEvent() is { } e; i++)
+            using (e) yield return e;
+    }
+
+    private static void ReadRecentChanges(HealthState s)
+    {
+        var list = new List<RecentChange>();
+        var cutoff = DateTime.UtcNow - ChangeWindow;
+        // Programs: the Uninstall keys (machine, 32-bit on 64-bit Windows, current user).
+        const string Uninstall = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+        foreach (var (hive, view) in new[] { (RegistryHive.LocalMachine, RegistryView.Registry64), (RegistryHive.LocalMachine, RegistryView.Registry32), (RegistryHive.CurrentUser, RegistryView.Default) })
+        {
+            using var root = RegistryKey.OpenBaseKey(hive, view);
+            using var k = root.OpenSubKey(Uninstall);
+            if (k is null) continue;
+            foreach (var name in k.GetSubKeyNames())
+            {
+                using var e = k.OpenSubKey(name);
+                if (e is null) continue;
+                if (e.GetValue("DisplayName") is not string display || string.IsNullOrWhiteSpace(display)) continue;
+                if (e.GetValue("SystemComponent") is int sc && sc == 1) continue;
+                if (ParseInstallDate(e.GetValue("InstallDate")?.ToString()) is { } when && when >= cutoff.Date)
+                    list.Add(new RecentChange(RecentChangeKind.Program, display.Trim(), when));
+            }
+        }
+        // Windows updates: "Installation Successful" (event 19). Antivirus signature updates happen daily and are left out.
+        foreach (var e in QueryWindow("System", "Provider[@Name='Microsoft-Windows-WindowsUpdateClient'] and EventID=19", ChangeWindow))
+        {
+            var title = (Prop(e, 0) ?? "").Trim();
+            if (title.Length == 0 || title.Contains("Security Intelligence", StringComparison.OrdinalIgnoreCase) || System.Text.RegularExpressions.Regex.IsMatch(title, "^[0-9A-Z]{12}-")) continue; // Store app updates are left out as well
+            list.Add(new RecentChange(RecentChangeKind.Update, title, e.TimeCreated?.ToUniversalTime() ?? DateTime.UtcNow));
+        }
+        // Drivers: UserPnp 20001 (driver installed) and 20003 (driver service added); readable without admin rights.
+        foreach (var e in QueryWindow("System", "Provider[@Name='Microsoft-Windows-UserPnp'] and (EventID=20001 or EventID=20003)", ChangeWindow))
+        {
+            var name = (Prop(e, 0) ?? "").Trim();
+            if (name.Length > 0) list.Add(new RecentChange(RecentChangeKind.Driver, name, e.TimeCreated?.ToUniversalTime() ?? DateTime.UtcNow));
+        }
+        s.RecentChanges = list.GroupBy(c => (c.Kind, c.Name.ToLowerInvariant())).Select(g => g.OrderByDescending(c => c.WhenUtc).First())
+            .OrderByDescending(c => c.WhenUtc).Take(40).ToList();
+    }
+
+    /// <summary>"yyyymmdd" as written by installers; null for anything else.</summary>
+    public static DateTime? ParseInstallDate(string? v) =>
+        v is { Length: 8 } && DateTime.TryParseExact(v, "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var d) ? d : null;
+
+    /// <summary>System Restore points through WMI (root\default). Needs administrator rights on most machines: then the answer stays Unknown.</summary>
+    private static void ReadRestorePoints(HealthState s)
+    {
+        try
+        {
+            var dates = new List<DateTime>();
+            using var q = new System.Management.ManagementObjectSearcher(@"root\default", "SELECT CreationTime FROM SystemRestore");
+            foreach (System.Management.ManagementObject o in q.Get())
+                using (o)
+                    if (o["CreationTime"] is string t) dates.Add(System.Management.ManagementDateTimeConverter.ToDateTime(t).ToUniversalTime());
+            s.RestorePoints = dates.OrderByDescending(d => d).ToList();
+            s.RestorePointsKnown = Tri.Yes;
+        }
+        catch (Exception) { s.RestorePointsKnown = Tri.Unknown; }
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex LiveKernelCode =
+        new(@"\bP1\s*:\s*(141|117)\b", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static void ReadGraphicsResets(HealthState s)
+    {
+        var n = Query("System", "Provider[@Name='Display'] and EventID=4101").Count();
+        foreach (var e in Query("Application", "Provider[@Name='Windows Error Reporting'] and EventID=1001"))
+        {
+            string text;
+            try { text = e.FormatDescription() ?? ""; } catch (Exception) { text = ""; }
+            if (text.Length == 0) text = string.Join(" ", e.Properties.Select(p => p.Value?.ToString() ?? ""));
+            if (text.Contains("LiveKernelEvent", StringComparison.OrdinalIgnoreCase) && LiveKernelCode.IsMatch(text)) n++;
+        }
+        s.GraphicsResets = n;
+    }
+
+    // ---- USB ----
+
+    private static UsbState ReadUsb()
+    {
+        var u = new UsbState();
+        var events = new List<UsbPnpEvent>();
+        // Device start/configure events live in the Kernel-PnP Configuration log, not in System (checked on the bench: 0 vs 671).
+        foreach (var e in QueryWindow("Microsoft-Windows-Kernel-PnP/Configuration", "(EventID=400 or EventID=410 or EventID=420 or EventID=430)", UsbHealth.Window, 3000))
+            if (Prop(e, 0) is { } id && UsbHealth.IsUsbInstance(id))
+                events.Add(new UsbPnpEvent(id, e.TimeCreated?.ToUniversalTime() ?? DateTime.UtcNow));
+        u.PnpEvents = events.Count;
+        u.HubErrors = QueryWindow("System",
+            "(Provider[@Name='USBHUB3'] or Provider[@Name='Microsoft-Windows-USB-USBHUB3'] or Provider[@Name='USBHUB'] or Provider[@Name='USBXHCI'] or Provider[@Name='Microsoft-Windows-USB-USBXHCI'] or Provider[@Name='USBPORT']) and (Level=1 or Level=2 or Level=3)",
+            UsbHealth.Window).Count();
+        var sessions = QueryWindow("System", "(Provider[@Name='Microsoft-Windows-Kernel-General'] and EventID=12) or (Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1)", UsbHealth.Window).Count();
+        u.Churn = UsbHealth.Repeated(events, UsbHealth.ThresholdFor(sessions)).Select(r => LookUpUsb(r.InstanceId, r.Count)).ToList();
+        try
+        {
+            if (UsbHealth.ParseSelectiveSuspend(Areas.PowerFlow.Powercfg($"/query SCHEME_CURRENT {UsbHealth.UsbSubgroup} {UsbHealth.SelectiveSuspendSetting}")) is { } v)
+            { u.SelectiveSuspendAc = v.Ac; u.SelectiveSuspendDc = v.Dc; }
+        }
+        catch (Exception) { /* left unknown; not an error of the whole part */ }
+        return u;
+    }
+
+    private static UsbChurn LookUpUsb(string instanceId, int count)
+    {
+        string? name = null, cls = null;
+        try
+        {
+            using var q = new System.Management.ManagementObjectSearcher(
+                "SELECT Name, PNPClass FROM Win32_PnPEntity WHERE DeviceID='" + instanceId.Replace(@"\", @"\\").Replace("'", @"\'") + "'");
+            foreach (System.Management.ManagementObject d in q.Get())
+                using (d) { name = d["Name"] as string; cls = d["PNPClass"] as string; }
+        }
+        catch (Exception) { }
+        return new UsbChurn(UsbHealth.SafeName(name), cls ?? "", count);
+    }
     // ---- devices and profile ----
 
     private static IReadOnlyList<DeviceProblem> ReadDeviceProblems()
