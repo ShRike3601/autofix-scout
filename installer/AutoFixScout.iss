@@ -60,15 +60,31 @@ Name: "{autodesktop}\AutoFix Scout"; Filename: "{app}\AutoFixScout.UI.exe"; Task
 [Run]
 ; runasoriginaluser: the app itself must never run elevated (only the executor does, per action, with a UAC prompt).
 Filename: "{app}\AutoFixScout.UI.exe"; Description: "Start AutoFix Scout now"; Flags: nowait postinstall skipifsilent runasoriginaluser
+; After an update, start the Wi-Fi watcher again if the person had switched it on.
+Filename: "{app}\AutoFixScout.Watch.exe"; Flags: nowait runasoriginaluser; Check: WatcherWasOn
 
 ; Uninstall leaves %LOCALAPPDATA%\AutoFixScout (session log, reports) and C:\ProgramData\AutoFixScout (driver save
 ; points) on purpose: a save point may still be needed to put a driver back.
+
+; The optional Wi-Fi watcher (AutoFixScout.Watch.exe, in the same folder as the app) is switched on by the person inside AutoFix
+; Scout, which writes a per-user Run value. Uninstalling stops the process and removes that value. Inno runs this for the account
+; that runs the uninstaller; a value left in another account only points at a missing file and does nothing.
+[Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "AutoFixScout Wi-Fi watcher"; Flags: uninsdeletevalue dontcreatekey
+
+[UninstallRun]
+Filename: "{sys}\taskkill.exe"; Parameters: "/im AutoFixScout.Watch.exe /f"; Flags: runhidden skipifdoesntexist; RunOnceId: "StopWifiWatcher"
 
 [Code]
 // One copy only: a newer setup first removes the installed version silently (same AppId, same folder,
 // one Start menu entry), then installs. User data in %LOCALAPPDATA% and C:\ProgramData is kept by the uninstaller.
 const
   UninstKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F1C2A3E-8B4D-4E7A-9C51-2D0B7E4F9A13}_is1';
+  RunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
+  WatcherValue = 'AutoFixScout Wi-Fi watcher';
+
+var
+  WatcherRun: String;
 
 function InstalledValue(Name: String): String;
 begin
@@ -108,8 +124,16 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 var Uninst: String; Code: Integer;
 begin
   Result := '';
+  // The silent uninstall below removes the Wi-Fi watcher Run value (uninsdeletevalue); keep the person's choice.
+  if not RegQueryStringValue(HKCU, RunKey, WatcherValue, WatcherRun) then WatcherRun := '';
   Uninst := RemoveQuotes(InstalledValue('UninstallString'));
   if (Uninst <> '') and FileExists(Uninst) then
     if not Exec(Uninst, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '', SW_HIDE, ewWaitUntilTerminated, Code) or (Code <> 0) then
       Log('Previous version could not be removed first (code ' + IntToStr(Code) + '); installing over it.');
+  if WatcherRun <> '' then RegWriteStringValue(HKCU, RunKey, WatcherValue, WatcherRun);
+end;
+
+function WatcherWasOn(): Boolean;
+begin
+  Result := WatcherRun <> '';
 end;

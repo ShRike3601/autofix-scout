@@ -41,6 +41,10 @@ public sealed class NetworkState
     public IReadOnlyList<string> WifiTuningPending { get; set; } = new List<string>();
     /// <summary>Yes when connected to an enterprise (802.1X) Wi-Fi network such as a campus or office.</summary>
     public Tri WifiEnterprise { get; set; } = Tri.Unknown;
+    /// <summary>Yes when the Wi-Fi watcher is switched on (registered to start with Windows); No when it is installed but off; Unknown when it is not installed or not read.</summary>
+    public Tri WifiWatcher { get; set; } = Tri.Unknown;
+    /// <summary>Counts from the watcher's wifi-watch.json (last 30 days); null when there is no file.</summary>
+    public Watching.WifiWatchSummary? WifiWatch { get; set; }
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
     /// <summary>Failures of the extra checks above. Kept apart so they never replace the main result with "could not complete".</summary>
     public IReadOnlyList<string> ExtraProbeErrors { get; set; } = new List<string>();

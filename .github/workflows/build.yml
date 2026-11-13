@@ -28,6 +28,10 @@ jobs:
             dotnet publish src/AutoFixScout.Executor/AutoFixScout.Executor.csproj -c Release -r $rid --self-contained true -o $out "-p:Version=$version"
             if ($LASTEXITCODE) { exit 1 }
             if (!(Test-Path "$out/AutoFixScout.Executor.exe")) { Write-Error "executor missing ($rid)"; exit 1 }
+            dotnet publish src/AutoFixScout.Watch/AutoFixScout.Watch.csproj -c Release -r $rid --self-contained true -o $out "-p:Version=$version"
+            if ($LASTEXITCODE) { exit 1 }
+            if (!(Test-Path "$out/AutoFixScout.Watch.exe")) { Write-Error "Wi-Fi watcher missing ($rid)"; exit 1 }
+            if ((Get-Content "$out/AutoFixScout.Watch.runtimeconfig.json" -Raw) -notmatch "includedFrameworks") { Write-Error "Wi-Fi watcher not self-contained ($rid)"; exit 1 }
             if ((Get-Content "$out/AutoFixScout.Executor.runtimeconfig.json" -Raw) -notmatch 'includedFrameworks') { Write-Error "executor not self-contained ($rid)"; exit 1 }
             Copy-Item docs/TESTERS.md "$out/READ ME FIRST.md"
           }
