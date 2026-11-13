@@ -47,3 +47,17 @@ public class SystemSummaryTests
         Assert.DoesNotContain(Environment.MachineName, text, StringComparison.OrdinalIgnoreCase);
     }
 }
+
+public class SystemSummaryShortTests
+{
+    [Theory]
+    [InlineData("Windows", "Windows 11 Home Single Language 26H2 (build 26300)", "Windows 11 Home 26H2")]
+    [InlineData("Processor", "Intel Core i7-10750H", "Core i7-10750H")]
+    [InlineData("Processor", "AMD Ryzen 7 5800X 8-Core Processor", "Ryzen 7 5800X")]
+    [InlineData("Graphics", "NVIDIA GeForce RTX 2060 + Intel UHD Graphics", "GeForce RTX 2060")]
+    [InlineData("Memory", "16 GB", "16 GB memory")]
+    [InlineData("Disk C:", "420 GB free of 511 GB", "420 GB free on C:")]
+    [InlineData("Running for", "13 h 40 min", "On for 13 h 40 min")]
+    [InlineData("Battery", "99 %, plugged in", "99 %, plugged in")]
+    public void Short_IsOneLine(string label, string value, string expected) => Assert.Equal(expected, SystemSummary.Shorten(label, value));
+}

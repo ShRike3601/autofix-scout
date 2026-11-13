@@ -13,7 +13,7 @@ namespace AutoFixScout.UI;
 
 /// <summary>
 /// Screens around the checks (owned by the UI work, like MainWindow.Visuals.cs): the short load test, the update banner,
-/// the "What is new" card, and the "History and settings" page (changes with Undo, recent checks, settings).
+/// the "What is new" card, and the "History" page (changes with Undo, recent checks) and the Settings panel.
 /// </summary>
 public partial class MainWindow
 {
@@ -152,7 +152,7 @@ public partial class MainWindow
         UpdateLaterButton.Visibility = Visibility.Visible;
     }
 
-    // ---- History and settings page ----
+    // ---- History page ----
 
     private void ShowHistory(string? message = null)
     {
@@ -162,7 +162,7 @@ public partial class MainWindow
         StepPanel.Visibility = Visibility.Collapsed;
         HeaderHome.Visibility = Visibility.Collapsed;
         HeaderStep.Visibility = Visibility.Visible;
-        HeaderTitle.Text = "History and settings";
+        HeaderTitle.Text = "History";
         HeaderTitle.Visibility = Visibility.Visible;
         BuildHistory(message);
         if (HistoryPanel.Visibility != Visibility.Visible)
@@ -243,9 +243,21 @@ public partial class MainWindow
         kept.Margin = new Thickness(0, 8, 0, 0);
         checks.Children.Add(kept);
         HistoryPanel.Children.Add(Card(checks));
+    }
 
-        // Settings.
-        HistoryPanel.Children.Add(Section("Settings"));
+    // ---- Settings panel (opens over any page, also during a check) ----
+
+    private void BuildSettings(string? message = null)
+    {
+        SettingsBody.Children.Clear();
+        if (message is not null)
+        {
+            var note = Text(message, "BodyText");
+            note.Margin = new Thickness(0, 0, 0, 12);
+            AutomationProperties.SetLiveSetting(note, AutomationLiveSetting.Polite);
+            SettingsBody.Children.Add(note);
+        }
+        SettingsBody.Children.Add(Section("General", first: true));
         var settings = new StackPanel();
         var appSettings = AppSettings.Load();
         var updates = Check("Check for updates when AutoFix Scout starts", appSettings.CheckForUpdates);
@@ -269,7 +281,7 @@ public partial class MainWindow
             {
                 off.IsEnabled = false;
                 var (ok, _) = await FixActions.RunAsync(new Rung("wifi_watch_off", "network.wifi_watch_off", 1, ""));
-                if (_historyOpen) ShowHistory(ok ? "The Wi-Fi watcher has been switched off." : "The Wi-Fi watcher could not be switched off.");
+                BuildSettings(ok ? "The Wi-Fi watcher has been switched off." : "The Wi-Fi watcher could not be switched off.");
             };
             var summary = "It reconnects your Wi-Fi automatically.";
             try
@@ -287,11 +299,49 @@ public partial class MainWindow
         else
             settings.Children.Add(Row("The Wi-Fi watcher is off.",
                 "It can be switched on from the internet check when Wi-Fi keeps dropping.", new Border(), divider: false));
-        HistoryPanel.Children.Add(Card(settings));
+        SettingsBody.Children.Add(Card(settings));
 
         var version = Text($"AutoFix Scout version {AppVersion}", "CaptionText");
         version.Margin = new Thickness(2, 14, 0, 0);
-        HistoryPanel.Children.Add(version);
+        SettingsBody.Children.Add(version);
+    }
+
+    private bool _settingsOpen;
+
+    /// <summary>Esc closes the settings panel first (otherwise it would press the step screen's cancel button underneath).</summary>
+    private void OnWindowPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (_settingsOpen && e.Key == System.Windows.Input.Key.Escape) { SetSettingsOpen(false); e.Handled = true; }
+    }
+
+    private void OnSettingsButtonClicked(object sender, RoutedEventArgs e) => SetSettingsOpen(!_settingsOpen);
+    private void OnSettingsCloseClicked(object sender, RoutedEventArgs e) => SetSettingsOpen(false);
+    private void OnSettingsScrimClicked(object sender, System.Windows.Input.MouseButtonEventArgs e) => SetSettingsOpen(false);
+
+    /// <summary>Slides the settings panel in from the right (and the scrim fades in), or back out. The page below keeps its state.</summary>
+    private void SetSettingsOpen(bool open)
+    {
+        _settingsOpen = open;
+        if (open)
+        {
+            BuildSettings();
+            SettingsScrim.Visibility = SettingsFlyout.Visibility = Visibility.Visible;
+            Motion.FromTo(SettingsShift, System.Windows.Media.TranslateTransform.XProperty, 60, 0, 420, Motion.EaseOutStrong);
+            Motion.FromTo(SettingsFlyout, OpacityProperty, 0, 1, 260);
+            Motion.FromTo(SettingsScrim, OpacityProperty, 0, 1, 260);
+            SettingsFlyout.Focus();
+            System.Windows.Input.Keyboard.Focus(SettingsFlyout);
+            return;
+        }
+        Motion.To(SettingsShift, System.Windows.Media.TranslateTransform.XProperty, 40, 200, Motion.EaseOut);
+        Motion.To(SettingsScrim, OpacityProperty, 0, 200);
+        Motion.To(SettingsFlyout, OpacityProperty, 0, 180);
+        _ = Dispatcher.InvokeAsync(async () =>
+        {
+            await Task.Delay(Motion.Enabled ? 210 : 0);
+            if (!_settingsOpen) SettingsScrim.Visibility = SettingsFlyout.Visibility = Visibility.Collapsed;
+        });
+        SettingsButton.Focus();
     }
 
     private static string Sentence(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];

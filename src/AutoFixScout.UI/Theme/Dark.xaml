@@ -10,6 +10,9 @@
     <SolidColorBrush x:Key="CardBorderBrush" Color="#28282E"/>
     <SolidColorBrush x:Key="CardHoverBorderBrush" Color="#3F6FB5"/>
     <SolidColorBrush x:Key="SurfaceBrush" Color="#1A1A1E"/>
+    <!-- Settings panel that slides in over the page. -->
+    <SolidColorBrush x:Key="FlyoutBrush" Color="#1C1C21"/>
+    <SolidColorBrush x:Key="ScrimBrush" Color="#66000000"/>
     <SolidColorBrush x:Key="DividerBrush" Color="#232328"/>
     <SolidColorBrush x:Key="InputBrush" Color="#0B0B0D"/>
     <SolidColorBrush x:Key="InputBorderBrush" Color="#2E2E35"/>

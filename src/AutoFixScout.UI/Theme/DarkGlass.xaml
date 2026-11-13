@@ -22,6 +22,7 @@
         <GradientStop Color="#405AA2FF" Offset="1"/>
     </LinearGradientBrush>
     <SolidColorBrush x:Key="SurfaceBrush" Color="#0DFFFFFF"/>
+    <SolidColorBrush x:Key="FlyoutBrush" Color="#FF1A1A1F"/>
     <SolidColorBrush x:Key="DividerBrush" Color="#17FFFFFF"/>
     <SolidColorBrush x:Key="InputBrush" Color="#33000000"/>
     <SolidColorBrush x:Key="InputBorderBrush" Color="#26FFFFFF"/>

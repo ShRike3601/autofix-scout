@@ -5,7 +5,7 @@ using Microsoft.Win32;
 namespace AutoFixScout;
 
 /// <summary>One line of the "This computer" panel: a label and a value, both safe to show and to copy for a helper.</summary>
-public sealed record SummaryLine(string Label, string Value);
+public sealed record SummaryLine(string Label, string Value, string Short);
 
 /// <summary>
 /// The "This computer" facts for the sidebar. Read-only and quick (registry, two small WMI queries, Win32 calls).
@@ -18,7 +18,7 @@ public static class SystemSummary
         var lines = new List<SummaryLine>();
         void Add(string label, Func<string?> read)
         {
-            try { if (read() is { Length: > 0 } v) lines.Add(new SummaryLine(label, v)); }
+            try { if (read() is { Length: > 0 } v) lines.Add(new SummaryLine(label, v, Shorten(label, v))); }
             catch (Exception) { /* a missing fact is left out */ }
         }
         Add("Windows", WindowsVersion);
@@ -29,6 +29,30 @@ public static class SystemSummary
         Add("Battery", Battery);
         Add("Running for", () => Uptime(TimeSpan.FromMilliseconds(Environment.TickCount64)));
         return lines;
+    }
+
+    /// <summary>The one-line form for the sidebar ("Core i7-10750H", "420 GB free"); the full value goes in the tooltip and the copy.</summary>
+    public static string Shorten(string label, string value)
+    {
+        string Drop(string s, params string[] words) { foreach (var w in words) s = s.Replace(w, "", StringComparison.OrdinalIgnoreCase); return string.Join(' ', s.Split(' ', StringSplitOptions.RemoveEmptyEntries)); }
+        switch (label)
+        {
+            case "Windows":
+                var paren = value.IndexOf(" (build", StringComparison.Ordinal);
+                var w = paren > 0 ? value[..paren] : value;
+                return Drop(w, "Single Language", "Education", "Workstations").Replace("Windows 11 Home N", "Windows 11 Home");
+            case "Processor":
+                return System.Text.RegularExpressions.Regex.Replace(Drop(value, "Intel ", "AMD ", " Processor"), @" \d+-Core", "").Trim();
+            case "Graphics":
+                var first = value.Split(" + ")[0];
+                return Drop(first, "NVIDIA ", "AMD ", "(R)", "Graphics Family");
+            case "Memory": return value + " memory";
+            case "Disk C:":
+                var of = value.IndexOf(" of ", StringComparison.Ordinal);
+                return (of > 0 ? value[..of] : value) + " on C:";
+            case "Running for": return "On for " + value;
+            default: return value;
+        }
     }
 
     /// <summary>"Windows 11 Home 24H2 (build 26100)". Windows 11 still reports "Windows 10" in ProductName; build 22000+ is 11.</summary>

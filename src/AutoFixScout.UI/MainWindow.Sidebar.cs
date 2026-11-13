@@ -23,16 +23,25 @@ public partial class MainWindow
         try { facts = await Task.Run(SystemSummary.Read); } catch (Exception) { facts = Array.Empty<SummaryLine>(); }
 
         var computer = new StackPanel();
+        // One quiet line per fact: icon and short value; the full value (and its label) is in the tooltip and the copy.
         foreach (var f in facts)
         {
-            var line = new StackPanel { Margin = new Thickness(0, 0, 0, 5) };
-            line.Children.Add(new TextBlock { Text = f.Label, Style = (Style)FindResource("CaptionText"), FontSize = 11 });
-            line.Children.Add(new TextBlock { Text = f.Value, FontSize = 12.5, TextWrapping = TextWrapping.Wrap, Foreground = (Brush)FindResource("TextPrimaryBrush") });
+            var line = new DockPanel { Margin = new Thickness(0, 0, 0, 8), Background = Brushes.Transparent, ToolTip = $"{f.Label}: {f.Value}" };
+            var icon = new TextBlock
+            {
+                Text = ((char)FactGlyph(f.Label)).ToString(), FontSize = 13, Width = 16, Style = (Style)FindResource("Icon"),
+                Foreground = (Brush)FindResource("TextSecondaryBrush"), Margin = new Thickness(0, 0, 10, 0),
+            };
+            DockPanel.SetDock(icon, Dock.Left);
+            line.Children.Add(icon);
+            line.Children.Add(new TextBlock { Text = f.Short, FontSize = 12.5, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center,
+                                             Foreground = (Brush)FindResource("TextPrimaryBrush") });
+            AutomationProperties.SetName(line, $"{f.Label}: {f.Value}");
             computer.Children.Add(line);
         }
         if (facts.Count > 0)
         {
-            var copy = new Button { Style = (Style)FindResource("SubtleButton"), Content = "Copy details", Tag = ((char)0xE8C8).ToString(), MinHeight = 30, Margin = new Thickness(-11, 0, 0, 0) };
+            var copy = new Button { Style = (Style)FindResource("SubtleButton"), Content = "Copy details", Tag = ((char)0xE8C8).ToString(), MinHeight = 28, Margin = new Thickness(-11, -2, 0, 0) };
             copy.Click += (_, _) =>
             {
                 try { Clipboard.SetText(SystemSummary.AsText(facts)); copy.Content = "Copied"; }
@@ -86,6 +95,13 @@ public partial class MainWindow
         all.Click += (_, _) => NavHistory.IsChecked = true;
         _recentBody.Children.Add(all);
     }
+
+    /// <summary>Segoe Fluent Icons glyph for each fact in "This computer".</summary>
+    private static int FactGlyph(string label) => label switch
+    {
+        "Windows" => 0xE770, "Processor" => 0xE950, "Graphics" => 0xE7F4, "Memory" => 0xE964,
+        "Disk C:" => 0xEDA2, "Battery" => 0xE83F, "Running for" => 0xE823, _ => 0xE946,
+    };
 
     /// <summary>A section whose body folds open and closed smoothly (height and opacity), with a turning chevron.</summary>
     private FrameworkElement Foldable(string title, UIElement body, bool open)

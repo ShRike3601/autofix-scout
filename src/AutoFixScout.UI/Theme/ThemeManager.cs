@@ -89,7 +89,7 @@ public static class ThemeManager
         var hiText = SystemColors.HighlightTextBrush;
         // Hover and selection keep the window colour behind text (so text stays readable); the highlight shows as an outline or bar.
         foreach (var k in new[] { "WindowBackgroundBrush", "SidebarBrush", "CardBrush", "CardHoverBrush", "CardPressedBrush",
-                     "SurfaceBrush", "InputBrush", "ButtonBrush", "ButtonHoverBrush", "ButtonPressedBrush",
+                     "SurfaceBrush", "FlyoutBrush", "ScrimBrush", "InputBrush", "ButtonBrush", "ButtonHoverBrush", "ButtonPressedBrush",
                      "SubtleHoverBrush", "SubtlePressedBrush", "NavSelectedBrush", "AccentSoftBrush", "StepPendingFillBrush",
                      "LogoBrush", "NeutralTileBrush", "SuccessTileBrush", "InfoTileBrush", "CautionTileBrush",
                      "ProblemTileBrush", "FocusInnerBrush", "OnStatusBrush" })
