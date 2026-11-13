@@ -11,8 +11,9 @@ public static class GraphicsFlow
 
     public static Task<Diagnosis> DiagnoseAsync() => Task.Run(() =>
     {
+        using var _ = Activity.Scope(Topic);
         var s = new RealGraphicsProbe().Read();
-        var f = GraphicsTriage.Evaluate(s);
-        return new Diagnosis(s, f, GraphicsTriage.Ladder(s, f), GraphicsTriage.ProbablyHardware(s), GraphicsTriage.NotFixedHint(f));
+        var f = Analysis.Judge(() => GraphicsTriage.Evaluate(s));
+        return new Diagnosis(s, f, Analysis.Plan(GraphicsTriage.Ladder(s, f)), GraphicsTriage.ProbablyHardware(s), GraphicsTriage.NotFixedHint(f));
     });
 }

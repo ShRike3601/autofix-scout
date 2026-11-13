@@ -53,7 +53,7 @@ public static class NetworkChecks
         var events = new List<(int, int, string?)>();
         try
         {
-            using var reader = new EventLogReader(new EventLogQuery("Microsoft-Windows-WLAN-AutoConfig/Operational", PathType.LogName, WifiDrops.Query));
+            using var reader = EventLogs.Open("Microsoft-Windows-WLAN-AutoConfig/Operational", WifiDrops.Query, TimeSpan.FromDays(WifiDrops.Days));
             for (var ev = reader.ReadEvent(); ev != null; ev = reader.ReadEvent())
                 using (ev) events.Add(WifiDrops.ParseEvent(ev.ToXml()));
         }
@@ -62,7 +62,7 @@ public static class NetworkChecks
         try
         {
             var q = $"*[System[((Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=42) or (Provider[@Name='Microsoft-Windows-Kernel-General'] and EventID=13)) and TimeCreated[timediff(@SystemTime) <= {(long)TimeSpan.FromDays(WifiDrops.Days).TotalMilliseconds}]]]";
-            using var r = new EventLogReader(new EventLogQuery("System", PathType.LogName, q));
+            using var r = EventLogs.Open("System", q, TimeSpan.FromDays(WifiDrops.Days));
             for (var ev = r.ReadEvent(); ev != null; ev = r.ReadEvent()) using (ev) transitions++;
         }
         catch (EventLogException) { }
@@ -71,7 +71,7 @@ public static class NetworkChecks
         try
         {
             var q = $"*[System[EventID=12013 and TimeCreated[timediff(@SystemTime) <= {(long)TimeSpan.FromDays(WifiDrops.Days).TotalMilliseconds}]]]";
-            using var r = new EventLogReader(new EventLogQuery("Microsoft-Windows-WLAN-AutoConfig/Operational", PathType.LogName, q));
+            using var r = EventLogs.Open("Microsoft-Windows-WLAN-AutoConfig/Operational", q, TimeSpan.FromDays(WifiDrops.Days));
             for (var ev = r.ReadEvent(); ev != null; ev = r.ReadEvent()) using (ev) signIn++;
         }
         catch (EventLogException) { }
@@ -81,6 +81,7 @@ public static class NetworkChecks
     /// <summary>Whether Windows may turn the adapter with this connection GUID off to save power (class key PnPCapabilities). Unknown when no key matches.</summary>
     public static Tri ReadWifiPowerSaving(string adapterGuid)
     {
+        Activity.ReadingRegistry("HKLM", @"SYSTEM\CurrentControlSet\Control\Class\{4d36e972...}", "adapter power saving setting");
         using var cls = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}");
         if (cls is null) return Tri.Unknown;
         foreach (var name in cls.GetSubKeyNames().Where(n => n.Length == 4 && n.All(char.IsDigit)))
@@ -96,6 +97,7 @@ public static class NetworkChecks
     /// <summary>Driver date/version and the Wi-Fi tuning still pending, from the adapter's class key (read-only).</summary>
     public static (DateTime? Date, string? Version, IReadOnlyList<string> Pending) ReadWifiDriver(string adapterGuid)
     {
+        Activity.ReadingRegistry("HKLM", @"SYSTEM\CurrentControlSet\Control\Class\{4d36e972...}", "adapter driver and tuning settings");
         using var cls = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}");
         if (cls is null) return (null, null, Array.Empty<string>());
         foreach (var name in cls.GetSubKeyNames().Where(n => n.Length == 4 && n.All(char.IsDigit)))
@@ -126,6 +128,7 @@ public static class NetworkChecks
     /// <summary>Yes when the current Wi-Fi connection uses enterprise (802.1X) sign-in. "WPA2-Enterprise" is not translated by Windows.</summary>
     public static Tri ReadWifiEnterprise()
     {
+        Commands.Running("netsh.exe", "wlan show interfaces", "sign-in type only");
         var psi = new System.Diagnostics.ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "netsh.exe"))
         { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true };
         foreach (var a in new[] { "wlan", "show", "interfaces" }) psi.ArgumentList.Add(a);
@@ -141,6 +144,7 @@ public static class NetworkChecks
     /// <summary>Address state of the adapter with this connection GUID (Win32_NetworkAdapter.GUID).</summary>
     public static Tri ReadAddressObtained(string adapterGuid)
     {
+        Activity.Report(ActivityKind.Network, "Reading the address and gateway state of the network adapter");
         var ni = NetworkInterface.GetAllNetworkInterfaces()
             .FirstOrDefault(n => string.Equals(n.Id, adapterGuid, StringComparison.OrdinalIgnoreCase));
         if (ni is null || ni.OperationalStatus != OperationalStatus.Up) return Tri.Unknown;
@@ -156,7 +160,7 @@ public static class NetworkChecks
     {
         try
         {
-            using var reader = new EventLogReader(new EventLogQuery("System", PathType.LogName, ConflictQuery));
+            using var reader = EventLogs.Open("System", ConflictQuery, TimeSpan.FromDays(1));
             using var ev = reader.ReadEvent();
             return ev != null;
         }
@@ -169,6 +173,7 @@ public static class NetworkChecks
     /// </summary>
     public static Tri ReadMetered(bool wireless)
     {
+        Activity.Report(ActivityKind.Network, "Asking the Network List Manager whether the connection is metered");
         try
         {
             var type = Type.GetTypeFromCLSID(new Guid("DCB00C01-570F-4A9B-8D69-199FDBA5723B"));
@@ -198,6 +203,7 @@ public static class NetworkChecks
     /// <summary>Signal quality (0-100) and 5 GHz support of the first connected Wi-Fi interface; null when there is none. The SSID is never read.</summary>
     public static (int SignalPercent, Tri Supports5GHz)? ReadWifi()
     {
+        Activity.Report(ActivityKind.Network, "Reading Wi-Fi signal strength and band through the Native Wifi API (network name not read)");
         const int ErrorServiceNotActive = 1062;
         var rc = WlanOpenHandle(2, IntPtr.Zero, out _, out var handle);
         if (rc == ErrorServiceNotActive) return null;

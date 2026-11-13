@@ -34,6 +34,7 @@ public static class StressTest
         ILoad? active = null;
         try
         {
+            Activity.Report(ActivityKind.Load, $"Starting the load test: baseline {options.IdleSeconds:0} s, processor {options.CpuSeconds:0} s, graphics {options.GpuSeconds:0} s, cool-down {options.CooldownSeconds:0} s");
             reader = env.CreateReader();
             result.HasBattery = reader.HasBattery;
             var first = await reader.ReadAsync().WaitAsync(ct);
@@ -41,6 +42,7 @@ public static class StressTest
             if (first.OnBattery == true || (first.OnBattery == null && result.HasBattery))
             {
                 result.Outcome = StressOutcome.RefusedOnBattery;
+                Activity.Report(ActivityKind.Analyze, "The load test did not start because the computer runs on battery");
                 return result;
             }
 
@@ -80,6 +82,13 @@ public static class StressTest
                 if (stopped && phase is StressPhase.Cpu or StressPhase.Gpu) continue;
                 ct.ThrowIfCancellationRequested();
 
+                Activity.Report(ActivityKind.Load, phase switch
+                {
+                    StressPhase.Idle => $"Measuring the idle baseline for {seconds:0} s",
+                    StressPhase.Cpu => $"Loading the processor with {Activity.Count(threads, "thread")} for {seconds:0} s",
+                    StressPhase.Gpu => $"Loading the graphics card with a Direct3D 11 compute workload for {seconds:0} s",
+                    _ => $"Measuring the cool-down for {seconds:0} s",
+                });
                 if (phase == StressPhase.Cpu) { active = cpu = env.CreateCpuLoad(threads, ct); cpu.Start(); }
                 else if (phase == StressPhase.Gpu) { active = gpu!; gpu!.Start(); result.GpuStatus = GpuLoadStatus.Ran; }
 
@@ -107,12 +116,13 @@ public static class StressTest
                         result.StopReason = decision;
                         result.StoppedIn = phase;
                         result.Outcome = StressOutcome.StoppedForSafety;
+                        Activity.Report(ActivityKind.Load, $"Stopping the load early for safety: {decision}");
                         stopped = true;
                         break;
                     }
                 }
 
-                if (active != null) { active.Stop(TimeSpan.FromSeconds(2)); active.Dispose(); active = null; }
+                if (active != null) { Activity.Report(ActivityKind.Load, "Stopping the load"); active.Stop(TimeSpan.FromSeconds(2)); active.Dispose(); active = null; }
                 if (stopped && result.StopReason is StressStop.TimeLimit or StressStop.Unplugged) break;
                 if (stopped && phase == StressPhase.Cooldown) break;
             }
@@ -120,6 +130,7 @@ public static class StressTest
         catch (OperationCanceledException)
         {
             result.Outcome = StressOutcome.Cancelled;
+            Activity.Report(ActivityKind.Load, "The load test was cancelled; every load is stopped");
         }
         finally
         {
@@ -129,6 +140,8 @@ public static class StressTest
             try { gpu?.Dispose(); } catch (Exception) { }
             try { reader?.Dispose(); } catch (Exception) { }
             result.TotalSeconds = Math.Round(total.Elapsed.TotalSeconds, 1);
+            Activity.Report(ActivityKind.Load, $"The load test ended after {result.TotalSeconds:0.0} s with {Activity.Count(result.Samples.Count, "reading")}");
+
         }
         return result;
     }

@@ -15,9 +15,10 @@ public static class PowerFlow
 
     public static Task<Diagnosis> DiagnoseAsync() => Task.Run(() =>
     {
+        using var _ = Activity.Scope(Topic);
         var s = Read();
-        var f = PowerTriage.Evaluate(s);
-        return new Diagnosis(s, f, PowerTriage.Ladder(s, f), false, PowerTriage.NotFixedHint(f));
+        var f = Analysis.Judge(() => PowerTriage.Evaluate(s));
+        return new Diagnosis(s, f, Analysis.Plan(PowerTriage.Ladder(s, f)), false, PowerTriage.NotFixedHint(f));
     });
 
     public static PowerState Read()
@@ -25,6 +26,7 @@ public static class PowerFlow
         var s = new PowerState();
         var errors = new List<string>();
         void Part(string name, Action a) { try { a(); } catch (Exception ex) { errors.Add($"{name}: {ex.Message}"); } }
+        Activity.Report(ActivityKind.Analyze, "Reading battery, power plan, sleep settings and wake events");
         Part("battery", () => ReadBattery(s));
         Part("power plan", () => s.ActiveSchemeGuid = PowerTriage.ParseActiveScheme(Powercfg("/getactivescheme")));
         Part("sleep timeouts", () =>
@@ -40,6 +42,7 @@ public static class PowerFlow
 
     private static int? ReadDword(string key, string name)
     {
+        Activity.ReadingRegistry("HKLM", key, $"({name})");
         using var k = Registry.LocalMachine.OpenSubKey(key);
         return k?.GetValue(name) is int i ? i : null;
     }
@@ -48,6 +51,7 @@ public static class PowerFlow
     {
         var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "powercfg.exe"), args)
         { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        Commands.Running("powercfg.exe", args.StartsWith("/query") ? "/query (power settings of the active plan)" : args);
         using var p = Process.Start(psi)!;
         var o = p.StandardOutput.ReadToEndAsync();
         _ = p.StandardError.ReadToEndAsync();
@@ -58,7 +62,7 @@ public static class PowerFlow
 
     private static void ReadBattery(PowerState s)
     {
-        using (var b = new ManagementObjectSearcher("SELECT EstimatedChargeRemaining FROM Win32_Battery"))
+        using (var b = Wmi.Searcher("SELECT EstimatedChargeRemaining FROM Win32_Battery"))
             foreach (ManagementBaseObject m in b.Get())
             {
                 s.HasBattery = true;
@@ -71,7 +75,7 @@ public static class PowerFlow
 
     private static int? SumWmi(string cls, string prop)
     {
-        using var q = new ManagementObjectSearcher(@"root\WMI", $"SELECT {prop} FROM {cls}");
+        using var q = Wmi.Searcher(@"root\WMI", $"SELECT {prop} FROM {cls}");
         long sum = 0; var any = false;
         foreach (ManagementBaseObject m in q.Get())
             if (m[prop] is { } v) { sum += Convert.ToInt64(v); any = true; }
@@ -82,8 +86,8 @@ public static class PowerFlow
     {
         const long week = 7L * 24 * 3600 * 1000;
         var wakes = new List<string>();
-        using (var r = new EventLogReader(new EventLogQuery("System", PathType.LogName,
-            $"*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1 and TimeCreated[timediff(@SystemTime) <= {week}]]]")))
+        using (var r = EventLogs.Open("System",
+            $"*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and EventID=1 and TimeCreated[timediff(@SystemTime) <= {week}]]]", TimeSpan.FromDays(7)))
             for (var i = 0; i < 500 && r.ReadEvent() is { } e; i++)
                 using (e)
                 {
@@ -92,8 +96,9 @@ public static class PowerFlow
                     wakes.Add(PowerTriage.ParseWakeSource(text) ?? "unknown");
                 }
         s.WakeSources = wakes;
-        using var k = new EventLogReader(new EventLogQuery("System", PathType.LogName,
-            $"*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=41 and TimeCreated[timediff(@SystemTime) <= {week}]]]"));
+        using var k = EventLogs.Open("System",
+            $"*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=41 and TimeCreated[timediff(@SystemTime) <= {week}]]]", TimeSpan.FromDays(7));
+
         var n = 0;
         while (k.ReadEvent() is { } e2) { using (e2) n++; }
         s.UnexpectedShutdowns = n;

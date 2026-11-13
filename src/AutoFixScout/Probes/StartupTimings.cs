@@ -70,8 +70,7 @@ public static class StartupTimings
         {
             var week = Days * 24L * 3600 * 1000;
             var list = new List<BootRecord>();
-            using var r = new EventLogReader(new EventLogQuery(Log, PathType.LogName,
-                $"*[System[EventID=100 and TimeCreated[timediff(@SystemTime) <= {week}]]]"));
+            using var r = EventLogs.Open(Log, $"*[System[EventID=100 and TimeCreated[timediff(@SystemTime) <= {week}]]]", TimeSpan.FromDays(Days));
             while (list.Count < MaxBoots && r.ReadEvent() is { } e)
                 using (e) { if (ParseBoot(e.ToXml()) is { } b) list.Add(b); }
             return list;
@@ -86,8 +85,7 @@ public static class StartupTimings
         {
             var week = Days * 24L * 3600 * 1000;
             var list = new List<SlowStartupItem>();
-            using var r = new EventLogReader(new EventLogQuery(Log, PathType.LogName,
-                $"*[System[(EventID>=101 and EventID<=110) and TimeCreated[timediff(@SystemTime) <= {week}]]]"));
+            using var r = EventLogs.Open(Log, $"*[System[(EventID>=101 and EventID<=110) and TimeCreated[timediff(@SystemTime) <= {week}]]]", TimeSpan.FromDays(Days));
             for (var i = 0; i < 300 && r.ReadEvent() is { } e; i++)
                 using (e) { if (ParseSlowItem(e.ToXml()) is { } s) list.Add(s); }
             return list.GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase).Select(g => g.MaxBy(x => x.TotalMs)!)
@@ -101,7 +99,9 @@ public static class StartupTimings
     {
         try
         {
+            Activity.ReadingRegistry("HKLM", @"SYSTEM\CurrentControlSet\Control\Session Manager\Power", "(Fast Startup setting)");
             using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Power");
+
             return k?.GetValue("HiberbootEnabled") is int v ? v != 0 : null;
         }
         catch (Exception) { return null; }

@@ -11,8 +11,9 @@ public static class DisplayFlow
 
     public static Task<Diagnosis> DiagnoseAsync() => Task.Run(() =>
     {
+        using var _ = Activity.Scope(Topic);
         var s = new RealDisplayProbe().Read();
-        var f = DisplayTriage.Evaluate(s);
-        return new Diagnosis(s, f, DisplayTriage.Ladder(s, f), DisplayTriage.ProbablyHardware(s), DisplayTriage.NotFixedHint(f));
+        var f = Analysis.Judge(() => DisplayTriage.Evaluate(s));
+        return new Diagnosis(s, f, Analysis.Plan(DisplayTriage.Ladder(s, f)), DisplayTriage.ProbablyHardware(s), DisplayTriage.NotFixedHint(f));
     });
 }

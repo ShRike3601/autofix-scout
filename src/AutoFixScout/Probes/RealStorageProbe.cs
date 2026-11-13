@@ -32,6 +32,7 @@ public sealed class RealStorageProbe : IStorageProbe
             {
                 try
                 {
+                    Activity.Report(ActivityKind.Files, "Measuring the temporary folder %LOCALAPPDATA%\\Temp (sizes and ages only, 24 hours is the cut-off)");
                     var (total, old) = TempSize(Path.GetTempPath(), DateTime.UtcNow - TempAge);
                     s.UserTempBytes = total;
                     s.ReclaimableTempBytes = old;
@@ -39,7 +40,11 @@ public sealed class RealStorageProbe : IStorageProbe
                 catch (Exception) { /* unknown */ }
             }),
             Task.Run(() => s.WindowsTempBytes = WindowsTempSize()),
-            Task.Run(() => s.RecycleBinBytes = RecycleBinSize()),
+            Task.Run(() =>
+            {
+                Activity.Report(ActivityKind.Files, "Asking Windows for the Recycle Bin size (SHQueryRecycleBin)");
+                s.RecycleBinBytes = RecycleBinSize();
+            }),
             Task.Run(() => ReadBigUsers(s)),
             Task.Run(() =>
             {
@@ -54,6 +59,7 @@ public sealed class RealStorageProbe : IStorageProbe
             Task.Run(() => { try { s.TopProcesses = ProcessSampler.Sample(TimeSpan.FromSeconds(2), TotalMemory()); } catch (Exception) { /* unknown */ } }),
             Task.Run(() =>
             {
+                Activity.Report(ActivityKind.Analyze, "Reading start-up timings from the last 30 days");
                 s.BootTimes = StartupTimings.ReadBoots();
                 s.SlowStartupItems = StartupTimings.ReadSlowItems();
                 s.FastStartup = StartupTimings.ReadFastStartup();
@@ -61,6 +67,7 @@ public sealed class RealStorageProbe : IStorageProbe
             Task.Run(() => { try { s.ProblemDevices = ReadProblemDevices(); } catch (Exception) { /* unknown */ } }),
         };
         Task.WaitAll(tasks.ToArray());
+        Activity.Report(ActivityKind.Analyze, $"Read the storage and start-up details{(errors.Count > 0 ? $"; {Activity.Count(errors.Count, "part")} could not be read" : "")}");
         s.Uptime = TimeSpan.FromMilliseconds(Environment.TickCount64);
         s.MemoryLoadPercent = MemoryLoad();
         return s;
@@ -75,15 +82,18 @@ public sealed class RealStorageProbe : IStorageProbe
         var b = SpaceWalker.DefaultBudget;
         try
         {
+            Activity.Report(ActivityKind.Files, "Checking for the Windows.old folder and measuring it (sizes only)");
             var w = Path.Combine(root, "Windows.old");
             s.WindowsOld = Directory.Exists(w) ? SpaceWalker.Folder(w, b) : new SpaceItem(0, false);
         }
         catch (Exception) { /* unknown */ }
+        Activity.Report(ActivityKind.Files, "Reading the size of hiberfil.sys (file information only)");
         try { s.HiberFile = SpaceWalker.FileSize(Path.Combine(root, "hiberfil.sys")); } catch (Exception) { /* unknown */ }
         try
         {
             if (SpaceWalker.DownloadsPath() is { } dl && Directory.Exists(dl))
             {
+                Activity.Report(ActivityKind.Files, "Measuring %USERPROFILE%\\Downloads (file sizes and ages only, no names)");
                 var r = SpaceWalker.Measure(dl, b, DateTime.UtcNow - OldDownload);
                 if (r.TopReadable) { s.Downloads = new SpaceItem(r.Bytes, !r.Complete); s.DownloadsOldCount = r.OldFiles; }
             }
@@ -91,6 +101,7 @@ public sealed class RealStorageProbe : IStorageProbe
         catch (Exception) { /* unknown */ }
         try
         {
+            Activity.Report(ActivityKind.Files, "Measuring the Delivery Optimization cache (sizes only)");
             var parts = new[]
             {
                 Path.Combine(s.WindowsDirectory, @"SoftwareDistribution\DeliveryOptimization"),
@@ -101,6 +112,7 @@ public sealed class RealStorageProbe : IStorageProbe
         catch (Exception) { /* unknown */ }
         try
         {
+            Activity.Report(ActivityKind.Files, "Measuring the largest folders in %USERPROFILE% (sizes only, folder names are not recorded here)");
             s.BigProfileFolders = SpaceWalker.BigProfileFolders(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(12));
         }
@@ -141,6 +153,8 @@ public sealed class RealStorageProbe : IStorageProbe
         try
         {
             var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Temp");
+            Activity.Report(ActivityKind.Files, "Measuring C:\\Windows\\Temp if this account may list it (sizes only)");
+
             _ = Directory.EnumerateFileSystemEntries(dir).FirstOrDefault(); // throws when access is denied
             return TempSize(dir, DateTime.MinValue).Total;
         }
@@ -198,7 +212,7 @@ public sealed class RealStorageProbe : IStorageProbe
     private static List<StorageDeviceInfo> ReadProblemDevices()
     {
         var list = new List<StorageDeviceInfo>();
-        using var q = new ManagementObjectSearcher(
+        using var q = Wmi.Searcher(
             "SELECT Name, DeviceID, PNPClass, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE ConfigManagerErrorCode <> 0");
         foreach (var d in q.Get())
         {

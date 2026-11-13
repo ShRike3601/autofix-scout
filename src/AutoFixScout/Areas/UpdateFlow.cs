@@ -17,9 +17,10 @@ public static class UpdateFlow
 
     public static async Task<Diagnosis> DiagnoseAsync()
     {
+        using var _ = Activity.Scope(Topic);
         var s = await Task.Run(Probe.Read);
-        var f = UpdateTriage.Evaluate(s);
-        return new Diagnosis(s, f, UpdateTriage.Ladder(s, f), UpdateTriage.ProbablyHardware(s), UpdateTriage.NotFixedHint(f));
+        var f = Analysis.Judge(() => UpdateTriage.Evaluate(s));
+        return new Diagnosis(s, f, Analysis.Plan(UpdateTriage.Ladder(s, f)), UpdateTriage.ProbablyHardware(s), UpdateTriage.NotFixedHint(f));
     }
 
     /// <summary>Re-reads the machine: nothing switched off, "Cryptographic Services" running, no restart waiting.</summary>

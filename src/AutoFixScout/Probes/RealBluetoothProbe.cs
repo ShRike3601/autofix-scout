@@ -17,6 +17,7 @@ public sealed class RealBluetoothProbe : IBluetoothProbe
 
         try
         {
+            Activity.Report(ActivityKind.Command, "Reading the state of the Bluetooth Support Service (bthserv)");
             using var sc = new ServiceController("bthserv");
             state.ServiceStatus = sc.Status.ToString();
         }
@@ -26,7 +27,9 @@ public sealed class RealBluetoothProbe : IBluetoothProbe
         try { ReadDevices(state); }
         catch (Exception ex) { errors.Add($"WMI: {ex.Message}"); }
 
+        Activity.Report(ActivityKind.Command, "Asking Windows whether the Bluetooth radio is on (Windows.Devices.Radios)");
         try { state.RadioOn = Radios.BluetoothOn(); }
+
         catch (Exception ex) { errors.Add($"Radios: {ex.Message}"); }
         return state;
     }
@@ -35,7 +38,7 @@ public sealed class RealBluetoothProbe : IBluetoothProbe
     {
         var adapters = new List<BtAdapterInfo>();
         var paired = new List<BtPairedDevice>();
-        using var q = new ManagementObjectSearcher(
+        using var q = Wmi.Searcher(
             "SELECT Name, DeviceID, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE PNPClass = 'Bluetooth'");
         foreach (ManagementObject d in q.Get())
         {

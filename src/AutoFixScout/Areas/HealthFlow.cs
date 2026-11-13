@@ -19,16 +19,17 @@ public static class HealthFlow
 
     public static async Task<Diagnosis> DiagnoseAsync()
     {
+        using var _ = Activity.Scope(Topic);
         var s = await Task.Run(Probe.Read);
-        var f = HealthTriage.Evaluate(s);
-        return new Diagnosis(s, f, HealthTriage.Ladder(s, f), HealthTriage.ProbablyHardware(s), HealthTriage.NotFixedHint(f));
+        var f = Analysis.Judge(() => HealthTriage.Evaluate(s));
+        return new Diagnosis(s, f, Analysis.Plan(HealthTriage.Ladder(s, f)), HealthTriage.ProbablyHardware(s), HealthTriage.NotFixedHint(f));
     }
 
     /// <summary>Triage again for a state the person refined (for example the program they picked).</summary>
     public static Diagnosis Diagnose(HealthState s)
     {
-        var f = HealthTriage.Evaluate(s);
-        return new Diagnosis(s, f, HealthTriage.Ladder(s, f), HealthTriage.ProbablyHardware(s), HealthTriage.NotFixedHint(f));
+        var f = Analysis.Judge(() => HealthTriage.Evaluate(s));
+        return new Diagnosis(s, f, Analysis.Plan(HealthTriage.Ladder(s, f)), HealthTriage.ProbablyHardware(s), HealthTriage.NotFixedHint(f));
     }
 
     public static string ProgramQuestion(CrashInfo c) =>
