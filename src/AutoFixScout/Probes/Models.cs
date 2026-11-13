@@ -39,6 +39,15 @@ public sealed class AudioState
     public IReadOnlyList<AudioSessionInfo> Sessions { get; set; } = new List<AudioSessionInfo>();
     /// <summary>Why the sessions could not be read; does not block the check (the device-level findings stand on their own).</summary>
     public string? SessionError { get; set; }
+    /// <summary>Set by the UI when the person talks about calls; triage adds the call findings only then.</summary>
+    public bool CallFocus { get; set; }
+    /// <summary>Communications ducking preference (absent value = Windows default); null = unreadable.</summary>
+    public Ducking? Ducking { get; set; }
+    /// <summary>Default output for media and for communications (id, name); null = none or unknown.</summary>
+    public string? MultimediaDeviceId { get; set; }
+    public string? MultimediaDeviceName { get; set; }
+    public string? CommsDeviceId { get; set; }
+    public string? CommsDeviceName { get; set; }
 }
 
 public interface IAudioProbe { AudioState Read(); }
