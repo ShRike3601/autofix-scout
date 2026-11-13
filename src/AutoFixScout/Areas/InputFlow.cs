@@ -12,9 +12,13 @@ public static class InputFlow
 
     private static readonly IInputProbe Probe = new RealInputProbe();
 
-    public static Task<Diagnosis> DiagnoseAsync() => Task.Run(() =>
+    public static Task<Diagnosis> DiagnoseAsync() => DiagnoseAsync(false);
+
+    /// <summary>With typingFocus the layout findings come first (the person reported wrong characters).</summary>
+    public static Task<Diagnosis> DiagnoseAsync(bool typingFocus) => Task.Run(() =>
     {
         var s = Read();
+        s.TypingFocus = typingFocus;
         var f = InputTriage.Evaluate(s);
         return new Diagnosis(s, f, InputTriage.Ladder(s, f), InputTriage.ProbablyHardware(s), InputTriage.NotFixedHint(f));
     });

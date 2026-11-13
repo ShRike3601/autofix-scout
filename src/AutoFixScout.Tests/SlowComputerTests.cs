@@ -332,7 +332,11 @@ public class SlowComputerTests
         var one = Healthy();
         one.StartupEntries = new[] { User("Steam", @"C:\Steam\steam.exe") };
         one.StartupAppCount = 1;
-        return new[] { s, one, Full() };
+        var slow = Healthy();
+        slow.FastStartup = false;
+        slow.BootTimes = new[] { new BootRecord(DateTime.UtcNow, 90000, 80000, 10000) };
+        slow.SlowStartupItems = new[] { new SlowStartupItem("Contoso Sync", 20000) };
+        return new[] { s, one, Full(), slow };
     }
 
     [Fact]

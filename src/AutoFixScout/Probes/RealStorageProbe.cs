@@ -42,6 +42,9 @@ public sealed class RealStorageProbe : IStorageProbe
         }
         catch (Exception) { /* unknown */ }
         try { s.TopProcesses = ProcessSampler.Sample(TimeSpan.FromSeconds(2), TotalMemory()); } catch (Exception) { /* unknown */ }
+        s.BootTimes = StartupTimings.ReadBoots();
+        s.SlowStartupItems = StartupTimings.ReadSlowItems();
+        s.FastStartup = StartupTimings.ReadFastStartup();
         s.Uptime = TimeSpan.FromMilliseconds(Environment.TickCount64);
         s.MemoryLoadPercent = MemoryLoad();
         try { s.ProblemDevices = ReadProblemDevices(); } catch (Exception) { /* unknown */ }

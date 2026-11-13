@@ -29,8 +29,60 @@ public sealed class RealInputProbe : IInputProbe
             s.MouseKeysFlags = Accessibility.Get(Accessibility.Kind.Mouse);
         }
         catch (Exception ex) { errors.Add($"Accessibility: {ex.Message}"); }
+        try { ReadLayouts(s); }
+        catch (Exception ex) { errors.Add($"Layouts: {ex.Message}"); }
         return s;
     }
+
+    /// <summary>Read-only: HKCU Keyboard Layout Preload, Substitutes and Toggle, and the display language.</summary>
+    private static void ReadLayouts(InputState s)
+    {
+        var layouts = new List<KeyboardLayoutInfo>();
+        using (var pre = Registry.CurrentUser.OpenSubKey(@"Keyboard Layout\Preload"))
+        using (var sub = Registry.CurrentUser.OpenSubKey(@"Keyboard Layout\Substitutes"))
+        {
+            if (pre is not null)
+                foreach (var n in pre.GetValueNames().OrderBy(x => int.TryParse(x, out var i) ? i : int.MaxValue))
+                {
+                    var klid = pre.GetValue(n) as string;
+                    if (klid is null) continue;
+                    var real = sub?.GetValue(klid) as string ?? klid;
+                    if (!layouts.Any(l => l.Klid.Equals(real, StringComparison.OrdinalIgnoreCase)))
+                        layouts.Add(new KeyboardLayoutInfo(real, KeyboardLayouts.FriendlyName(real)));
+                }
+        }
+        if (layouts.Count == 0)
+        {
+            var n0 = GetKeyboardLayoutList(0, null);
+            var arr = new IntPtr[Math.Max(n0, 0)];
+            var got = n0 > 0 ? GetKeyboardLayoutList(n0, arr) : 0;
+            foreach (var h in arr.Take(got))
+            {
+                var klid = ((long)h & 0xFFFF).ToString("x8");
+                if (!layouts.Any(l => l.Klid == klid)) layouts.Add(new KeyboardLayoutInfo(klid, KeyboardLayouts.FriendlyName(klid)));
+            }
+        }
+        s.Layouts = layouts;
+        using (var prof = Registry.CurrentUser.OpenSubKey(@"Control Panel\International\User Profile"))
+        {
+            var klid = (prof?.GetValue("InputMethodOverride") as string)?.Split(':').LastOrDefault(); // for example "0409:00000409"
+            s.DefaultLayout = KeyboardLayouts.TryParseKlid(klid, out _)
+                ? new KeyboardLayoutInfo(klid!, KeyboardLayouts.FriendlyName(klid!))
+                : layouts.FirstOrDefault();
+        }
+        using (var d = Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop"))
+            s.DisplayLanguage = (d?.GetValue("PreferredUILanguages") as string[])?.FirstOrDefault()
+                ?? System.Globalization.CultureInfo.CurrentUICulture.Name;
+        using (var t = Registry.CurrentUser.OpenSubKey(@"Keyboard Layout\Toggle"))
+        {
+            var legacy = t?.GetValue("Hotkey") as string ?? "1"; // Windows default: Alt+Shift
+            s.LanguageHotkey = KeyboardLayouts.DecodeHotkey(t?.GetValue("Language Hotkey") as string ?? legacy);
+            s.LayoutHotkey = KeyboardLayouts.DecodeHotkey(t?.GetValue("Layout Hotkey") as string ?? legacy);
+        }
+    }
+
+    [DllImport("user32.dll")]
+    private static extern int GetKeyboardLayoutList(int size, IntPtr[]? list);
 
     private static Tri ReadTri(string path, string name)
     {

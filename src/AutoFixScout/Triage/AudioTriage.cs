@@ -345,4 +345,9 @@ public enum FindingCode
     // Sound during calls
     SoundDuckingDuringCalls,
     SoundCallDeviceDifferent,
+    // Slow start-up (Slow or full computer)
+    StorageSlowStartup,
+    // Keyboard layouts
+    InputSeveralLayouts,
+    InputLayoutMismatch,
 }

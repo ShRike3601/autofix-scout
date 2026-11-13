@@ -434,3 +434,8 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
   7 s with backup written. No UI changes were needed (no new tile).
 - Part 6 status: G1 display and G4 call ducking merged; G2 slow start-up and G3 keyboard layout are WIP on branches
   g2-boot / g3-layout (agents stopped by the owner, WIP committed, unreviewed, not merged).
+
+## Part 7 status (2026-11-13)
+- Merged g2-boot (slow start-up: boot times, slow items, Fast Startup) and g3-layout (several keyboard layouts with a switch hotkey, layout vs display language). 873 tests pass; live read-only tests pass on the bench.
+- Known limit: the Diagnostics-Performance log (boot times) is readable only by administrators, so without elevation the slow start-up check reports Unknown and raises no finding. A later part can read it through the elevated executor.
+- InputFlow.DiagnoseAsync(typingFocus: true) puts layout steps first; the UI does not call it yet (UI session to wire when the symptom is about wrong characters). The search words route "wrong characters", "keyboard layout" and similar to the keyboard check.

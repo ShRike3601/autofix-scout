@@ -58,6 +58,8 @@ public static class FixActions
                         "powersleep" => "ms-settings:powersleep",
                         "batterysaver" => "ms-settings:batterysaver",
                         "touchpad" => "ms-settings:devices-touchpad",
+                        "language" => "ms-settings:regionlanguage",
+                        "typing" => "ms-settings:typing",
                         "keyboard_access" => "ms-settings:easeofaccess-keyboard",
                         "mouse" => "ms-settings:mousetouchpad",
                         "notifications" => "ms-settings:notifications",

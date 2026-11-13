@@ -42,6 +42,18 @@ public static class InputTriage
         if (InputState.IsOn(s.MouseKeysFlags))
             f.Add(F(FindingCode.MouseKeysOn, "\"Mouse Keys\" is on, so the number keys move the pointer instead of typing numbers.", $"MouseKeys flags {s.MouseKeysFlags}"));
 
+        var layoutFindings = new List<Finding>();
+        if (s.Layouts.Count >= 2 && s.SwitchHotkeyOn)
+            layoutFindings.Add(F(FindingCode.InputSeveralLayouts,
+                "Several keyboard layouts are installed and a switch key combination is on, so pressing it by accident changes the layout. Typing may produce the wrong characters.",
+                $"{s.Layouts.Count} layouts: {string.Join(", ", s.Layouts.Select(l => l.Name).Take(6))}; language hotkey {s.LanguageHotkey}, layout hotkey {s.LayoutHotkey}"));
+        if (s.DefaultLayout is { } dl && s.DisplayLanguage is { Length: > 0 } dispLang
+            && KeyboardLayouts.LanguageOfLangId(dl.LangId) is { } layoutLang && layoutLang != KeyboardLayouts.LanguageOfTag(dispLang))
+            layoutFindings.Add(F(FindingCode.InputLayoutMismatch,
+                "The default keyboard layout belongs to a different language than the Windows display language. This is not a fault, but it can explain unexpected characters.",
+                $"default layout {dl.Klid} ({dl.Name}), display language {dispLang}"));
+        f = s.TypingFocus ? layoutFindings.Concat(f).ToList() : f.Concat(layoutFindings).ToList();
+
         if (f.Count > 0) return f;
         return new[] { F(FindingCode.LooksNormal, "Windows reports no problem with the keyboard, mouse or touchpad, and no accessibility key feature is on.",
             $"{s.Devices.Count(d => d.IsKeyboard)} keyboard(s), {s.Devices.Count(d => d.IsMouse)} mouse device(s)") };
@@ -79,6 +91,22 @@ public static class InputTriage
                 "Please unplug the keyboard or mouse, wait a few seconds, and plug it into a different USB port. " +
                 "For a wireless device, please also check the batteries, the on and off switch, and that the small wireless receiver is plugged in firmly."));
             r.Add(Rescan.Rung("input", "keyboard or mouse"));
+        }
+        if (codes.Contains(FindingCode.InputSeveralLayouts) || codes.Contains(FindingCode.InputLayoutMismatch))
+        {
+            var layoutRungs = new List<Rung>
+            {
+                new("language_settings", "ui.open_settings_page", 0,
+                    "AutoFix Scout will open the \"Language & region\" settings. Please select the language, choose \"Language options\" and remove the keyboard layouts that you do not need. Nothing is changed without your action.", "language"),
+            };
+            if (codes.Contains(FindingCode.InputSeveralLayouts))
+            {
+                layoutRungs.Add(new("typing_settings", "ui.open_settings_page", 0,
+                    "AutoFix Scout will open the \"Typing\" settings. Please select \"Advanced keyboard settings\", then \"Input language hot keys\", and switch the key combination off if you do not use it.", "typing"));
+                layoutRungs.Add(new("layout_tip", "ui.human_step", 0,
+                    "A tip: the keys Windows and Space together show the list of keyboard layouts and let you choose one on purpose. The layout in use is also shown at the right end of the taskbar."));
+            }
+            if (s.TypingFocus) r.InsertRange(0, layoutRungs); else r.AddRange(layoutRungs);
         }
         if (r.Count == 0)
             r.Add(new("mouse_settings", "ui.open_settings_page", 0,
