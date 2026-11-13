@@ -32,7 +32,7 @@ easy for people who are not technical.
 
 Short verbs, title case not needed: "Continue", "Apply fix", "Skip", "Yes, it works", "No, it does not", "Close",
 "Restore driver", "Not now". The home choices stay symptom-first: "Sound is not working", "Camera is not working",
-"Cannot connect to the internet", "Something else".
+"Cannot connect to the internet"; all other areas are listed under "Other problems".
 
 ## Keep
 

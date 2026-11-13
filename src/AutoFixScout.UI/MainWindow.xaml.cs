@@ -12,6 +12,7 @@ public partial class MainWindow : Window, IFixHost
     private readonly INetworkProbe _networkProbe = new RealNetworkProbe();
     private readonly ICameraProbe _cameraProbe = new RealCameraProbe();
     private string? _lastReportPath;
+    private bool _historyOpen; // the "History and reports" page is showing
     private TaskCompletionSource<bool>? _choice;
     private Func<Task<bool>> _test = () => Task.FromResult(false);
     private IReadOnlyList<Finding> _before = Array.Empty<Finding>(); // findings of the current flow, for its real test
@@ -321,12 +322,25 @@ public partial class MainWindow : Window, IFixHost
     {
         var text = SymptomBox.Text.Trim();
         if (text.Length == 0) { SymptomBox.Focus(); return; }
-        var route = Areas.SymptomRouter.Best(text);
+        // The three closest checks, best first; the full check-up is always offered as the way forward when none fits.
+        var areas = Areas.SymptomRouter.Scores(text).Select(s => s.Area).Distinct().Take(3).ToList();
+        var matched = areas.Count > 0;
+        var options = areas.Select(a => new Choice(AreaGlyph(a), Areas.SymptomRouter.Routes[a].Title, AreaCaption(a))).ToList();
+        if (!areas.Contains("health"))
+        {
+            areas.Add("health");
+            options.Add(new Choice(TopicGlyph("health"), matched ? "None of these" : "Full computer check-up",
+                matched ? "Run the full computer check-up instead" : AreaCaption("health")));
+        }
         SetTopic(null);
-        var start = await ShowStepAsync($"{route.Explanation} AutoFix Scout recommends the check \"{route.Title}\".", "Start this check", "Back");
+        _topicTitle = "Find a fix";
+        var pick = await ShowChoicesAsync(matched
+            ? "These checks are the closest match to your description. Please select the one that fits best."
+            : "AutoFix Scout could not match your description to a specific check. The full computer check-up is the best place to start.",
+            options, "Back");
         SymptomBox.Text = "";
-        if (!start) { ShowHome(); return; }
-        Action<object, RoutedEventArgs> run = route.Area switch
+        if (pick < 0) { ShowHome(); return; }
+        Action<object, RoutedEventArgs> run = areas[pick] switch
         {
             "sound" => OnSoundClicked,
             "camera" => OnCameraClicked,
@@ -349,14 +363,7 @@ public partial class MainWindow : Window, IFixHost
         };
         run(sender, e);
     }
-    // ---- more areas (home screen "Something else") ----
-
-    private void OnOtherClicked(object sender, RoutedEventArgs e)
-    {
-        var show = MoreAreas.Visibility != Visibility.Visible;
-        MoreAreas.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        if (show) Dispatcher.BeginInvoke(() => MoreAreas.BringIntoView(), System.Windows.Threading.DispatcherPriority.Loaded);
-    }
+    // ---- more areas (home screen "Other problems") ----
 
     /// <summary>The person's own answer is the real test where no automatic check exists.</summary>
     private Task<bool> AskAsync(string question)
@@ -475,14 +482,14 @@ public partial class MainWindow : Window, IFixHost
     /// <summary>History and reports: version, recent checks, and the folder with reports and saved settings.</summary>
     private async void OnSettingsClicked(object sender, RoutedEventArgs e)
     {
+        if (_historyOpen) return; // already on this page
         IReadOnlyList<SessionLog.SessionSummary> recent;
         try { using var db = new SessionLog(SessionLog.DefaultPath); recent = db.Recent(4); }
         catch (Exception) { recent = Array.Empty<SessionLog.SessionSummary>(); }
-        // Informational version carries the installer version (CI passes -p:Version); drop the "+commit" suffix.
-        var info = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(System.Reflection.Assembly.GetExecutingAssembly())?.InformationalVersion;
-        var version = info?.Split('+')[0] ?? "unknown";
         SetTopic(null);
-        var open = await ShowStepAsync(HistoryText.Build(version, recent), "Open the reports folder", "Close");
+        _historyOpen = true;
+        var open = await ShowStepAsync(HistoryText.Build(AppVersion, recent), "Open the reports folder", "Close");
+        _historyOpen = false;
         if (open)
         {
             var dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AutoFixScout");
