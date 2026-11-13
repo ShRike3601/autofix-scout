@@ -51,6 +51,33 @@ public static class StorageTriage
                (machine.Count > 0 ? string.Join(", ", machine.Select(x => $"{x.Name} ({x.Scope})")) : "none");
     }
 
+    /// <summary>Median MainPath boot time above this (ms) is slow.</summary>
+    public const long SlowMainPathMs = 60_000, SlowPostBootMs = 120_000;
+
+    public static long Median(IEnumerable<long> values)
+    {
+        var v = values.OrderBy(x => x).ToList();
+        if (v.Count == 0) return 0;
+        return v.Count % 2 == 1 ? v[v.Count / 2] : (v[v.Count / 2 - 1] + v[v.Count / 2]) / 2;
+    }
+
+    /// <summary>Medians over the recorded boots (up to the newest ten); null when unknown or no boot recorded.</summary>
+    public static (long MainPathMs, long PostBootMs, int Boots)? BootMedians(StorageState s) =>
+        s.BootTimes is { Count: > 0 } b
+            ? (Median(b.Select(x => x.MainPathMs)), Median(b.Select(x => x.PostBootMs)), b.Count) : null;
+
+    public static bool SlowStartup(StorageState s) =>
+        BootMedians(s) is { } m && (m.MainPathMs > SlowMainPathMs || m.PostBootMs > SlowPostBootMs);
+
+    private static string Secs(long ms) => (ms / 1000.0).ToString("0", CultureInfo.InvariantCulture);
+
+    private static string SlowStartupDetail(StorageState s)
+    {
+        var m = BootMedians(s)!.Value;
+        return $"median over {m.Boots} boots: main path {Secs(m.MainPathMs)} s, post boot {Secs(m.PostBootMs)} s; slow items reported by Windows: " +
+               (s.SlowStartupItems is { Count: > 0 } i ? string.Join(", ", i.Take(3).Select(x => x.Name)) : "none named");
+    }
+
     private const string Incomplete = "AutoFix Scout could not complete the storage check.";
 
     private const string StorageSenseSay =
@@ -144,6 +171,14 @@ public static class StorageTriage
                     ? $"The app \"{StartupApps.DisplayName(offer[0])}\" starts automatically when you sign in to Windows, which can slow the computer down."
                     : $"{offer.Count} apps that are not part of Windows start automatically when you sign in, which can slow the computer down.",
                 StartupDetail(s)));
+        if (SlowStartup(s))
+        {
+            var names = s.SlowStartupItems is { Count: > 0 } items ? items.Take(3).Select(x => "\"" + x.Name + "\"").ToList() : new List<string>();
+            f.Add(F(FindingCode.StorageSlowStartup,
+                "Windows takes a long time to start on this computer." +
+                (names.Count > 0 ? " Windows names " + string.Join(", ", names) + " as slowing the start-up down." : ""),
+                SlowStartupDetail(s)));
+        }
         if (s.Uptime > LongUptime)
             f.Add(F(FindingCode.LongUptime, $"The computer has not been restarted for {(int)s.Uptime.Value.TotalDays} days.", $"uptime {s.Uptime.Value.TotalHours:0} h"));
 
@@ -225,11 +260,23 @@ public static class StorageTriage
                 "The change takes effect the next time you sign in.", offers[i].Name));
         }
 
-        if (codes.Contains(FindingCode.ManyStartupApps) || codes.Contains(FindingCode.HighMemoryPressure)
+        if (codes.Contains(FindingCode.ManyStartupApps) || codes.Contains(FindingCode.HighMemoryPressure) || codes.Contains(FindingCode.StorageSlowStartup)
             || codes.Contains(FindingCode.LongUptime) || codes.Contains(FindingCode.LooksNormal))
             rungs.Add(new("startup_apps", "ui.open_settings_page", 0,
                 "AutoFix Scout will open the \"Startup apps\" settings. Please turn off the apps that you do not need right after you sign in. " +
                 "You can turn them on again at any time.", "startupapps"));
+
+        if (codes.Contains(FindingCode.StorageSlowStartup))
+        {
+            rungs.Add(new("keep_windows_updated", "ui.human_step", 0,
+                "Slow start-up is often fixed by updates. Please open \"Settings\", then \"Windows Update\", and install the updates that are offered, " +
+                "including the optional driver updates. Then restart the computer and open AutoFix Scout again."));
+            if (s.FastStartup == false)
+                rungs.Add(new("fast_startup_info", "ui.human_step", 0,
+                    "Fast Startup is switched off, which makes a full start-up slower. To switch it on, open the Windows search, type \"Control Panel\", " +
+                    "open \"Hardware and Sound\", \"Power Options\", \"Choose what the power buttons do\", select \"Change settings that are currently unavailable\" " +
+                    "and select \"Turn on fast start-up\". Windows will ask for your permission. AutoFix Scout does not change this setting itself."));
+        }
 
         if (codes.Contains(FindingCode.LongUptime))
             rungs.Add(new("restart_pc", "ui.human_step", 0,
@@ -256,7 +303,7 @@ public static class StorageTriage
             return "A program is still using a large part of the processor or memory. If closing it did not help, restarting the computer " +
                    "usually stops it. If it happens again, the person helping you can check whether the program needs an update.";
         if (codes.Contains(FindingCode.LooksNormal) || codes.Contains(FindingCode.ManyStartupApps) || codes.Contains(FindingCode.HighMemoryPressure)
-            || codes.Contains(FindingCode.StartupAppsOptional))
+            || codes.Contains(FindingCode.StartupAppsOptional) || codes.Contains(FindingCode.StorageSlowStartup))
             return "If the computer is still slow, it may have too little memory for the apps in use, or its drive may be getting old. " +
                    "The person helping you can check this.";
         return null;
