@@ -217,51 +217,75 @@ UAC prompts can't be clicked by automation; run the app from an elevated termina
 
 Plain WPF, no UI library, no new packages. Presentation is kept apart from the flow: `MainWindow.xaml.cs` decides
 what to show, `MainWindow.Visuals.cs` only draws it (`PresentStep` / `PresentHome`, header, journey, banner, picture,
-checks list, transitions). Presentation-only hooks the flow calls: `ShowStepAsync(..., look:)` (picture + banner),
+checks list, transitions, title bar and sidebar). Presentation-only hooks the flow calls: `ShowStepAsync(..., look:)` (picture + banner),
 `ShowBusy(text, scan:)` (scanner + list of checks), `Journey(Stage)` (header steps), `SetTopic`. None of them change
 what the flow does. All in-app wording follows `docs/WRITING.md`.
 
 | What | Where |
 |---|---|
 | Colours (light / dark) | `src/AutoFixScout.UI/Theme/Light.xaml`, `Dark.xaml` (same keys in both, always `DynamicResource`) |
-| High contrast | `ThemeManager.HighContrastPalette` maps every key onto the user's system colours (glows off, art goes monochrome) |
+| High contrast | `ThemeManager.HighContrastPalette` maps every key onto the user's system colours |
 | Type scale, spacing, buttons, cards, focus ring, scroll bar | `Theme/Styles.xaml` |
-| Illustrations (app mark, topics, endings) | `Theme/Art.xaml`: layered vector art on a 64-unit grid, one `ControlTemplate` each |
-| Theme switching + Mica | `Theme/ThemeManager.cs` |
+| App mark | `Theme/Art.xaml` (vector, 64-unit grid). Every other picture is an icon-font glyph on a tinted tile |
+| Palette choice (dark / light / high contrast) | `Theme/ThemeManager.cs` |
 | Animation | `Theme/Motion.cs` |
 
-- **Layout**: branded header on top (gradient + three soft glows drifting very slowly + faint scanner rings, app mark).
-  Home: large header ("What would you like to check today?") and three elevated symptom cards, each with an
-  illustration, a title and a formal subtitle ("Speakers, headphones and volume"). During a check the header turns
-  compact: topic title + journey **Check -> Diagnosis -> Fix -> Confirm** (done = tick, current = number with halo,
-  connector fills). An ending that did not resolve the problem marks the last step amber with "!".
-- **Step card**: optional status banner (colour + icon by severity), illustration, overline "Step n of 4: ...", the
-  first sentence as a heading, any further sentences as smaller supporting text (`Split`; "\n\n" also splits), buttons.
+- **Look (redesigned 2026-11-13, owner request)**: a dark, flat utility-dashboard look in the style of vendor
+  control-centre apps: solid surfaces, 1 px borders, no shadows, gradients, glows, illustrations or confetti. The
+  owner found the earlier large-type, illustrated look unprofessional; do not bring back the big type scale.
+- **Layout**: the window draws its own title bar (`WindowChrome`, 36 px drag strip, own minimise / maximise / close
+  buttons). Left sidebar (220 px): app mark, navigation ("Troubleshoot", "History and reports"), and at the bottom
+  "Report for your helper" and the version. Home page: greeting + question, the describe-the-problem box, and "Browse by
+  category" (see **Categories** below). During a check the page header shows only the
+  topic title; the journey **Check -> Diagnosis -> Fix -> Confirm** is a vertical "Progress" panel on the right (264 px:
+  dot, name and one line per stage; done = tick, current = number with halo, connector fills downwards; hidden outside
+  a check). An ending that did not resolve the problem marks the last step amber with "!".
+  "History and reports" is disabled while a check is running; "Troubleshoot" closes the history page.
+- **Closest checks** (2026-11-13, owner approved): "Find a fix" no longer offers one guess. `OnSymptomSearch` shows the
+  top three `SymptomRouter.Rank` candidates as rows (icon, name, `Covers` line) plus "None of these", which runs the
+  full check-up; when `NoGoodMatch` it says so and offers the nearest check and the check-up. `ShowChoicesAsync`
+  (Visuals) is the reusable choice screen.
+- **Categories** (2026-11-13, owner's idea: group like Control Panel instead of one tile per problem): the home page
+  shows nine cards in three columns: eight categories named after the part of the computer (Sound and microphone,
+  Internet and Bluetooth, Display and camera, Keyboard mouse and touchpad, Printer and scanner, Battery and
+  performance, Apps and programs, Windows and security) and an accent "Full computer check-up" card that starts the
+  check-up directly. Each card's caption lists what is inside. A category opens a choice screen (`OpenCategory` ->
+  `ShowChoicesAsync`) whose rows are still symptom-first ("Printer is not working") with one line of examples, plus
+  "Something else", which runs the full check-up. The list lives in `Categories()` in `MainWindow.Visuals.cs`; the
+  cards are built in code (`BuildCategories`), not in XAML. **A new area needs one `Problem` line in its category**
+  (glyph, title, caption, handler), no XAML. "Keyboard types the wrong characters" uses `OnTypingClicked`
+  (`InputFlow.DiagnoseAsync(typingFocus: true)`). The old "Common problems" cards and 18 "Other problems" tiles are gone.
+- **Step card** (the "stage": fills the page beside the progress panel, content centred, at most 560 wide): optional
+  status banner (tinted strip, icon + label coloured by severity), a 56 px icon tile, the first sentence as a centred
+  heading, any further sentences as supporting text (`Split`; "\n\n" also splits; centred when short, left aligned for
+  lists and long text), and the buttons side by side (not full width). The owner rejected a small card in the corner with a
+  horizontal step bar on top (2026-11-13): keep the page filled.
   Finding severity comes from `FindingLook(FindingCode)`: LooksNormal = ok (green), ProbeIncomplete = info (blue),
   settings such as mute / Airplane mode / privacy / disabled = warning (amber), everything else = error (red).
-  Endings: fixed = green check with sparkles, no fault = blue shield, not fixed = report with "!", probably hardware =
-  chip (both amber, and "Report for your helper" gets an accent outline), error = red, stopped = grey info.
-- **Busy screen**: scanner (rotating arc + two sonar rings + magnifier). For the read-only check it also lists what is
-  being looked at per topic (`ChecksFor`). The probe reports everything at once, so the list advances on a 900 ms
-  timer and only says "checked / in progress / waiting", never a result; the last item stays in progress until the
-  probe returns, and the caption says the results come when all checks are complete.
-- **Theme**: follows Windows light/dark (`AppsUseLightTheme`) and high contrast live (WM_SETTINGCHANGE). Mica backdrop
-  on Windows 11 22H2+ with transparency on; solid `#F3F3F3` / `#202020` otherwise (Windows 10, high contrast).
-  `AUTOFIXSCOUT_THEME=light|dark` forces a theme for screenshots.
-- **Colours**: Windows 11 accent blue (`#005FB8` light, `#60CDFF` dark). Text `#1B1B1B` / white, secondary text kept
-  dark enough for older eyes (~8:1). Topic duotones: sound blue, camera orange, internet green.
-- **Type**: Segoe UI Variable (falls back to Segoe UI): display 32, title 26, card title 21, body / buttons 18,
-  caption 15, overline 13. Small icons from Segoe Fluent Icons (falls back to Segoe MDL2 Assets on Windows 10).
-- **Shape**: cards 14 px corners, buttons 10 px, step card 16 px; answer buttons full width, 56 px tall; primary =
-  gradient accent with a soft glow, secondary = outlined, subtle = text + icon.
+  The icon tile shows the topic's icon (`TopicGlyph`) during a flow and a status icon on endings: fixed = green
+  check, no fault = blue shield, not fixed = amber document, probably hardware = amber chip (for both, "Report for
+  your helper" gets an accent outline), error = red, stopped = grey info.
+- **Busy screen**: small scanner (rotating arc + two sonar rings + magnifier). For the read-only check it also lists
+  what is being looked at per topic (`ChecksFor`). The probe reports everything at once, so the list advances on a
+  900 ms timer and only says "checked / in progress / waiting", never a result; the last item stays in progress until
+  the probe returns, and the caption says the results come when all checks are complete.
+- **Theme**: dark by default, whatever the Windows app mode is. High contrast is still followed live
+  (WM_SETTINGCHANGE). `Light.xaml` is kept in step but is only reachable with `AUTOFIXSCOUT_THEME=light`; there is
+  no in-app switch yet. No Mica: all surfaces are solid.
+- **Colours**: page `#121215`, sidebar `#0B0B0D`, cards `#1A1A1E`, borders `#28282E`; text `#F1F1F3` / `#A1A1AB`.
+  One accent: `AccentBrush` `#5AA2FF` for icons and lines, `AccentFillBrush` `#2670E8` under white text (buttons,
+  journey dots). Status: green / blue / amber / red, each with a dark tinted tile.
+- **Type**: Segoe UI Variable (falls back to Segoe UI): page title 22, card heading 17, tile title 14, body 13.5,
+  buttons 13, caption 12, label 11. Icons from Segoe Fluent Icons (falls back to Segoe MDL2 Assets on Windows 10).
+- **Shape**: cards and tiles 8 px corners, buttons 5 px; answer buttons 34 px tall, at least 112 wide; primary =
+  solid accent, secondary = grey with a border, sidebar items = text + icon.
 - **Motion**: everything goes through `Motion`, which checks `SystemParameters.ClientAreaAnimation` each time
-  (Windows "Animation effects" off = no movement at all, nothing loops). Screens fade + slide up (240 ms fade,
-  340 ms exponential ease-out), home cards stagger by 55 ms, cards lift 3 px with a deeper shadow on hover and dip on
-  press (100-220 ms), journey connectors fill in 320 ms, end pictures pop and their check draws itself. Only the
-  header glows (13-21 s) and the busy visuals loop. Repeated busy screens don't re-animate. Nothing waits for an animation.
+  (Windows "Animation effects" off = no movement at all, nothing loops). Screens fade + slide up a few pixels, home
+  cards stagger by 40 ms, buttons dip on press, journey connectors fill in 320 ms, end icons pop. Only the busy
+  visuals loop. Repeated busy screens don't re-animate. Nothing waits for an animation.
 - **Accessibility**: two-ring keyboard focus visual, `AutomationProperties.Name` + `HelpText` on the cards, the journey
   and banner have names ("Step 2 of 4: Diagnosis"), the sentence is a live region whose name is the full text, window
-  fits the work area and scrolls when small (min 440 x 480).
+  fits the work area and scrolls when small (min 880 x 560; default 1100 x 760).
 - **Screenshots**: `AUTOFIXSCOUT_SOFTWARE_RENDER=1` forces WPF software rendering. Needed on the TestBench on
   2026-11-11: with hardware rendering every WPF window (also the previous UI) stayed white when started from a Claude
   shell, while UI Automation saw the full layout. Not seen elsewhere; check on the owner's PC before release.

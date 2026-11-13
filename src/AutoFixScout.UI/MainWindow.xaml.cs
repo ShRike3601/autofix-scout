@@ -12,6 +12,7 @@ public partial class MainWindow : Window, IFixHost
     private readonly INetworkProbe _networkProbe = new RealNetworkProbe();
     private readonly ICameraProbe _cameraProbe = new RealCameraProbe();
     private string? _lastReportPath;
+    private bool _historyOpen; // the "History and reports" page is showing
     private TaskCompletionSource<bool>? _choice;
     private Func<Task<bool>> _test = () => Task.FromResult(false);
     private IReadOnlyList<Finding> _before = Array.Empty<Finding>(); // findings of the current flow, for its real test
@@ -321,12 +322,26 @@ public partial class MainWindow : Window, IFixHost
     {
         var text = SymptomBox.Text.Trim();
         if (text.Length == 0) { SymptomBox.Focus(); return; }
-        var route = Areas.SymptomRouter.Best(text);
+        // The closest checks, best first (SymptomRouter.Rank); the full check-up is always offered as the way forward when none fits.
+        var rank = Areas.SymptomRouter.Rank(text);
+        var matched = rank.Candidates.Any(c => c.Score > 0);
+        var areas = rank.Candidates.Select(c => c.Route.Area).ToList();
+        var options = rank.Candidates.Select(c => new Choice(AreaGlyph(c.Route.Area), c.Route.Title, c.Covers)).ToList();
+        if (!areas.Contains("health"))
+        {
+            areas.Add("health");
+            options.Add(new Choice(AreaGlyph("health"), "None of these", "The full computer check-up examines the whole computer instead."));
+        }
         SetTopic(null);
-        var start = await ShowStepAsync($"{route.Explanation} AutoFix Scout recommends the check \"{route.Title}\".", "Start this check", "Back");
+        _topicTitle = "Find a fix";
+        var pick = await ShowChoicesAsync(
+            !matched ? "AutoFix Scout could not match your description to a specific check. The full computer check-up is the best place to start."
+            : rank.NoGoodMatch ? "AutoFix Scout is not certain which check fits your description. Please select the nearest one, or run the full computer check-up."
+            : "These checks are the closest match to your description. Please select the one that fits best.",
+            options, "Back");
         SymptomBox.Text = "";
-        if (!start) { ShowHome(); return; }
-        Action<object, RoutedEventArgs> run = route.Area switch
+        if (pick < 0) { ShowHome(); return; }
+        Action<object, RoutedEventArgs> run = areas[pick] switch
         {
             "sound" => OnSoundClicked,
             "camera" => OnCameraClicked,
@@ -352,14 +367,7 @@ public partial class MainWindow : Window, IFixHost
         };
         run(sender, e);
     }
-    // ---- more areas (home screen "Something else") ----
-
-    private void OnOtherClicked(object sender, RoutedEventArgs e)
-    {
-        var show = MoreAreas.Visibility != Visibility.Visible;
-        MoreAreas.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        if (show) Dispatcher.BeginInvoke(() => MoreAreas.BringIntoView(), System.Windows.Threading.DispatcherPriority.Loaded);
-    }
+    // ---- more areas (home screen "Other problems") ----
 
     /// <summary>The person's own answer is the real test where no automatic check exists.</summary>
     private Task<bool> AskAsync(string question)
@@ -439,6 +447,11 @@ private async void OnInstallClicked(object sender, RoutedEventArgs e) => await R
         await RunFlowAsync(Areas.InputFlow.Topic, Areas.InputFlow.What, Areas.InputFlow.DiagnoseAsync,
             () => AskAsync(Areas.InputFlow.TestQuestion));
 
+    /// <summary>The same check with the keyboard layout findings first (the person reported wrong characters).</summary>
+    private async void OnTypingClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.InputFlow.Topic, Areas.InputFlow.What, () => Areas.InputFlow.DiagnoseAsync(typingFocus: true),
+            () => AskAsync(Areas.InputFlow.TestQuestion));
+
     private async void OnMicrophoneClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.MicrophoneFlow.Topic, Areas.MicrophoneFlow.What, Areas.MicrophoneFlow.DiagnoseAsync, async () =>
         {
@@ -480,14 +493,14 @@ private async void OnScannerClicked(object sender, RoutedEventArgs e) =>        
     /// <summary>History and reports: version, recent checks, and the folder with reports and saved settings.</summary>
     private async void OnSettingsClicked(object sender, RoutedEventArgs e)
     {
+        if (_historyOpen) return; // already on this page
         IReadOnlyList<SessionLog.SessionSummary> recent;
         try { using var db = new SessionLog(SessionLog.DefaultPath); recent = db.Recent(4); }
         catch (Exception) { recent = Array.Empty<SessionLog.SessionSummary>(); }
-        // Informational version carries the installer version (CI passes -p:Version); drop the "+commit" suffix.
-        var info = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(System.Reflection.Assembly.GetExecutingAssembly())?.InformationalVersion;
-        var version = info?.Split('+')[0] ?? "unknown";
         SetTopic(null);
-        var open = await ShowStepAsync(HistoryText.Build(version, recent), "Open the reports folder", "Close");
+        _historyOpen = true;
+        var open = await ShowStepAsync(HistoryText.Build(AppVersion, recent), "Open the reports folder", "Close");
+        _historyOpen = false;
         if (open)
         {
             var dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AutoFixScout");

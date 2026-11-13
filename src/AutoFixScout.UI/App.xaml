@@ -5,8 +5,8 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- [0] = palette, swapped at runtime by ThemeManager to follow the system theme. -->
-                <ResourceDictionary Source="Theme/Light.xaml"/>
+                <!-- [0] = palette, swapped at runtime by ThemeManager (dark, light or high contrast). -->
+                <ResourceDictionary Source="Theme/Dark.xaml"/>
                 <ResourceDictionary Source="Theme/Styles.xaml"/>
                 <ResourceDictionary Source="Theme/Art.xaml"/>
             </ResourceDictionary.MergedDictionaries>

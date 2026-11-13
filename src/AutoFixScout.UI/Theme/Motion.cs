@@ -10,52 +10,11 @@ namespace AutoFixScout.UI;
 /// All movement in the app goes through here so it can follow the Windows "Animation effects" setting
 /// (SystemParameters.ClientAreaAnimation): when it's off, every change jumps straight to its end state and nothing loops.
 /// Rules: 150-350 ms with decelerating curves for anything that responds or arrives, nothing that delays a click.
-/// Only the header glows and the busy visuals loop, slowly.
+/// Only the busy visuals loop.
 /// </summary>
 public static class Motion
 {
     public static bool Enabled => SystemParameters.ClientAreaAnimation;
-
-    private static readonly Color[] ConfettiColors =
-        { Color.FromRgb(0x60, 0xCD, 0xFF), Color.FromRgb(0xA7, 0x8B, 0xFA), Color.FromRgb(0x6C, 0xCB, 0x5F),
-          Color.FromRgb(0xFF, 0xB9, 0x00), Color.FromRgb(0xFF, 0x7A, 0x8A), Color.FromRgb(0xFF, 0xFF, 0xFF) };
-
-    /// <summary>
-    /// A short burst of confetti over the window when a problem is fixed: ~1.8 s, then the pieces are removed.
-    /// Nothing at all when Windows animation effects are off.
-    /// </summary>
-    public static void Confetti(System.Windows.Controls.Canvas layer, int pieces = 70)
-    {
-        if (!Enabled || layer.ActualWidth < 10) return;
-        layer.Children.Clear();
-        var rnd = new Random();
-        var w = layer.ActualWidth;
-        var h = layer.ActualHeight;
-        for (var i = 0; i < pieces; i++)
-        {
-            var rotate = new RotateTransform(rnd.Next(360));
-            var piece = new System.Windows.Shapes.Rectangle
-            {
-                Width = 6 + rnd.Next(6), Height = 10 + rnd.Next(8), RadiusX = 2, RadiusY = 2,
-                Fill = new SolidColorBrush(ConfettiColors[rnd.Next(ConfettiColors.Length)]),
-                RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = rotate,
-            };
-            var x = w * (0.15 + 0.7 * rnd.NextDouble());
-            System.Windows.Controls.Canvas.SetLeft(piece, x);
-            System.Windows.Controls.Canvas.SetTop(piece, -30);
-            layer.Children.Add(piece);
-
-            var ms = 1300 + rnd.Next(700);
-            var delay = rnd.Next(250);
-            FromTo(piece, System.Windows.Controls.Canvas.TopProperty, -30, h * (0.55 + 0.45 * rnd.NextDouble()), ms, EaseOut, delay);
-            FromTo(piece, System.Windows.Controls.Canvas.LeftProperty, x, x + rnd.Next(-160, 160), ms, EaseOut, delay);
-            FromTo(rotate, RotateTransform.AngleProperty, rotate.Angle, rotate.Angle + rnd.Next(-540, 540), ms, null, delay);
-            FromTo(piece, UIElement.OpacityProperty, 1, 0, 450, null, delay + ms - 450);
-        }
-        var cleanup = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(2400) };
-        cleanup.Tick += (_, _) => { cleanup.Stop(); layer.Children.Clear(); };
-        cleanup.Start();
-    }
 
     public static readonly IEasingFunction EaseOut = Frozen(new CubicEase { EasingMode = EasingMode.EaseOut });
     public static readonly IEasingFunction EaseOutStrong = Frozen(new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 6 });
@@ -128,19 +87,6 @@ public static class Motion
             RepeatBehavior = RepeatBehavior.Forever,
             EasingFunction = linear ? null : Gentle,
         });
-    }
-
-    /// <summary>Header glows: a very slow, gentle back-and-forth. Off (and reset) when animation effects are off.</summary>
-    public static void Drift(TranslateTransform shift, double dx, double dy, double seconds)
-    {
-        shift.BeginAnimation(TranslateTransform.XProperty, null);
-        shift.BeginAnimation(TranslateTransform.YProperty, null);
-        shift.X = shift.Y = 0;
-        if (!Enabled) return;
-        shift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(0, dx, TimeSpan.FromSeconds(seconds))
-        { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = Gentle });
-        shift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0, dy, TimeSpan.FromSeconds(seconds * 1.3))
-        { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = Gentle });
     }
 
     /// <summary>A ring that grows and fades out, repeating (the scanner's sonar rings). Without animation: a faint still ring.</summary>

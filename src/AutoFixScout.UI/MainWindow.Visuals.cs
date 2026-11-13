@@ -10,7 +10,7 @@ using AutoFixScout.Triage;
 namespace AutoFixScout.UI;
 
 /// <summary>
-/// Presentation only: theme hookup, header, journey indicator, the picture and banner around each sentence, the
+/// Presentation only: theme hookup, title bar, sidebar, page header, journey indicator, the icon and banner around each sentence, the
 /// checks list on the busy screen, page transitions. Nothing in here decides what the flow does; MainWindow.xaml.cs
 /// calls PresentStep / PresentHome after it has set the screen's content, and Journey to say where the flow is.
 /// </summary>
@@ -54,6 +54,39 @@ public partial class MainWindow
         Width = Math.Min(Width, area.Width - 32);
         BuildJourney();
         _checkTimer.Tick += (_, _) => AdvanceChecks();
+        StateChanged += (_, _) => OnWindowStateChanged();
+        // Informational version carries the installer version (CI passes -p:Version); drop the "+commit" suffix.
+        VersionText.Text = $"Version {AppVersion}";
+    }
+
+    internal static string AppVersion =>
+        System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(
+            System.Reflection.Assembly.GetExecutingAssembly())?.InformationalVersion.Split('+')[0] ?? "unknown";
+
+    // ---- title bar and sidebar ----
+
+    private void OnMinimizeClicked(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+    private void OnCloseClicked(object sender, RoutedEventArgs e) => SystemCommands.CloseWindow(this);
+
+    private void OnMaximizeClicked(object sender, RoutedEventArgs e)
+    {
+        if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+        else SystemCommands.MaximizeWindow(this);
+    }
+
+    private void OnWindowStateChanged()
+    {
+        var max = WindowState == WindowState.Maximized;
+        // A maximised window with custom chrome extends past the screen by its resize border; pad the content back in.
+        Root.Margin = max ? new Thickness(7) : new Thickness(0);
+        MaximizeButton.Content = ((char)(max ? 0xE923 : 0xE922)).ToString(); // Segoe Fluent Icons: ChromeRestore / ChromeMaximize
+        AutomationProperties.SetName(MaximizeButton, max ? "Restore" : "Maximize");
+    }
+
+    /// <summary>"Troubleshoot" in the sidebar: closes the history page. During a check it is already the current page.</summary>
+    private void OnNavHomeClicked(object sender, RoutedEventArgs e)
+    {
+        if (_historyOpen) _choice?.TrySetResult(false);
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -71,11 +104,6 @@ public partial class MainWindow
             < 12 => "Good morning",
             _ => "Good afternoon",
         };
-        // Ambient header movement: very slow, and none at all when Windows animation effects are off.
-        Motion.Drift(Glow1Shift, 70, 26, 13);
-        Motion.Drift(Glow2Shift, -80, 34, 17);
-        Motion.Drift(Glow3Shift, 60, -24, 21);
-        Motion.Spin(HeroRingsRotate, true, periodMs: 90_000, linear: true);
         if (HomePanel.Visibility == Visibility.Visible) AnimateHome();
     }
 
@@ -102,11 +130,12 @@ public partial class MainWindow
     private void SetTopic(string? topic)
     {
         _topic = topic;
+        _glyphOverride = null;
         _topicTitle = topic switch
         {
-            "sound" => SoundTitle.Text,
-            "camera" => CameraTitle.Text,
-            "network" => NetworkTitle.Text,
+            "sound" => "Sound is not working",
+            "camera" => "Camera is not working",
+            "network" => "Cannot connect to the internet",
             "driver" => "Unfinished driver change",
             "health" => "Computer check-up",
             "microphone" => "Microphone",
@@ -118,7 +147,7 @@ public partial class MainWindow
             "input" => "Keyboard, mouse and touchpad",
             "storage" => "Slow or full computer",
             "update" => "Windows Update",
-            "printer" => "Printer",
+            "printer" => "Printer and scanner",
             "display" => "Screen and display",
             _ => null,
         };
@@ -126,30 +155,38 @@ public partial class MainWindow
 
     // ---- journey: Check -> Diagnosis -> Fix -> Confirm ----
 
+    private static readonly string[] StageNotes =
+    [
+        "AutoFix Scout examines your computer. Nothing is changed.",
+        "The result of the check is explained.",
+        "A fix is applied only with your permission.",
+        "A test confirms whether the problem has been resolved.",
+    ];
+
+    /// <summary>Builds the vertical progress list in the panel beside the step card: dot, name and one line on what the stage does.</summary>
     private void BuildJourney()
     {
         for (var i = 0; i < StageNames.Length; i++)
         {
-            JourneyBar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            if (i < StageNames.Length - 1) JourneyBar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 28 });
-        }
-        JourneyBar.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        JourneyBar.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var last = i == StageNames.Length - 1;
+            var row = new Grid();
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
+            row.ColumnDefinitions.Add(new ColumnDefinition());
+            row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            row.RowDefinitions.Add(new RowDefinition());
 
-        for (var i = 0; i < StageNames.Length; i++)
-        {
-            var dot = new Grid { Width = 42, Height = 42, HorizontalAlignment = HorizontalAlignment.Center };
-            var halo = new Ellipse { StrokeThickness = 2, Opacity = 0.45 };
+            var dot = new Grid { Width = 28, Height = 28 };
+            var halo = new Ellipse { StrokeThickness = 1.5, Opacity = 0.5 };
             halo.SetResourceReference(Shape.StrokeProperty, "AccentBrush");
-            var circle = new Ellipse { StrokeThickness = 1.5, Margin = new Thickness(4) };
+            var circle = new Ellipse { StrokeThickness = 1, Margin = new Thickness(3) };
             var number = new TextBlock
             {
-                Text = (i + 1).ToString(), FontSize = 15, FontWeight = FontWeights.SemiBold,
+                Text = (i + 1).ToString(), FontSize = 11.5, FontWeight = FontWeights.SemiBold,
                 HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
             };
             var tick = new Path
             {
-                Data = Geometry.Parse("M 14.5,21.5 L 19,26 L 27.5,17"), StrokeThickness = 2.6,
+                Data = Geometry.Parse("M 9.8,14.3 L 12.7,17.2 L 18.3,11.4"), StrokeThickness = 1.8,
                 StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round,
             };
             tick.SetResourceReference(Shape.StrokeProperty, "OnAccentBrush");
@@ -157,27 +194,32 @@ public partial class MainWindow
             dot.Children.Add(circle);
             dot.Children.Add(number);
             dot.Children.Add(tick);
-            Grid.SetColumn(dot, i * 2);
-            JourneyBar.Children.Add(dot);
+            row.Children.Add(dot);
 
-            var label = new TextBlock { Text = StageNames[i], FontSize = 14, Margin = new Thickness(0, 2, 0, 0), HorizontalAlignment = HorizontalAlignment.Center };
-            Grid.SetColumn(label, i * 2);
-            Grid.SetRow(label, 1);
-            JourneyBar.Children.Add(label);
+            var text = new StackPanel { Margin = new Thickness(12, 4, 0, last ? 0 : 18) };
+            var label = new TextBlock { Text = StageNames[i], FontSize = 13 };
+            var note = new TextBlock { Text = StageNotes[i], FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0) };
+            note.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
+            text.Children.Add(label);
+            text.Children.Add(note);
+            Grid.SetColumn(text, 1);
+            Grid.SetRowSpan(text, 2);
+            row.Children.Add(text);
 
             ScaleTransform? fill = null;
-            if (i < StageNames.Length - 1)
+            if (!last)
             {
-                var track = new Border { Height = 3, CornerRadius = new CornerRadius(1.5), Margin = new Thickness(4, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
+                var track = new Border { Width = 2, CornerRadius = new CornerRadius(1), Margin = new Thickness(0, 2, 0, 2), HorizontalAlignment = HorizontalAlignment.Center };
                 track.SetResourceReference(Border.BackgroundProperty, "StepTrackBrush");
-                var bar = new Border { Height = 3, CornerRadius = new CornerRadius(1.5), Margin = new Thickness(4, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
-                bar.SetResourceReference(Border.BackgroundProperty, "AccentBrush");
-                bar.RenderTransform = fill = new ScaleTransform(0, 1);
-                Grid.SetColumn(track, i * 2 + 1);
-                Grid.SetColumn(bar, i * 2 + 1);
-                JourneyBar.Children.Add(track);
-                JourneyBar.Children.Add(bar);
+                var bar = new Border { Width = 2, CornerRadius = new CornerRadius(1), Margin = new Thickness(0, 2, 0, 2), HorizontalAlignment = HorizontalAlignment.Center };
+                bar.SetResourceReference(Border.BackgroundProperty, "AccentFillBrush");
+                bar.RenderTransform = fill = new ScaleTransform(1, 0); // grows downwards from the dot
+                Grid.SetRow(track, 1);
+                Grid.SetRow(bar, 1);
+                row.Children.Add(track);
+                row.Children.Add(bar);
             }
+            JourneyBar.Children.Add(row);
             _journey.Add(new JourneyStep(halo, circle, number, tick, label, fill));
         }
         UpdateJourney(animate: false);
@@ -193,7 +235,7 @@ public partial class MainWindow
 
     private void UpdateJourney(bool animate)
     {
-        JourneyBar.Visibility = _stage == Stage.None ? Visibility.Collapsed : Visibility.Visible;
+        JourneyRail.Visibility = _stage == Stage.None ? Visibility.Collapsed : Visibility.Visible;
         var current = _stage == Stage.Done ? StageNames.Length : (int)_stage - 1;
         for (var i = 0; i < _journey.Count; i++)
         {
@@ -206,18 +248,18 @@ public partial class MainWindow
             s.Number.Visibility = done && !warnHere ? Visibility.Collapsed : Visibility.Visible;
             s.Number.Text = warnHere ? "!" : (i + 1).ToString();
             s.Circle.SetResourceReference(Shape.FillProperty,
-                warnHere ? "CautionBrush" : done || active ? "AccentBrush" : "StepPendingFillBrush");
+                warnHere ? "CautionBrush" : done || active ? "AccentFillBrush" : "StepPendingFillBrush");
             s.Circle.SetResourceReference(Shape.StrokeProperty,
-                warnHere ? "CautionBrush" : done || active ? "AccentBrush" : "StepTrackBrush");
+                warnHere ? "CautionBrush" : done || active ? "AccentFillBrush" : "StepTrackBrush");
             s.Number.SetResourceReference(TextBlock.ForegroundProperty,
-                warnHere ? "OnStatusBrush" : active ? "OnAccentBrush" : "HeroSubtextBrush");
-            s.Label.SetResourceReference(TextBlock.ForegroundProperty, done || active ? "HeroTextBrush" : "HeroSubtextBrush");
+                warnHere ? "OnStatusBrush" : active ? "OnAccentBrush" : "TextSecondaryBrush");
+            s.Label.SetResourceReference(TextBlock.ForegroundProperty, done || active ? "TextPrimaryBrush" : "TextSecondaryBrush");
             s.Label.FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal;
             if (s.LineFill is { } fill)
             {
                 var to = i < current ? 1.0 : 0.0;
-                if (animate) Motion.To(fill, ScaleTransform.ScaleXProperty, to, 320, Motion.EaseOut);
-                else { fill.BeginAnimation(ScaleTransform.ScaleXProperty, null); fill.ScaleX = to; }
+                if (animate) Motion.To(fill, ScaleTransform.ScaleYProperty, to, 320, Motion.EaseOut);
+                else { fill.BeginAnimation(ScaleTransform.ScaleYProperty, null); fill.ScaleY = to; }
             }
         }
         if (_stage is not Stage.None and not Stage.Done)
@@ -245,20 +287,23 @@ public partial class MainWindow
         StepText.Text = head;
         StepDetail.Text = detail ?? "";
         StepDetail.Visibility = detail is null ? Visibility.Collapsed : Visibility.Visible;
+        // Short supporting text sits centred under the heading; lists and long paragraphs read better left aligned.
+        StepDetail.TextAlignment = detail is { } d && (d.Contains('\n') || d.Length > 220) ? TextAlignment.Left : TextAlignment.Center;
         AutomationProperties.SetName(StepText, full);
         StepButtons.Visibility = PrimaryButton.Visibility;
 
-        HeroTitle.Text = _topicTitle ?? "AutoFix Scout";
-        var overline = busy || _stage is Stage.None or Stage.Done ? null : StageNames[(int)_stage - 1];
-        StepOverline.Text = overline is null ? "" : $"Step {(int)_stage} of {StageNames.Length}: {overline}";
-        StepOverline.Visibility = overline is null ? Visibility.Collapsed : Visibility.Visible;
+        HeaderTitle.Text = _topicTitle ?? "AutoFix Scout";
+        HeaderTitle.Visibility = _historyOpen ? Visibility.Collapsed : Visibility.Visible; // the history card has its own heading
+        NavHistory.IsEnabled = _historyOpen; // a check cannot be left half-way for the history page
+        NavHistory.IsChecked = _historyOpen;
+        NavHome.IsChecked = !_historyOpen;
         HighlightHelper(look is Look.NotFixed or Look.Hardware);
 
         if (from.Home)
         {
-            HeroHome.Visibility = Visibility.Collapsed;
-            HeroStep.Visibility = Visibility.Visible;
-            Motion.FadeIn(HeroStep);
+            HeaderHome.Visibility = Visibility.Collapsed;
+            HeaderStep.Visibility = Visibility.Visible;
+            Motion.FadeIn(HeaderStep);
         }
 
         if (stillBusy)
@@ -272,9 +317,8 @@ public partial class MainWindow
             ShowPicture(look);
             ShowBanner(look);
             ShowChecks(look == Look.Scan);
-            if (look == Look.Fixed) Motion.Confetti(ConfettiLayer);
-            if (from.Home) Motion.Enter(StepPanel, distance: 22);
-            else Motion.Enter(StepContent, distance: 12);
+            if (from.Home) Motion.Enter(StepPanel, distance: 14);
+            else Motion.Enter(StepContent, distance: 8);
         }
 
         if (textChanged && AutomationPeer.ListenerExists(AutomationEvents.LiveRegionChanged))
@@ -305,17 +349,252 @@ public partial class MainWindow
         SetSpin(false);
         ShowChecks(false);
         HighlightHelper(false);
-        HeroStep.Visibility = Visibility.Collapsed;
-        HeroHome.Visibility = Visibility.Visible;
+        HeaderStep.Visibility = Visibility.Collapsed;
+        HeaderHome.Visibility = Visibility.Visible;
+        NavHistory.IsEnabled = true;
+        NavHome.IsChecked = true;
         AnimateHome();
     }
 
     private void AnimateHome()
     {
-        Motion.Enter(HeroHome, distance: 10);
-        FrameworkElement[] parts = [SoundCardHost, CameraCardHost, NetworkCardHost, OtherHost];
-        for (var i = 0; i < parts.Length; i++) Motion.Enter(parts[i], delayMs: 60 + i * 55, distance: 20);
+        Motion.Enter(HeaderHome, distance: 8);
+        if (CategoryGrid.Children.Count == 0) BuildCategories();
+        for (var i = 0; i < CategoryGrid.Children.Count; i++)
+            Motion.Enter((FrameworkElement)CategoryGrid.Children[i], delayMs: 40 + i / 3 * 40, distance: 12);
     }
+
+    // ---- home categories: the part of the computer first, then the problems inside it ----
+
+    /// <summary>Icon for the step tile when the screen has no topic (a category page).</summary>
+    private int? _glyphOverride;
+
+    /// <summary>One problem inside a category: the row shown on the category page and the check it starts.</summary>
+    private sealed record Problem(int Glyph, string Title, string Caption, RoutedEventHandler Run);
+
+    /// <summary>A home page card. The caption says what is inside, so the person can choose without opening it.</summary>
+    private sealed record Category(int Glyph, string Title, string Caption, Problem[] Problems);
+
+    private Category[] Categories() =>
+    [
+        new(0xE767, "Sound and microphone", "No sound, quiet calls, headphones, microphone",
+        [
+            new(0xE767, "Sound is not working", "Speakers, headphones, volume and sound that is quieter during calls.", OnSoundClicked),
+            new(0xE720, "Microphone is not working", "Other people cannot hear you, or the microphone is very quiet.", OnMicrophoneClicked),
+        ]),
+        new(0xE774, "Internet and Bluetooth", "Wi-Fi, network cable, dropped connections, Bluetooth devices",
+        [
+            new(0xE774, "Cannot connect to the internet", "Wi-Fi or cable not connecting, connection dropping, or websites not opening.", OnNetworkClicked),
+            new(0xE702, "Bluetooth is not working", "Headphones, mouse, keyboard or phone will not pair or keep disconnecting.", OnBluetoothClicked),
+        ]),
+        new(0xE7F4, "Display and camera", "Screen resolution, blurry or flickering picture, webcam",
+        [
+            new(0xE7F4, "Screen or display problem", "Blurry text, wrong resolution, flickering, or a second screen not showing.", OnDisplayClicked),
+            new(0xE714, "Camera is not working", "Webcam not detected, black picture, or blocked by privacy settings.", OnCameraClicked),
+        ]),
+        new(0xE765, "Keyboard, mouse and touchpad", "Not responding, wrong characters, pointer problems",
+        [
+            new(0xE765, "Keyboard, mouse or touchpad not responding", "Keys, pointer or touchpad do nothing or behave erratically.", OnInputClicked),
+            new(0xE8D2, "Keyboard types the wrong characters", "Symbols in the wrong place or a different language than expected.", OnTypingClicked),
+        ]),
+        new(0xE749, "Printer and scanner", "Printing, stuck print jobs, scanning",
+        [
+            new(0xE749, "Printer is not working", "Nothing prints, the printer shows as offline, or jobs are stuck.", OnPrinterClicked),
+            new(0xE8FE, "Scanner is not working", "The scanner is not found or scanning does not start.", OnScannerClicked),
+        ]),
+        new(0xE83F, "Battery and performance", "Battery life, sleep, slow start-up, full disk",
+        [
+            new(0xE83F, "Battery, sleep and power", "Battery drains quickly, will not charge, or the computer will not sleep or wake.", OnPowerClicked),
+            new(0xEDA2, "Slow or full computer", "Slow start-up, slow in use, or the disk is nearly full.", OnStorageClicked),
+        ]),
+        new(0xE71D, "Apps and programs", "Programs closing, installs, Microsoft Store, Office, OneDrive",
+        [
+            new(0xE783, "A program keeps closing", "A program crashes, freezes or will not open.", OnProgramClosingClicked),
+            new(0xE896, "A program will not install", "An installer fails, is blocked or never finishes.", OnInstallClicked),
+            new(0xE719, "Microsoft Store or app installs", "The Store will not open, or apps will not download or update.", OnStoreClicked),
+            new(0xE8A5, "Word, Excel or Outlook", "An Office program will not start, crashes or asks to be activated.", OnOfficeClicked),
+            new(0xE753, "OneDrive is not syncing", "Files are not uploading or sync is stuck.", OnOneDriveClicked),
+        ]),
+        new(0xE72E, "Windows and security", "Start menu, notifications, Windows Update, viruses",
+        [
+            new(0xE8FC, "Start menu, taskbar or search", "The Start menu will not open, the taskbar is frozen, or search finds nothing.", OnShellClicked),
+            new(0xEA8F, "Notifications are missing", "Alerts from apps do not appear.", OnNotificationsClicked),
+            new(0xE895, "Windows Update problems", "Updates fail, are stuck or keep being offered again.", OnUpdateClicked),
+            new(0xE72E, "Security, viruses or pop-ups", "Unwanted pop-ups, security warnings, or protection that is switched off.", OnSecurityClicked),
+        ]),
+    ];
+
+    private void BuildCategories()
+    {
+        foreach (var category in Categories())
+        {
+            var card = CategoryCard(category.Glyph, category.Title, category.Caption, accent: false);
+            card.Click += (_, _) => OpenCategory(category);
+            CategoryGrid.Children.Add(card);
+        }
+        // The ninth card is not a category: it is the way forward when the person cannot tell where the problem belongs.
+        var checkUp = CategoryCard(0xE9D9, "Full computer check-up", "Not sure where the problem is? This examines the whole computer.", accent: true);
+        checkUp.Click += OnHealthClicked;
+        CategoryGrid.Children.Add(checkUp);
+    }
+
+    private Button CategoryCard(int glyph, string title, string caption, bool accent)
+    {
+        var icon = new TextBlock { Text = ((char)glyph).ToString(), FontSize = 17, Style = (Style)FindResource("Icon") };
+        icon.SetResourceReference(TextBlock.ForegroundProperty, accent ? "OnAccentBrush" : "AccentBrush");
+        var tile = new Border { Style = (Style)FindResource("IconTile"), Child = icon, HorizontalAlignment = HorizontalAlignment.Left };
+        if (accent) tile.SetResourceReference(Border.BackgroundProperty, "AccentFillBrush");
+
+        var chevron = new TextBlock
+        {
+            Text = ((char)0xE76C).ToString(), FontSize = 10, Style = (Style)FindResource("Icon"),
+            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 4, 0, 0),
+        };
+        chevron.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
+        var top = new Grid();
+        top.Children.Add(tile);
+        top.Children.Add(chevron);
+
+        var stack = new StackPanel();
+        stack.Children.Add(top);
+        stack.Children.Add(new TextBlock
+        {
+            Text = title, FontSize = 14, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0),
+        });
+        stack.Children.Add(new TextBlock { Text = caption, Style = (Style)FindResource("CaptionText"), Margin = new Thickness(0, 2, 0, 0) });
+
+        var card = new Button { Style = (Style)FindResource("CardButton"), Content = stack, Margin = new Thickness(4) };
+        AutomationProperties.SetName(card, title);
+        AutomationProperties.SetHelpText(card, caption);
+        return card;
+    }
+
+    /// <summary>The category page: the problems inside it, and the full check-up for anything that is not listed.</summary>
+    private async void OpenCategory(Category category)
+    {
+        var options = category.Problems.Select(p => new Choice(p.Glyph, p.Title, p.Caption)).ToList();
+        options.Add(new Choice(0xE9D9, "Something else", "The full computer check-up examines the whole computer instead."));
+        SetTopic(null);
+        _topicTitle = category.Title;
+        _glyphOverride = category.Glyph; // the icon tile shows the category, not the generic mark
+        var pick = await ShowChoicesAsync("Please select the problem that is closest to yours.", options, "Back");
+        if (pick < 0) { ShowHome(); return; }
+        var args = new RoutedEventArgs();
+        if (pick < category.Problems.Length) category.Problems[pick].Run(this, args);
+        else OnHealthClicked(this, args);
+    }
+
+    // ---- choice screen: a sentence and a short list of checks to pick from ----
+
+    /// <summary>One row on a choice screen: icon, title and one line on what it covers.</summary>
+    internal sealed record Choice(int Glyph, string Title, string Caption);
+
+    /// <summary>
+    /// Shows a sentence with a list of options and one quiet button (<paramref name="back"/>, also Esc).
+    /// Completes with the index of the selected option, or -1 for the button.
+    /// </summary>
+    private async Task<int> ShowChoicesAsync(string text, IReadOnlyList<Choice> options, string back)
+    {
+        var from = CaptureScreen();
+        HomePanel.Visibility = Visibility.Collapsed;
+        StepPanel.Visibility = Visibility.Visible;
+        StepText.Text = text;
+        PrimaryButton.Visibility = Visibility.Collapsed;
+        SecondaryButton.Content = back;
+        SecondaryButton.Visibility = Visibility.Visible;
+
+        var pick = new TaskCompletionSource<int>();
+        ChoicesPanel.Children.Clear();
+        for (var i = 0; i < options.Count; i++)
+        {
+            var index = i;
+            var row = ChoiceRow(options[i]);
+            row.Click += (_, _) => pick.TrySetResult(index);
+            ChoicesPanel.Children.Add(row);
+        }
+        ChoicesPanel.Visibility = Visibility.Visible;
+        PresentStep(from, Look.Step);
+        StepButtons.Visibility = Visibility.Visible; // PresentStep ties the row to the primary button
+        if (ChoicesPanel.Children.Count > 0) ((Button)ChoicesPanel.Children[0]).Focus();
+
+        _choice = new TaskCompletionSource<bool>();
+        var first = await Task.WhenAny(pick.Task, _choice.Task);
+        ChoicesPanel.Children.Clear();
+        ChoicesPanel.Visibility = Visibility.Collapsed;
+        return first == pick.Task ? pick.Task.Result : -1;
+    }
+
+    private Button ChoiceRow(Choice choice)
+    {
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var glyph = new TextBlock { Text = ((char)choice.Glyph).ToString(), FontSize = 17, Style = (Style)FindResource("Icon") };
+        glyph.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
+        var tile = new Border { Style = (Style)FindResource("IconTile"), Child = glyph, VerticalAlignment = VerticalAlignment.Center };
+
+        var title = new TextBlock { Text = choice.Title, FontSize = 14, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+        var caption = new TextBlock { Text = choice.Caption, Style = (Style)FindResource("CaptionText"), Margin = new Thickness(0, 2, 0, 0) };
+        var text = new StackPanel { Margin = new Thickness(14, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+        text.Children.Add(title);
+        text.Children.Add(caption);
+        Grid.SetColumn(text, 1);
+
+        var chevron = new TextBlock { Text = ((char)0xE76C).ToString(), FontSize = 10, Style = (Style)FindResource("Icon") };
+        chevron.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
+        Grid.SetColumn(chevron, 2);
+
+        grid.Children.Add(tile);
+        grid.Children.Add(text);
+        grid.Children.Add(chevron);
+
+        var row = new Button
+        {
+            Style = (Style)FindResource("CardButton"), Content = grid, MinHeight = 0,
+            Padding = new Thickness(12, 10, 14, 10), Margin = new Thickness(0, 0, 0, 8),
+            VerticalContentAlignment = VerticalAlignment.Center,
+        };
+        AutomationProperties.SetName(row, choice.Title);
+        AutomationProperties.SetHelpText(row, choice.Caption);
+        return row;
+    }
+
+    /// <summary>Icon for a SymptomRouter area (areas are finer than topics: store, office and OneDrive share the "apps" topic).</summary>
+    private static int AreaGlyph(string area) => area switch
+    {
+        "program" => 0xE783,
+        "store" => 0xE719,
+        "office" => 0xE8A5,
+        "onedrive" => 0xE753,
+        "scanner" => 0xE8FE,
+        "install" => 0xE896,
+        "notifications" => 0xEA8F,
+        _ => TopicGlyph(area),
+    };
+
+    /// <summary>Segoe Fluent Icons / MDL2 Assets glyph for a topic (the icon tile on a step screen).</summary>
+    private static int TopicGlyph(string? topic) => topic switch
+    {
+        "sound" => 0xE767,
+        "camera" => 0xE714,
+        "network" => 0xE774,
+        "driver" => 0xE90F,
+        "health" => 0xE9D9,
+        "microphone" => 0xE720,
+        "bluetooth" => 0xE702,
+        "shell" => 0xE8FC,
+        "apps" => 0xE719,
+        "security" => 0xE72E,
+        "power" => 0xE83F,
+        "input" => 0xE765,
+        "storage" => 0xEDA2,
+        "update" => 0xE895,
+        "printer" => 0xE749,
+        "display" => 0xE7F4,
+        _ => 0xE946, // Info
+    };
 
     private void ShowPicture(Look look)
     {
@@ -326,34 +605,27 @@ public partial class MainWindow
         if (busy) return;
 
         var end = look is Look.Fixed or Look.AllGood or Look.NotFixed or Look.Hardware or Look.Problem or Look.Neutral;
-        var art = look switch
+        // Tile colour, icon colour, icon: CheckMark, Shield, Document, Component, ErrorBadge, Info, or the topic's icon.
+        var (tile, brush, glyph) = look switch
         {
-            Look.Fixed => "ArtFixed",
-            Look.AllGood => "ArtAllGood",
-            Look.NotFixed => "ArtNotFixed",
-            Look.Hardware => "ArtHardware",
-            Look.Problem => "ArtProblem",
-            Look.Neutral => "ArtNeutral",
-            _ => _topic switch
-            {
-                "sound" => "ArtSound",
-                "camera" => "ArtCamera",
-                "network" => "ArtNetwork",
-                _ => "ArtNeutral",
-            },
+            Look.Fixed => ("SuccessTileBrush", "SuccessBrush", 0xE73E),
+            Look.AllGood => ("InfoTileBrush", "InfoBrush", 0xEA18),
+            Look.NotFixed => ("CautionTileBrush", "CautionBrush", 0xE8A5),
+            Look.Hardware => ("CautionTileBrush", "CautionBrush", 0xE950),
+            Look.Problem => ("ProblemTileBrush", "ProblemBrush", 0xEA39),
+            Look.Neutral => ("NeutralTileBrush", "NeutralGlyphBrush", 0xE946),
+            _ => ("AccentSoftBrush", "AccentBrush", _glyphOverride ?? TopicGlyph(_topic)),
         };
-        StepArt.Template = (ControlTemplate)FindResource(art);
-        StepArt.Width = StepArt.Height = end ? 96 : 72;
-        StepArt.ApplyTemplate();
+        StepArt.SetResourceReference(Border.BackgroundProperty, tile);
+        StepArtGlyph.SetResourceReference(TextBlock.ForegroundProperty, brush);
+        StepArtGlyph.Text = ((char)glyph).ToString();
 
         var pop = StepArt.RenderTransform as ScaleTransform;
         if (pop is null || pop.IsFrozen) StepArt.RenderTransform = pop = new ScaleTransform();
         if (end)
         {
-            Motion.FromTo(pop, ScaleTransform.ScaleXProperty, 0.6, 1, 340, Motion.Overshoot);
-            Motion.FromTo(pop, ScaleTransform.ScaleYProperty, 0.6, 1, 340, Motion.Overshoot);
-            if (StepArt.Template.FindName("Check", StepArt) is Path check)
-                Motion.FromTo(check, Shape.StrokeDashOffsetProperty, 7, 0, 320, Motion.EaseOut, delayMs: 160);
+            Motion.FromTo(pop, ScaleTransform.ScaleXProperty, 0.7, 1, 300, Motion.Overshoot);
+            Motion.FromTo(pop, ScaleTransform.ScaleYProperty, 0.7, 1, 300, Motion.Overshoot);
         }
         else
         {
@@ -385,8 +657,8 @@ public partial class MainWindow
         if (banner is not { } b) { StatusBanner.Visibility = Visibility.Collapsed; return; }
         StatusBanner.Visibility = Visibility.Visible;
         StatusBanner.SetResourceReference(Border.BackgroundProperty, b.Tile);
-        StatusBanner.SetResourceReference(Border.BorderBrushProperty, b.Brush);
-        StatusDot.SetResourceReference(Border.BackgroundProperty, b.Brush);
+        StatusBanner.SetResourceReference(Border.BorderBrushProperty, "CardBorderBrush");
+        StatusGlyph.SetResourceReference(TextBlock.ForegroundProperty, b.Brush);
         StatusLabel.SetResourceReference(TextBlock.ForegroundProperty, b.Brush == "NeutralGlyphBrush" ? "TextPrimaryBrush" : b.Brush);
         StatusGlyph.Text = b.Glyph;
         StatusLabel.Text = b.Label;
@@ -420,8 +692,8 @@ public partial class MainWindow
 
         foreach (var text in labels)
         {
-            var row = new Grid { Margin = new Thickness(0, 0, 0, 12) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
             row.ColumnDefinitions.Add(new ColumnDefinition());
 
             var ring = new Ellipse { Width = 20, Height = 20, StrokeThickness = 2 };
@@ -442,7 +714,7 @@ public partial class MainWindow
 
             var done = new Grid { Width = 20, Height = 20 };
             var fill = new Ellipse();
-            fill.SetResourceReference(Shape.FillProperty, "AccentBrush");
+            fill.SetResourceReference(Shape.FillProperty, "AccentFillBrush");
             var tick = new Path
             {
                 Data = Geometry.Parse("M 5.8,10.2 L 8.6,13 L 14.2,7.4"), StrokeThickness = 2,
@@ -456,7 +728,7 @@ public partial class MainWindow
             indicator.Children.Add(ring);
             indicator.Children.Add(spinner);
             indicator.Children.Add(done);
-            var label = new TextBlock { Text = text, FontSize = 17, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+            var label = new TextBlock { Text = text, FontSize = 13.5, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
             Grid.SetColumn(label, 1);
             row.Children.Add(indicator);
             row.Children.Add(label);
@@ -510,7 +782,7 @@ public partial class MainWindow
         {
             HelperButton.SetResourceReference(BorderBrushProperty, "AccentBrush");
             HelperButton.SetResourceReference(ForegroundProperty, "AccentBrush");
-            HelperButton.BorderThickness = new Thickness(2);
+            HelperButton.BorderThickness = new Thickness(1);
         }
         else
         {
