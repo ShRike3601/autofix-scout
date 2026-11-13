@@ -62,7 +62,7 @@
                     <TextBlock Style="{StaticResource DisplayText}" Text="What would you like to check today?" Margin="0,2,0,4"
                                AutomationProperties.HeadingLevel="Level1"/>
                     <TextBlock Style="{StaticResource BodyText}"
-                               Text="Please select the problem you are experiencing. AutoFix Scout checks your computer first and does not change anything without your permission."/>
+                               Text="Describe the problem, or select the part of the computer it concerns. AutoFix Scout checks first and does not change anything without your permission."/>
                 </StackPanel>
 
                 <StackPanel x:Name="HeaderStep" Visibility="Collapsed">
@@ -73,7 +73,7 @@
             <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
                 <Grid MaxWidth="1000" Margin="32,20,32,28">
 
-                    <!-- Home: describe the problem, the three common problems, then every other area. -->
+                    <!-- Home: describe the problem, or browse the categories. -->
                     <StackPanel x:Name="HomePanel" VerticalAlignment="Top" KeyboardNavigation.DirectionalNavigation="Contained">
                         <!-- Describe the problem in your own words: routes to the best check (SymptomRouter). -->
                         <Border CornerRadius="{StaticResource CardRadius}" Background="{DynamicResource InputBrush}"
@@ -95,86 +95,9 @@
                             </Grid>
                         </Border>
 
-                        <TextBlock Style="{StaticResource SectionLabel}" Text="Common problems"/>
-                        <UniformGrid Columns="3" Margin="-4,-4,-4,0">
-                            <Border x:Name="SoundCardHost" Margin="4">
-                                <Button Style="{StaticResource CardButton}" Click="OnSoundClicked"
-                                        AutomationProperties.Name="Sound is not working" AutomationProperties.HelpText="Speakers, headphones and volume">
-                                    <StackPanel>
-                                        <Grid>
-                                            <Border Style="{StaticResource IconTile}">
-                                                <TextBlock Style="{StaticResource Icon}" Text="&#xE767;" FontSize="17" Foreground="{DynamicResource AccentBrush}"/>
-                                            </Border>
-                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE76C;" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                                       Margin="0,4,0,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                        </Grid>
-                                        <TextBlock x:Name="SoundTitle" Text="Sound is not working" Margin="0,14,0,0"
-                                                   FontSize="{StaticResource CardTitleSize}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                        <TextBlock Style="{StaticResource CaptionText}" Text="Speakers, headphones and volume" Margin="0,2,0,0"/>
-                                    </StackPanel>
-                                </Button>
-                            </Border>
-
-                            <Border x:Name="CameraCardHost" Margin="4">
-                                <Button Style="{StaticResource CardButton}" Click="OnCameraClicked"
-                                        AutomationProperties.Name="Camera is not working" AutomationProperties.HelpText="Webcam, privacy settings and camera apps">
-                                    <StackPanel>
-                                        <Grid>
-                                            <Border Style="{StaticResource IconTile}">
-                                                <TextBlock Style="{StaticResource Icon}" Text="&#xE714;" FontSize="17" Foreground="{DynamicResource AccentBrush}"/>
-                                            </Border>
-                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE76C;" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                                       Margin="0,4,0,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                        </Grid>
-                                        <TextBlock x:Name="CameraTitle" Text="Camera is not working" Margin="0,14,0,0"
-                                                   FontSize="{StaticResource CardTitleSize}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                        <TextBlock Style="{StaticResource CaptionText}" Text="Webcam, privacy settings and camera apps" Margin="0,2,0,0"/>
-                                    </StackPanel>
-                                </Button>
-                            </Border>
-
-                            <Border x:Name="NetworkCardHost" Margin="4">
-                                <Button Style="{StaticResource CardButton}" Click="OnNetworkClicked"
-                                        AutomationProperties.Name="Cannot connect to the internet" AutomationProperties.HelpText="Wi-Fi, network cable and connection">
-                                    <StackPanel>
-                                        <Grid>
-                                            <Border Style="{StaticResource IconTile}">
-                                                <TextBlock Style="{StaticResource Icon}" Text="&#xE774;" FontSize="17" Foreground="{DynamicResource AccentBrush}"/>
-                                            </Border>
-                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE76C;" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                                       Margin="0,4,0,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                        </Grid>
-                                        <TextBlock x:Name="NetworkTitle" Text="Cannot connect to the internet" Margin="0,14,0,0"
-                                                   FontSize="{StaticResource CardTitleSize}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                        <TextBlock Style="{StaticResource CaptionText}" Text="Wi-Fi, network cable and connection" Margin="0,2,0,0"/>
-                                    </StackPanel>
-                                </Button>
-                            </Border>
-                        </UniformGrid>
-
-                        <StackPanel x:Name="MoreAreas">
-                            <TextBlock Style="{StaticResource SectionLabel}" Text="Other problems"/>
-                            <UniformGrid Columns="3" Margin="-4,-4,-4,0">
-                                <Button Style="{StaticResource TileButton}" Content="Full computer check-up" Tag="&#xE9D9;" Click="OnHealthClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="A program keeps closing" Tag="&#xE783;" Click="OnProgramClosingClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="Start menu, taskbar or search" Tag="&#xE8FC;" Click="OnShellClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="Notifications are missing" Tag="&#xEA8F;" Click="OnNotificationsClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="Microsoft Store or app installs" Tag="&#xE719;" Click="OnStoreClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="A program will not install" Tag="&#xE896;" Click="OnInstallClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="Word, Excel or Outlook" Tag="&#xE8A5;" Click="OnOfficeClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="OneDrive not syncing" Tag="&#xE753;" Click="OnOneDriveClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="Security, viruses or pop-ups" Tag="&#xE72E;" Click="OnSecurityClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="Battery, sleep and power" Tag="&#xE83F;" Click="OnPowerClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="Keyboard, mouse or touchpad" Tag="&#xE765;" Click="OnInputClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="Bluetooth not working" Tag="&#xE702;" Click="OnBluetoothClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="Microphone not working" Tag="&#xE720;" Click="OnMicrophoneClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="Slow or full computer" Tag="&#xEDA2;" Click="OnStorageClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="Windows Update problems" Tag="&#xE895;" Click="OnUpdateClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="Printer not working" Tag="&#xE749;" Click="OnPrinterClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="Scanner not working" Tag="&#xE8FE;" Click="OnScannerClicked"/>
-                                <Button Style="{StaticResource TileButton}" Content="Screen or display problem" Tag="&#xE7F4;" Click="OnDisplayClicked"/>
-                            </UniformGrid>
-                        </StackPanel>
+                        <!-- Categories (built in MainWindow.Visuals.cs, BuildCategories): each opens a short list of the problems inside it. -->
+                        <TextBlock Style="{StaticResource SectionLabel}" Text="Browse by category"/>
+                        <UniformGrid x:Name="CategoryGrid" Columns="3" Margin="-4,-4,-4,0"/>
                     </StackPanel>
 
                 </Grid>

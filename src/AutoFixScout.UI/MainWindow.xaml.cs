@@ -447,6 +447,11 @@ private async void OnInstallClicked(object sender, RoutedEventArgs e) => await R
         await RunFlowAsync(Areas.InputFlow.Topic, Areas.InputFlow.What, Areas.InputFlow.DiagnoseAsync,
             () => AskAsync(Areas.InputFlow.TestQuestion));
 
+    /// <summary>The same check with the keyboard layout findings first (the person reported wrong characters).</summary>
+    private async void OnTypingClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.InputFlow.Topic, Areas.InputFlow.What, () => Areas.InputFlow.DiagnoseAsync(typingFocus: true),
+            () => AskAsync(Areas.InputFlow.TestQuestion));
+
     private async void OnMicrophoneClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.MicrophoneFlow.Topic, Areas.MicrophoneFlow.What, Areas.MicrophoneFlow.DiagnoseAsync, async () =>
         {

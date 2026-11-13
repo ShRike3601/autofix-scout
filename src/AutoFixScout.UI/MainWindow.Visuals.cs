@@ -130,11 +130,12 @@ public partial class MainWindow
     private void SetTopic(string? topic)
     {
         _topic = topic;
+        _glyphOverride = null;
         _topicTitle = topic switch
         {
-            "sound" => SoundTitle.Text,
-            "camera" => CameraTitle.Text,
-            "network" => NetworkTitle.Text,
+            "sound" => "Sound is not working",
+            "camera" => "Camera is not working",
+            "network" => "Cannot connect to the internet",
             "driver" => "Unfinished driver change",
             "health" => "Computer check-up",
             "microphone" => "Microphone",
@@ -358,8 +359,129 @@ public partial class MainWindow
     private void AnimateHome()
     {
         Motion.Enter(HeaderHome, distance: 8);
-        FrameworkElement[] parts = [SoundCardHost, CameraCardHost, NetworkCardHost, MoreAreas];
-        for (var i = 0; i < parts.Length; i++) Motion.Enter(parts[i], delayMs: 40 + i * 40, distance: 12);
+        if (CategoryGrid.Children.Count == 0) BuildCategories();
+        for (var i = 0; i < CategoryGrid.Children.Count; i++)
+            Motion.Enter((FrameworkElement)CategoryGrid.Children[i], delayMs: 40 + i / 3 * 40, distance: 12);
+    }
+
+    // ---- home categories: the part of the computer first, then the problems inside it ----
+
+    /// <summary>Icon for the step tile when the screen has no topic (a category page).</summary>
+    private int? _glyphOverride;
+
+    /// <summary>One problem inside a category: the row shown on the category page and the check it starts.</summary>
+    private sealed record Problem(int Glyph, string Title, string Caption, RoutedEventHandler Run);
+
+    /// <summary>A home page card. The caption says what is inside, so the person can choose without opening it.</summary>
+    private sealed record Category(int Glyph, string Title, string Caption, Problem[] Problems);
+
+    private Category[] Categories() =>
+    [
+        new(0xE767, "Sound and microphone", "No sound, quiet calls, headphones, microphone",
+        [
+            new(0xE767, "Sound is not working", "Speakers, headphones, volume and sound that is quieter during calls.", OnSoundClicked),
+            new(0xE720, "Microphone is not working", "Other people cannot hear you, or the microphone is very quiet.", OnMicrophoneClicked),
+        ]),
+        new(0xE774, "Internet and Bluetooth", "Wi-Fi, network cable, dropped connections, Bluetooth devices",
+        [
+            new(0xE774, "Cannot connect to the internet", "Wi-Fi or cable not connecting, connection dropping, or websites not opening.", OnNetworkClicked),
+            new(0xE702, "Bluetooth is not working", "Headphones, mouse, keyboard or phone will not pair or keep disconnecting.", OnBluetoothClicked),
+        ]),
+        new(0xE7F4, "Display and camera", "Screen resolution, blurry or flickering picture, webcam",
+        [
+            new(0xE7F4, "Screen or display problem", "Blurry text, wrong resolution, flickering, or a second screen not showing.", OnDisplayClicked),
+            new(0xE714, "Camera is not working", "Webcam not detected, black picture, or blocked by privacy settings.", OnCameraClicked),
+        ]),
+        new(0xE765, "Keyboard, mouse and touchpad", "Not responding, wrong characters, pointer problems",
+        [
+            new(0xE765, "Keyboard, mouse or touchpad not responding", "Keys, pointer or touchpad do nothing or behave erratically.", OnInputClicked),
+            new(0xE8D2, "Keyboard types the wrong characters", "Symbols in the wrong place or a different language than expected.", OnTypingClicked),
+        ]),
+        new(0xE749, "Printer and scanner", "Printing, stuck print jobs, scanning",
+        [
+            new(0xE749, "Printer is not working", "Nothing prints, the printer shows as offline, or jobs are stuck.", OnPrinterClicked),
+            new(0xE8FE, "Scanner is not working", "The scanner is not found or scanning does not start.", OnScannerClicked),
+        ]),
+        new(0xE83F, "Battery and performance", "Battery life, sleep, slow start-up, full disk",
+        [
+            new(0xE83F, "Battery, sleep and power", "Battery drains quickly, will not charge, or the computer will not sleep or wake.", OnPowerClicked),
+            new(0xEDA2, "Slow or full computer", "Slow start-up, slow in use, or the disk is nearly full.", OnStorageClicked),
+        ]),
+        new(0xE71D, "Apps and programs", "Programs closing, installs, Microsoft Store, Office, OneDrive",
+        [
+            new(0xE783, "A program keeps closing", "A program crashes, freezes or will not open.", OnProgramClosingClicked),
+            new(0xE896, "A program will not install", "An installer fails, is blocked or never finishes.", OnInstallClicked),
+            new(0xE719, "Microsoft Store or app installs", "The Store will not open, or apps will not download or update.", OnStoreClicked),
+            new(0xE8A5, "Word, Excel or Outlook", "An Office program will not start, crashes or asks to be activated.", OnOfficeClicked),
+            new(0xE753, "OneDrive is not syncing", "Files are not uploading or sync is stuck.", OnOneDriveClicked),
+        ]),
+        new(0xE72E, "Windows and security", "Start menu, notifications, Windows Update, viruses",
+        [
+            new(0xE8FC, "Start menu, taskbar or search", "The Start menu will not open, the taskbar is frozen, or search finds nothing.", OnShellClicked),
+            new(0xEA8F, "Notifications are missing", "Alerts from apps do not appear.", OnNotificationsClicked),
+            new(0xE895, "Windows Update problems", "Updates fail, are stuck or keep being offered again.", OnUpdateClicked),
+            new(0xE72E, "Security, viruses or pop-ups", "Unwanted pop-ups, security warnings, or protection that is switched off.", OnSecurityClicked),
+        ]),
+    ];
+
+    private void BuildCategories()
+    {
+        foreach (var category in Categories())
+        {
+            var card = CategoryCard(category.Glyph, category.Title, category.Caption, accent: false);
+            card.Click += (_, _) => OpenCategory(category);
+            CategoryGrid.Children.Add(card);
+        }
+        // The ninth card is not a category: it is the way forward when the person cannot tell where the problem belongs.
+        var checkUp = CategoryCard(0xE9D9, "Full computer check-up", "Not sure where the problem is? This examines the whole computer.", accent: true);
+        checkUp.Click += OnHealthClicked;
+        CategoryGrid.Children.Add(checkUp);
+    }
+
+    private Button CategoryCard(int glyph, string title, string caption, bool accent)
+    {
+        var icon = new TextBlock { Text = ((char)glyph).ToString(), FontSize = 17, Style = (Style)FindResource("Icon") };
+        icon.SetResourceReference(TextBlock.ForegroundProperty, accent ? "OnAccentBrush" : "AccentBrush");
+        var tile = new Border { Style = (Style)FindResource("IconTile"), Child = icon, HorizontalAlignment = HorizontalAlignment.Left };
+        if (accent) tile.SetResourceReference(Border.BackgroundProperty, "AccentFillBrush");
+
+        var chevron = new TextBlock
+        {
+            Text = ((char)0xE76C).ToString(), FontSize = 10, Style = (Style)FindResource("Icon"),
+            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 4, 0, 0),
+        };
+        chevron.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
+        var top = new Grid();
+        top.Children.Add(tile);
+        top.Children.Add(chevron);
+
+        var stack = new StackPanel();
+        stack.Children.Add(top);
+        stack.Children.Add(new TextBlock
+        {
+            Text = title, FontSize = 14, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0),
+        });
+        stack.Children.Add(new TextBlock { Text = caption, Style = (Style)FindResource("CaptionText"), Margin = new Thickness(0, 2, 0, 0) });
+
+        var card = new Button { Style = (Style)FindResource("CardButton"), Content = stack, Margin = new Thickness(4) };
+        AutomationProperties.SetName(card, title);
+        AutomationProperties.SetHelpText(card, caption);
+        return card;
+    }
+
+    /// <summary>The category page: the problems inside it, and the full check-up for anything that is not listed.</summary>
+    private async void OpenCategory(Category category)
+    {
+        var options = category.Problems.Select(p => new Choice(p.Glyph, p.Title, p.Caption)).ToList();
+        options.Add(new Choice(0xE9D9, "Something else", "The full computer check-up examines the whole computer instead."));
+        SetTopic(null);
+        _topicTitle = category.Title;
+        _glyphOverride = category.Glyph; // the icon tile shows the category, not the generic mark
+        var pick = await ShowChoicesAsync("Please select the problem that is closest to yours.", options, "Back");
+        if (pick < 0) { ShowHome(); return; }
+        var args = new RoutedEventArgs();
+        if (pick < category.Problems.Length) category.Problems[pick].Run(this, args);
+        else OnHealthClicked(this, args);
     }
 
     // ---- choice screen: a sentence and a short list of checks to pick from ----
@@ -492,7 +614,7 @@ public partial class MainWindow
             Look.Hardware => ("CautionTileBrush", "CautionBrush", 0xE950),
             Look.Problem => ("ProblemTileBrush", "ProblemBrush", 0xEA39),
             Look.Neutral => ("NeutralTileBrush", "NeutralGlyphBrush", 0xE946),
-            _ => ("AccentSoftBrush", "AccentBrush", TopicGlyph(_topic)),
+            _ => ("AccentSoftBrush", "AccentBrush", _glyphOverride ?? TopicGlyph(_topic)),
         };
         StepArt.SetResourceReference(Border.BackgroundProperty, tile);
         StepArtGlyph.SetResourceReference(TextBlock.ForegroundProperty, brush);

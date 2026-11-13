@@ -31,8 +31,9 @@ easy for people who are not technical.
 ## Buttons and labels
 
 Short verbs, title case not needed: "Continue", "Apply fix", "Skip", "Yes, it works", "No, it does not", "Close",
-"Restore driver", "Not now". The home choices stay symptom-first: "Sound is not working", "Camera is not working",
-"Cannot connect to the internet"; all other areas are listed under "Other problems".
+"Restore driver", "Not now". Home categories are named after the part of the computer
+("Sound and microphone", "Printer and scanner"); the choices inside a category stay symptom-first: "Sound is not
+working", "Camera is not working", "Cannot connect to the internet".
 
 ## Keep
 

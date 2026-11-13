@@ -235,9 +235,8 @@ what the flow does. All in-app wording follows `docs/WRITING.md`.
   owner found the earlier large-type, illustrated look unprofessional; do not bring back the big type scale.
 - **Layout**: the window draws its own title bar (`WindowChrome`, 36 px drag strip, own minimise / maximise / close
   buttons). Left sidebar (220 px): app mark, navigation ("Troubleshoot", "History and reports"), and at the bottom
-  "Report for your helper" and the version. Home page: greeting + question, the describe-the-problem box, "Common
-  problems" (three cards: icon tile, title, caption) and "Other problems" (all other areas as compact tiles, three
-  columns, always visible; there is no "Something else" button any more). During a check the page header shows only the
+  "Report for your helper" and the version. Home page: greeting + question, the describe-the-problem box, and "Browse by
+  category" (see **Categories** below). During a check the page header shows only the
   topic title; the journey **Check -> Diagnosis -> Fix -> Confirm** is a vertical "Progress" panel on the right (264 px:
   dot, name and one line per stage; done = tick, current = number with halo, connector fills downwards; hidden outside
   a check). An ending that did not resolve the problem marks the last step amber with "!".
@@ -245,7 +244,17 @@ what the flow does. All in-app wording follows `docs/WRITING.md`.
 - **Closest checks** (2026-11-13, owner approved): "Find a fix" no longer offers one guess. `OnSymptomSearch` shows the
   top three `SymptomRouter.Rank` candidates as rows (icon, name, `Covers` line) plus "None of these", which runs the
   full check-up; when `NoGoodMatch` it says so and offers the nearest check and the check-up. `ShowChoicesAsync`
-  (Visuals) is the reusable choice screen. Home has 18 "Other problems" tiles (scanner, install, notifications added).
+  (Visuals) is the reusable choice screen.
+- **Categories** (2026-11-13, owner's idea: group like Control Panel instead of one tile per problem): the home page
+  shows nine cards in three columns: eight categories named after the part of the computer (Sound and microphone,
+  Internet and Bluetooth, Display and camera, Keyboard mouse and touchpad, Printer and scanner, Battery and
+  performance, Apps and programs, Windows and security) and an accent "Full computer check-up" card that starts the
+  check-up directly. Each card's caption lists what is inside. A category opens a choice screen (`OpenCategory` ->
+  `ShowChoicesAsync`) whose rows are still symptom-first ("Printer is not working") with one line of examples, plus
+  "Something else", which runs the full check-up. The list lives in `Categories()` in `MainWindow.Visuals.cs`; the
+  cards are built in code (`BuildCategories`), not in XAML. **A new area needs one `Problem` line in its category**
+  (glyph, title, caption, handler), no XAML. "Keyboard types the wrong characters" uses `OnTypingClicked`
+  (`InputFlow.DiagnoseAsync(typingFocus: true)`). The old "Common problems" cards and 18 "Other problems" tiles are gone.
 - **Step card** (the "stage": fills the page beside the progress panel, content centred, at most 560 wide): optional
   status banner (tinted strip, icon + label coloured by severity), a 56 px icon tile, the first sentence as a centred
   heading, any further sentences as supporting text (`Split`; "\n\n" also splits; centred when short, left aligned for
