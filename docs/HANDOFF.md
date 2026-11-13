@@ -462,3 +462,10 @@ Branch `perf` (from main 9f5f3f5) collects the work; agents work in C:\afs-wt\g5
 - g8-speed: ReadyToRun, parallel probes, smaller installer; measure before/after.
 - then: opt-in stress test (CPU + GPU load ~60 s with live readings, stops on heat), bench live tests, CI, v0.3.0 tag.
 - UI tiles: ask the UI session (one Problem line each in Categories() in MainWindow.Visuals.cs).
+- Installer (done, bf699c2, verify on the bench): a newer setup silently uninstalls the old version first (same AppId,
+  same folder, one Start menu entry), asks before a downgrade, force-closes a running app. Bench check: install
+  v0.2.0, then the perf CI setup; expect one entry in Installed apps and one Start menu entry.
+- Quality-of-life candidates (owner to pick): in-app "new version available" check against GitHub releases
+  (needs privacy note), "What's new" after an update, "Did this fix it?" feedback kept locally and added to the
+  helper report, changes history with Undo buttons, watcher toast "Wi-Fi reconnected", optional weekly check-up
+  with a toast only when something is wrong, uninstall option to also delete AutoFix Scout data.
