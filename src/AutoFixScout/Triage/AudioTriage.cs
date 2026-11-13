@@ -324,4 +324,8 @@ public enum FindingCode
     HealthUsbErrors,
     // Wi-Fi keeps dropping
     NetWifiDrops,
+    // Screen looks wrong (Display area)
+    DisplayNotNativeResolution,
+    DisplayLowRefreshRate,
+    DisplayUnusualScaling,
 }

@@ -28,6 +28,9 @@ public sealed class RealDisplayProbe : IDisplayProbe
         try { state.ShowingScreens = CountShowingScreens(); }
         catch (Exception ex) { errors.Add($"EnumDisplayDevices: {ex.Message}"); }
 
+        try { state.Screens = ReadScreens(); }
+        catch (Exception ex) { errors.Add($"EnumDisplaySettings: {ex.Message}"); }
+
         // Desktops have no software brightness ("Not supported"): that is normal, not a probe error.
         try
         {
@@ -90,5 +93,82 @@ public sealed class RealDisplayProbe : IDisplayProbe
             count += Math.Max(monitors, 1); // an attached output shows the desktop on at least one screen
         }
         return count;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct DEVMODE
+    {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmDeviceName;
+        public ushort dmSpecVersion, dmDriverVersion, dmSize, dmDriverExtra;
+        public uint dmFields;
+        public int dmPositionX, dmPositionY;
+        public uint dmDisplayOrientation, dmDisplayFixedOutput;
+        public short dmColor, dmDuplex, dmYResolution, dmTTOption, dmCollate;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmFormName;
+        public ushort dmLogPixels;
+        public uint dmBitsPerPel, dmPelsWidth, dmPelsHeight, dmDisplayFlags, dmDisplayFrequency;
+        public uint dmICMMethod, dmICMIntent, dmMediaType, dmDitherType, dmReserved1, dmReserved2, dmPanningWidth, dmPanningHeight;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool EnumDisplaySettingsW(string? device, int mode, ref DEVMODE dm);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromPoint(POINT pt, uint flags);
+
+    [StructLayout(LayoutKind.Sequential)] private struct POINT { public int X, Y; }
+
+    [DllImport("shcore.dll")]
+    private static extern int GetDpiForMonitor(IntPtr monitor, int type, out uint x, out uint y);
+
+    private const int CurrentSettings = -1;
+
+    /// <summary>Read-only: current mode and every supported mode of each active, non-mirroring output.</summary>
+    internal static List<ScreenInfo> ReadScreens()
+    {
+        var screens = new List<ScreenInfo>();
+        for (uint i = 0; i < 64; i++)
+        {
+            var output = new DISPLAY_DEVICE { cb = Marshal.SizeOf<DISPLAY_DEVICE>() };
+            if (!EnumDisplayDevicesW(null, i, ref output, 0)) break;
+            if ((output.StateFlags & AttachedToDesktop) == 0 || (output.StateFlags & MirroringDriver) != 0) continue;
+            var cur = NewMode();
+            if (!EnumDisplaySettingsW(output.DeviceName, CurrentSettings, ref cur)) continue;
+            var modes = new HashSet<DisplayMode>();
+            for (var m = 0; m < 5000; m++)
+            {
+                var dm = NewMode();
+                if (!EnumDisplaySettingsW(output.DeviceName, m, ref dm)) break;
+                if (dm.dmPelsWidth == 0 || dm.dmPelsHeight == 0) continue;
+                modes.Add(new DisplayMode((int)dm.dmPelsWidth, (int)dm.dmPelsHeight, (int)dm.dmDisplayFrequency));
+            }
+            screens.Add(new ScreenInfo(output.DeviceName,
+                new DisplayMode((int)cur.dmPelsWidth, (int)cur.dmPelsHeight, (int)cur.dmDisplayFrequency),
+                modes.ToList(), ReadScale(cur.dmPositionX, cur.dmPositionY, output.DeviceName)));
+        }
+        return screens;
+    }
+
+    private static DEVMODE NewMode() => new() { dmSize = (ushort)Marshal.SizeOf<DEVMODE>(), dmDeviceName = "", dmFormName = "" };
+
+    /// <summary>Scale in percent for the monitor at the output's top-left corner: GetDpiForMonitor, else the registry.</summary>
+    private static int? ReadScale(int x, int y, string device)
+    {
+        try
+        {
+            var mon = MonitorFromPoint(new POINT { X = x, Y = y }, 2 /* MONITOR_DEFAULTTONEAREST */);
+            if (mon != IntPtr.Zero && GetDpiForMonitor(mon, 0 /* effective */, out var dx, out _) == 0 && dx > 0)
+                return (int)Math.Round(dx * 100.0 / 96);
+        }
+        catch (Exception) { /* fall through to the registry */ }
+        try
+        {
+            using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop\WindowMetrics");
+            if (k?.GetValue("AppliedDPI") is int dpi && dpi > 0) return (int)Math.Round(dpi * 100.0 / 96);
+            using var d = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop");
+            if (d?.GetValue("LogPixels") is int lp && lp > 0) return (int)Math.Round(lp * 100.0 / 96);
+        }
+        catch (Exception) { }
+        return null;
     }
 }
