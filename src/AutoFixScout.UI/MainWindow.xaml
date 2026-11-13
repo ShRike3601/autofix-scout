@@ -36,7 +36,7 @@
                 <StackPanel KeyboardNavigation.DirectionalNavigation="Contained">
                     <RadioButton x:Name="NavHome" Style="{StaticResource NavItem}" Content="Troubleshoot" Tag="&#xE90F;"
                                  IsChecked="True" Checked="OnNavHomeClicked"/>
-                    <RadioButton x:Name="NavHistory" Style="{StaticResource NavItem}" Content="History and reports" Tag="&#xE81C;"
+                    <RadioButton x:Name="NavHistory" Style="{StaticResource NavItem}" Content="History and settings" Tag="&#xE81C;"
                                  Checked="OnSettingsClicked"/>
                 </StackPanel>
             </DockPanel>
@@ -75,6 +75,38 @@
 
                     <!-- Home: describe the problem, or browse the categories. -->
                     <StackPanel x:Name="HomePanel" VerticalAlignment="Top" KeyboardNavigation.DirectionalNavigation="Contained">
+                        <!-- A newer version is ready (MainWindow.Extras.cs). Nothing is downloaded before the click. -->
+                        <Border x:Name="UpdateBar" Visibility="Collapsed" Margin="0,0,0,12" Padding="14,8,8,8"
+                                CornerRadius="{StaticResource CardRadius}" Background="{DynamicResource AccentSoftBrush}">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Left" Style="{StaticResource Icon}" Text="&#xE896;" FontSize="15" Foreground="{DynamicResource AccentBrush}"/>
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button x:Name="UpdateButton" Style="{StaticResource AccentButton}" Content="Update and restart" MinWidth="0" MinHeight="30"
+                                            Padding="14,4" Click="OnAppUpdateClicked"/>
+                                    <Button x:Name="UpdateLaterButton" Style="{StaticResource StandardButton}" Content="Not now" MinWidth="0" MinHeight="30"
+                                            Padding="14,4" Margin="8,0,0,0" Click="OnAppUpdateLaterClicked"/>
+                                </StackPanel>
+                                <TextBlock x:Name="UpdateText" Margin="12,0" VerticalAlignment="Center" TextWrapping="Wrap"
+                                           AutomationProperties.LiveSetting="Polite"/>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- What is new, shown once per version (MainWindow.Extras.cs). -->
+                        <Border x:Name="WhatsNewCard" Visibility="Collapsed" Margin="0,0,0,12" Padding="16,14,12,14"
+                                CornerRadius="{StaticResource CardRadius}" Background="{DynamicResource CardBrush}"
+                                BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource StandardButton}" Content="Close" MinWidth="0" MinHeight="30"
+                                        Padding="14,4" Margin="12,0,0,0" VerticalAlignment="Top" Click="OnWhatsNewCloseClicked"/>
+                                <StackPanel>
+                                    <TextBlock x:Name="WhatsNewTitle" FontSize="{StaticResource CardTitleSize}" FontWeight="SemiBold"/>
+                                    <ScrollViewer MaxHeight="130" Margin="0,6,0,0" VerticalScrollBarVisibility="Auto" Focusable="False">
+                                        <TextBlock x:Name="WhatsNewText" Style="{StaticResource CaptionText}"/>
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </DockPanel>
+                        </Border>
+
                         <!-- Describe the problem in your own words: routes to the best check (SymptomRouter). -->
                         <Border CornerRadius="{StaticResource CardRadius}" Background="{DynamicResource InputBrush}"
                                 BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" Padding="14,4,4,4">
@@ -99,6 +131,9 @@
                         <TextBlock Style="{StaticResource SectionLabel}" Text="Browse by category"/>
                         <UniformGrid x:Name="CategoryGrid" Columns="3" Margin="-4,-4,-4,0"/>
                     </StackPanel>
+
+                    <!-- History and settings: changes with Undo, recent checks, settings (built in MainWindow.Extras.cs). -->
+                    <StackPanel x:Name="HistoryPanel" VerticalAlignment="Top" Visibility="Collapsed"/>
 
                 </Grid>
             </ScrollViewer>

@@ -25,6 +25,7 @@ public partial class MainWindow : Window, IFixHost
         {
             CloseUnfinishedSessions();
             await RecoverOpenSavePointsAsync();
+            await ShowStartupNoticesAsync();
         };
     }
 
@@ -97,7 +98,7 @@ public partial class MainWindow : Window, IFixHost
     {
         SetTopic(topic);
         Journey(Stage.Check);
-        var sessionId = StartSession(topic switch { "sound" => "audio", "health" or "shell" or "apps" or "security" or "power" or "input" => "other", _ => topic });
+        var sessionId = StartSession(topic == "sound" ? "audio" : topic);
         try
         {
             ShowBusy("Checking your computer", scan: true);
@@ -448,6 +449,14 @@ private async void OnInstallClicked(object sender, RoutedEventArgs e) => await R
             () => AskAsync(Areas.InputFlow.TestQuestion));
 
     /// <summary>The same check with the keyboard layout findings first (the person reported wrong characters).</summary>
+    private async void OnPerfClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.PerfFlow.Topic, Areas.PerfFlow.What, Areas.PerfFlow.DiagnoseAsync,
+            () => AskAsync(Areas.PerfFlow.TestQuestion));
+
+    private async void OnGraphicsClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.GraphicsFlow.Topic, Areas.GraphicsFlow.What, Areas.GraphicsFlow.DiagnoseAsync,
+            () => AskAsync(Areas.GraphicsFlow.TestQuestion));
+
     private async void OnTypingClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.InputFlow.Topic, Areas.InputFlow.What, () => Areas.InputFlow.DiagnoseAsync(typingFocus: true),
             () => AskAsync(Areas.InputFlow.TestQuestion));
@@ -490,24 +499,10 @@ private async void OnScannerClicked(object sender, RoutedEventArgs e) =>        
             Process.Start(new ProcessStartInfo("notepad.exe", $"\"{_lastReportPath}\""));
     }
 
-    /// <summary>History and reports: version, recent checks, and the folder with reports and saved settings.</summary>
-    private async void OnSettingsClicked(object sender, RoutedEventArgs e)
+    /// <summary>"History and settings" in the sidebar: changes with Undo, recent checks and settings (MainWindow.Extras.cs).</summary>
+    private void OnSettingsClicked(object sender, RoutedEventArgs e)
     {
-        if (_historyOpen) return; // already on this page
-        IReadOnlyList<SessionLog.SessionSummary> recent;
-        try { using var db = new SessionLog(SessionLog.DefaultPath); recent = db.Recent(4); }
-        catch (Exception) { recent = Array.Empty<SessionLog.SessionSummary>(); }
-        SetTopic(null);
-        _historyOpen = true;
-        var open = await ShowStepAsync(HistoryText.Build(AppVersion, recent), "Open the reports folder", "Close");
-        _historyOpen = false;
-        if (open)
-        {
-            var dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AutoFixScout");
-            System.IO.Directory.CreateDirectory(dir);
-            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{dir}\""));
-        }
-        ShowHome();
+        if (!_historyOpen) ShowHistory();
     }
 
 }

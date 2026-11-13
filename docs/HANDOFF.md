@@ -234,13 +234,13 @@ what the flow does. All in-app wording follows `docs/WRITING.md`.
   control-centre apps: solid surfaces, 1 px borders, no shadows, gradients, glows, illustrations or confetti. The
   owner found the earlier large-type, illustrated look unprofessional; do not bring back the big type scale.
 - **Layout**: the window draws its own title bar (`WindowChrome`, 36 px drag strip, own minimise / maximise / close
-  buttons). Left sidebar (220 px): app mark, navigation ("Troubleshoot", "History and reports"), and at the bottom
+  buttons). Left sidebar (220 px): app mark, navigation ("Troubleshoot", "History and settings"), and at the bottom
   "Report for your helper" and the version. Home page: greeting + question, the describe-the-problem box, and "Browse by
   category" (see **Categories** below). During a check the page header shows only the
   topic title; the journey **Check -> Diagnosis -> Fix -> Confirm** is a vertical "Progress" panel on the right (264 px:
   dot, name and one line per stage; done = tick, current = number with halo, connector fills downwards; hidden outside
   a check). An ending that did not resolve the problem marks the last step amber with "!".
-  "History and reports" is disabled while a check is running; "Troubleshoot" closes the history page.
+  "History and settings" is disabled while a check is running; "Troubleshoot" closes the history page.
 - **Closest checks** (2026-11-13, owner approved): "Find a fix" no longer offers one guess. `OnSymptomSearch` shows the
   top three `SymptomRouter.Rank` candidates as rows (icon, name, `Covers` line) plus "None of these", which runs the
   full check-up; when `NoGoodMatch` it says so and offers the nearest check and the check-up. `ShowChoicesAsync`
@@ -255,6 +255,22 @@ what the flow does. All in-app wording follows `docs/WRITING.md`.
   cards are built in code (`BuildCategories`), not in XAML. **A new area needs one `Problem` line in its category**
   (glyph, title, caption, handler), no XAML. "Keyboard types the wrong characters" uses `OnTypingClicked`
   (`InputFlow.DiagnoseAsync(typingFocus: true)`). The old "Common problems" cards and 18 "Other problems" tiles are gone.
+- **Part 8 screens** (2026-11-14, `MainWindow.Extras.cs`, owned by the UI work; requests in `docs/UI_REQUESTS_PART8.md`):
+  - *Battery and performance* has three more rows: "Computer or games running slowly" (`OnPerfClicked`), "Games stutter
+    or crash" (`OnGraphicsClicked`), "Short load test" (`OnStressClicked`).
+  - *Short load test*: consent screen (bullets, "Start test" / "Not now"), then a busy screen with phase, seconds,
+    processor speed limit, graphics card temperature and a "Stop" button, then the normal `RunFlowAsync` result
+    screens. The re-test is the load test itself; a clean first run is not repeated (`_stressFresh`). A stopped test
+    (`StressNotRun`) is shown as information, not as a problem.
+  - *Home notices*: `ShowStartupNoticesAsync` (called from `Loaded`) shows the "What is new" card once per version and
+    the update bar ("Version X is ready." / "Update and restart" / "Not now"). Download and setup only start on the click.
+  - *History and settings* is now a real page (`HistoryPanel`, built in `BuildHistory`), not a step screen: changes with
+    "Undo" / "Undone" / hint, recent checks with outcome, "Open the reports folder", and settings (update check,
+    Wi-Fi watcher state with "Switch off", notification on reconnect). `HistoryText.Build` is no longer used by the UI.
+  - Sessions are logged under the topic name itself (only "sound" is still mapped to "audio").
+  - Checked on the bench: home with the What is new card, history page (also maximised), category rows, load test
+    consent, progress and Stop. **Not exercised**: Undo, Wi-Fi watcher "Switch off", the update bar and download
+    (a local build is never offered an update), a load test run to the end, perf and graphics checks.
 - **Step card** (the "stage": fills the page beside the progress panel, content centred, at most 560 wide): optional
   status banner (tinted strip, icon + label coloured by severity), a 56 px icon tile, the first sentence as a centred
   heading, any further sentences as supporting text (`Split`; "\n\n" also splits; centred when short, left aligned for
