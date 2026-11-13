@@ -21,6 +21,7 @@ public static partial class SymptomRouter
         ["update"] = new("update", "Windows Update problems", "This sounds like a problem with Windows Update."),
         ["printer"] = new("printer", "Printer not working", "This sounds like a problem with printing."),
         ["display"] = new("display", "Screen or display problem", "This sounds like a problem with the screen or display."),
+        ["graphics"] = new("graphics", "Games stutter or the graphics card misbehaves", "This sounds like a problem with the graphics card or its settings."),
         ["shell"] = new("shell", "Start menu, taskbar or search not working", "This sounds like a problem with the Start menu, the taskbar or search."),
         ["store"] = new("store", "Microsoft Store or app installs", "This sounds like a problem with the Microsoft Store or with installing apps."),
         ["office"] = new("office", "Word, Excel or Outlook problems", "This sounds like a problem with Microsoft Office."),
@@ -31,6 +32,7 @@ public static partial class SymptomRouter
         ["scanner"] = new("scanner", "Scanner not working", "This sounds like a problem with the scanner."),
         ["install"] = new("install", "A program will not install", "This sounds like a problem with installing a program."),
         ["notifications"] = new("notifications", "Notifications are missing", "This sounds like a problem with notifications."),
+        ["performance"] = new("performance", "Computer or games running slowly", "This sounds like a computer that has become slow, or games that stutter."),
         ["health"] = new("health", "Full computer check-up", "AutoFix Scout will check the whole computer for common software problems."),
     };
 
@@ -67,6 +69,8 @@ public static partial class SymptomRouter
                    new[] { "restart", "restarts", "reboot", "error", "errors", "broken", "weird", "strange" }),
         ("program", new[] { "keeps closing", "keeps crashing", "stopped working", "not responding", "won't open", "wont open", "will not open", "doesn't open", "does not open", "closes by itself", "app crash", "freezes" },
                     new[] { "crash", "crashes", "crashing", "closes", "freeze", "freezing", "hangs", "error message", "missing dll", ".dll", "vcruntime", "msvcp" }),
+        ("performance", new[] { "slow games", "games stutter", "game stutter", "stuttering", "fps drop", "low fps", "performance drop", "performance dropped", "got slow", "suddenly slow", "game lag", "lag in games", "lagging in games", "overheating", "too hot", "fans loud", "loud fan", "fan is loud", "fan noise", "fans are loud" },
+                        new[] { "stutter", "fps", "throttle", "throttling", "overheat", "game", "games", "gaming", "framerate" }),
         ("storage", new[] { "running slow", "very slow", "is slow", "disk full", "out of space", "low disk", "takes long to start", "slow startup" },
                     new[] { "slow", "sluggish", "lag", "lagging", "space", "storage", "full", "disk", "memory", "startup" }),
         ("update", new[] { "windows update", "update failed", "updates fail", "update error", "update stuck", "cannot update", "can't update" },
@@ -74,6 +78,8 @@ public static partial class SymptomRouter
         ("scanner", new[] { "scanner", "cannot scan", "can't scan", "scanning", "scan a document" }, new[] { "scan", "scanner" }),
         ("printer", new[] { "won't print", "wont print", "will not print", "cannot print", "can't print", "printer offline", "print queue" },
                     new[] { "printer", "print", "printing", "scanner" }),
+        ("graphics", new[] { "graphics card", "game crash", "games crash", "game keeps crashing", "driver crashed", "driver stopped responding", "black screen in game", "artifacts", "artefacts", "afterburner", "overclock", "stutter", "gpu" },
+                     new[] { "gpu", "graphics", "afterburner", "overclock", "overclocking", "artifact", "artifacts", "nvidia", "geforce", "radeon", "fps", "game", "games", "gaming" }),
         ("display", new[] { "second monitor", "external monitor", "screen is dark", "screen too dark", "screen flickers", "no display", "projector not" },
                     new[] { "monitor", "display", "screen", "brightness", "hdmi", "projector", "resolution", "flicker", "flickering" }),
     };

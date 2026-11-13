@@ -448,3 +448,48 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
 - Merged g2-boot (slow start-up: boot times, slow items, Fast Startup) and g3-layout (several keyboard layouts with a switch hotkey, layout vs display language). 873 tests pass; live read-only tests pass on the bench.
 - Known limit: the Diagnostics-Performance log (boot times) is readable only by administrators, so without elevation the slow start-up check reports Unknown and raises no finding. A later part can read it through the elevated executor.
 - InputFlow.DiagnoseAsync(typingFocus: true) puts layout steps first; the UI does not call it yet (UI session to wire when the symptom is about wrong characters). The search words route "wrong characters", "keyboard layout" and similar to the keyboard check.
+
+## Roadmap (part 8, from 2026-11-13 evening; owner away, heartbeat every 20 min, agents on Sonnet)
+Owner's goals: find why games/PCs suddenly run slowly (throttling, Resizable BAR, power/voltage instability,
+crashing or corrupt drivers, GPU overclocks from MSI Afterburner), a short opt-in stress test, a background
+Wi-Fi watcher that reconnects, and a faster/smaller app. Rust rewrite: declined (bottleneck is Windows calls).
+Branch `perf` (from main 9f5f3f5) collects the work; agents work in C:\afs-wt\g5..g8 and are merged into `perf`.
+- g5-perf: new area "performance" (CPU/system): throttling (perf counters, Kernel-Processor-Power), power plan,
+  battery, BIOS age, Intel 13th/14th gen microcode, RAM speed vs rated (XMP), single-channel RAM; reuses health readings.
+- g6-gpu: new area "graphics": GPU, driver age, NVIDIA readings via nvidia-smi (temperature, clocks, throttle
+  reasons, PCIe link, BAR1 = Resizable BAR), driver resets, MSI Afterburner overclock profiles, monitor on the wrong GPU.
+- g7-watch: opt-in background Wi-Fi watcher (AutoFixScout.Watch.exe, HKCU Run), reconnects saved networks.
+- g8-speed: ReadyToRun, parallel probes, smaller installer; measure before/after.
+- then: opt-in stress test (CPU + GPU load ~60 s with live readings, stops on heat), bench live tests, CI, v0.3.0 tag.
+- UI tiles: ask the UI session (one Problem line each in Categories() in MainWindow.Visuals.cs).
+- Installer (done, bf699c2, verify on the bench): a newer setup silently uninstalls the old version first (same AppId,
+  same folder, one Start menu entry), asks before a downgrade, force-closes a running app. Bench check: install
+  v0.2.0, then the perf CI setup; expect one entry in Installed apps and one Start menu entry.
+- Quality-of-life candidates (owner to pick): in-app "new version available" check against GitHub releases
+  (needs privacy note), "What's new" after an update, "Did this fix it?" feedback kept locally and added to the
+  helper report, changes history with Undo buttons, watcher toast "Wi-Fi reconnected", optional weekly check-up
+  with a toast only when something is wrong, uninstall option to also delete AutoFix Scout data.
+- Status ~22:30 IST: merged into perf: g5-perf (performance area, 10 Perf codes), g6-gpu (graphics area, Gpu codes;
+  Afterburner .cfg keys unverified against a real install), g7-watch (watcher). 1018 tests pass. Installer fix: silent
+  upgrade kept removing the watcher Run value -> PrepareToInstall saves/restores it and [Run] restarts the watcher.
+  Running: g8-speed, g9-qol (update check, What's new, history+undo, uninstall-data prompt), g10-stress (stress test),
+  g11-watch2 (watcher via wlanapi instead of English netsh text, "Wi-Fi reconnected" toast).
+  Bench live (this laptop): PerfBiosOld (BIOS 2020); GpuDriverResets (2 in 14 days), GpuResizableBarOff (BAR1 256 MiB).
+- UI tile requests to send in one message when all agents are merged: performance (PerfFlow, "Computer or games
+  running slowly"), graphics (GraphicsFlow, "Games stutter or crash"), stress (StressFlow), update banner, What's new,
+  History with Undo, watcher on/off + toast switch.
+
+## Quality of life (branch g9-qol)
+Core only; the UI session wires it (see the UI requests in the g9 report). Files: `src/AutoFixScout/Updates/*`
+(`UpdateService`, `AppVersion`, `AppSettings`, `UpdateState`, `WhatsNew`, `ReleaseNotes`), `ChangeHistory.cs`,
+`docs/WHATS_NEW.md` (embedded resource, built-in "What's new" text; the release workflow also puts it above the first
+`---` of the GitHub release notes, which is what the app shows).
+- Files in `%LOCALAPPDATA%\AutoFixScout`: `settings.json` (`CheckForUpdates`, default true; `OfferUpdatesToDevBuilds`,
+  default false), `update.json` (last check time, last seen version, newest release found), `updates\` (downloaded setup).
+- Update flow: `CheckAsync` (api.github.com, 5 s, at most once per start and per 6 h) -> person clicks ->
+  `DownloadAsync` (size from the asset, SHA-256 from `AutoFixScout-Setup-<v>.exe.sha256` when present; build.yml writes and
+  uploads it) -> `StartSetup` (`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /RELAUNCH=1`, runas) -> app exits. The setup
+  restarts the app only with `/RELAUNCH=1`. Open item: an Authenticode check of the downloaded setup once releases are signed.
+- History: `SessionLog.AddSteps` now stores `step_log.detail` and writes an `undo_record` for driver changes (save point id)
+  and switched-off start-up apps; `ChangeHistory.List/UndoAsync` use them. Other changes are listed with a hint only.
+- Uninstall asks (interactive only, default No) whether to delete both data folders; silent uninstall (updates) keeps them.

@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <!-- Packaging for portable installer -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!-- English only: drops the localized resource folders of the packages from the install -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,9 +16,16 @@
     <PackageReference Include="System.Diagnostics.EventLog" Version="8.0.0" />
     <PackageReference Include="System.Management" Version="8.0.0" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.0" />
+    <PackageReference Include="Vortice.D3DCompiler" Version="3.6.2" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.6.2" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="AutoFixScout.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Built-in "What is new" text, used when the GitHub release notes could not be fetched. -->
+    <EmbeddedResource Include="../../docs/WHATS_NEW.md" LogicalName="WHATS_NEW.md" />
   </ItemGroup>
 </Project>

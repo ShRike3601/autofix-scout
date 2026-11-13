@@ -92,6 +92,12 @@ public sealed class RealNetworkProbe : INetworkProbe
             try { if (wifiAdapter.Connected) state.WifiEnterprise = NetworkChecks.ReadWifiEnterprise(); }
             catch (Exception ex) { errors.Add($"Wi-Fi security type: {ex.Message}"); }
         }
+        try
+        {
+            state.WifiWatcher = Watching.WifiWatcherSetup.ReadState();
+            state.WifiWatch = new Watching.WifiWatchStore().Summarize(DateTime.UtcNow);
+        }
+        catch (Exception ex) { errors.Add($"Wi-Fi watcher: {ex.Message}"); }
         try { state.IpConflictRecent = NetworkChecks.ReadRecentIpConflict(); }
         catch (Exception ex) { errors.Add($"Event log: {ex.Message}"); }
         try { state.Metered = NetworkChecks.ReadMetered(connected.IsWireless); }

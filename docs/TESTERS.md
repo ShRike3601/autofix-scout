@@ -5,6 +5,9 @@ Windows problems: sound, camera, microphone, internet and Wi-Fi, Bluetooth, prin
 a slow or full computer, Windows Update, start-up, and damaged Windows files or apps. This build is not yet digitally signed, so Windows will show a
 warning before it runs.
 
+Code signing policy: free code signing provided by SignPath.io, certificate by SignPath Foundation (applied for). See
+[CODE_SIGNING.md](https://github.com/ShRike3601/autofix-scout/blob/main/docs/CODE_SIGNING.md).
+
 ## Requirements
 
 - A Windows 10 or Windows 11 PC or laptop (Intel, AMD or ARM; the installer chooses the right version).
@@ -16,6 +19,10 @@ warning before it runs.
 1. Download `AutoFixScout-Setup-<version>.exe` from the release page.
 2. Open the file. If Windows shows "Windows protected your PC", select **More info**, then **Run anyway**.
    Your antivirus software may also ask for confirmation.
+   If Windows shows "Smart App Control blocked an app that may be unsafe" instead, there is no way to run this
+   build on that PC: Smart App Control blocks every app that is not digitally signed. Please test on another PC
+   until signed releases are available. Turning Smart App Control off is not recommended, because on many PCs it
+   cannot be turned on again without resetting Windows.
 3. Select **Yes** when Windows asks whether the installer may make changes, then follow the steps.
 4. Start AutoFix Scout from the Start menu (or the desktop shortcut, if you chose one).
 

@@ -6,7 +6,7 @@ public static class HistoryText
     public static string Symptom(string s) => s switch
     {
         "audio" => "Sound", "camera" => "Camera", "network" => "Internet connection", "microphone" => "Microphone",
-        "bluetooth" => "Bluetooth", "printer" => "Printer", "display" => "Screen", "storage" => "Slow or full computer",
+        "bluetooth" => "Bluetooth", "printer" => "Printer", "display" => "Screen", "performance" => "Computer speed", "graphics" => "Graphics card", "storage" => "Slow or full computer",
         "update" => "Windows Update", _ => "Other check",
     };
 

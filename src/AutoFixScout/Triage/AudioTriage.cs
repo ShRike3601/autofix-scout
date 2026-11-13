@@ -350,4 +350,33 @@ public enum FindingCode
     // Keyboard layouts
     InputSeveralLayouts,
     InputLayoutMismatch,
+    // Slow PC, games stutter (Performance area)
+    PerfProcessorThrottled,
+    PerfHardwareInstability,
+    PerfIntelMicrocode,
+    PerfPowerSaver,
+    PerfOnBattery,
+    PerfBatterySaver,
+    PerfBiosOld,
+    PerfRamBelowRated,
+    PerfRamSingleChannel,
+    PerfLowRam,
+    // Graphics card (Graphics area)
+    GpuOverheating,
+    GpuOverclockUnstable,
+    GpuOverclockActive,
+    GpuOverclockToolInstalled,
+    GpuDriverResets,
+    GpuDriverOld,
+    GpuPowerBrake,
+    GpuPcieLinkNarrow,
+    GpuMonitorOnIntegrated,
+    GpuResizableBarOff,
+    // Short load test (Stress area). A test without any slowdown uses LooksNormal.
+    StressCpuThrottles,
+    StressGpuOverheats,
+    StressGpuPowerLimited,
+    StressGpuClocksLow,
+    StressStoppedForSafety,
+    StressNotRun,
 }

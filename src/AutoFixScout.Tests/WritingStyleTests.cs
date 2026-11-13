@@ -103,7 +103,7 @@ public class WritingStyleTests
         weak.WifiSignalPercent = 30;
         yield return weak;
         var drops = Online(Tri.Yes, Tri.Yes, Tri.Yes);
-        drops.WifiDrops = new WifiDropStats(9, 12, 1, 3, 4, 1); drops.WifiPowerSavingMayTurnOff = Tri.Yes;
+        drops.WifiDrops = new WifiDropStats(9, 12, 1, 3, 4, 1); drops.WifiPowerSavingMayTurnOff = Tri.Yes; drops.WifiWatcher = Tri.No;
         yield return drops;
     }
 
