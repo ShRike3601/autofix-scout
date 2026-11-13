@@ -134,6 +134,20 @@ public static partial class AudioTriage
                     $"Session '{app.Process}': level {app.VolumePercent}%, {(app.Active ? "active" : "inactive")}"));
         }
 
+        // Rule 9c: calls, only when the person asked about calls and the device itself is fine (app findings do not block it).
+        if (state.CallFocus && !findings.Any(f => f.Code is not (FindingCode.AppSoundMuted or FindingCode.AppSoundVeryLow)))
+        {
+            if (CallSound.LowersOthers(state.Ducking))
+                findings.Add(new Finding(FindingCode.SoundDuckingDuringCalls,
+                    "Windows lowers other sounds during calls.",
+                    $"UserDuckingPreference: Windows {CallSound.Describe(state.Ducking!.Value)} during calls"));
+            if (state.MultimediaDeviceId != null && state.CommsDeviceId != null
+                && !string.Equals(state.MultimediaDeviceId, state.CommsDeviceId, StringComparison.OrdinalIgnoreCase))
+                findings.Add(new Finding(FindingCode.SoundCallDeviceDifferent,
+                    $"Calls use \"{state.CommsDeviceName}\" instead of \"{state.MultimediaDeviceName}\".",
+                    $"Communications default: '{state.CommsDeviceName}'; media default: '{state.MultimediaDeviceName}'"));
+        }
+
         // Rule 10: LooksNormal ONLY if no other findings AND no Unknown values
         var hasOtherFindings = findings.Count > 0;
         var hasUnknownMuteOrVolume = state.DefaultMuted == Tri.Unknown || (state.DefaultVolumePercent.HasValue && state.DefaultVolumePercent.Value == 0); // Treat 0 as potentially unknown/neutral
@@ -328,4 +342,7 @@ public enum FindingCode
     DisplayNotNativeResolution,
     DisplayLowRefreshRate,
     DisplayUnusualScaling,
+    // Sound during calls
+    SoundDuckingDuringCalls,
+    SoundCallDeviceDifferent,
 }

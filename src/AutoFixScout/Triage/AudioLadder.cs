@@ -42,6 +42,15 @@ public static class AudioLadder
                 "AutoFix Scout will open the \"Volume mixer\" settings. Please check that the volume of the app is not turned down or muted.", "volume_mixer"));
         }
 
+        if (codes.Contains(FindingCode.SoundDuckingDuringCalls))
+            rungs.Add(new("ducking_off", "audio.ducking_off", 1,
+                "Windows lowers other sounds while a call is active. AutoFix Scout can change this to \"Do nothing\" for your account. " +
+                "The previous setting is saved first. You can change it again at any time."));
+        if (codes.Contains(FindingCode.SoundCallDeviceDifferent))
+            rungs.Add(new("call_device", "ui.open_settings_page", 0,
+                $"Calls use \"{state.CommsDeviceName}\" instead of \"{state.MultimediaDeviceName}\". AutoFix Scout will open the classic \"Sound\" window. " +
+                $"Under \"Playback\", please right-click \"{state.MultimediaDeviceName}\", select \"Set as Default Communication Device\", and then select \"OK\".", "sound_classic"));
+
         rungs.Add(new("restart_services", "service.restart", 1,
             "AutoFix Scout can restart the part of Windows that plays sound. Windows will ask for your permission.", "AudioEndpointBuilder"));
         // An uninstalled or vanished sound device leaves no active output; Windows reinstalls it on a hardware scan.
