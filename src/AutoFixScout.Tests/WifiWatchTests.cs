@@ -180,6 +180,41 @@ public class WifiWatchTests
         Assert.Null(WifiNetsh.ParseProfileName(xml.Replace("Campus", "")));
     }
 
+    private const string Ns = "http://www.microsoft.com/networking/WLAN/profile/v1";
+
+    [Theory]
+    [InlineData("<WLANProfile xmlns=\"" + Ns + "\"><name>Sample</name><connectionType>ESS</connectionType><connectionMode>auto</connectionMode></WLANProfile>", true)]
+    [InlineData("<WLANProfile xmlns=\"" + Ns + "\"><connectionMode>manual</connectionMode></WLANProfile>", false)]
+    [InlineData("<WLANProfile xmlns=\"" + Ns + "\"><name>Sample</name></WLANProfile>", false)]
+    [InlineData("<WLANProfile xmlns=\"http://example.invalid/other\"><connectionMode>auto</connectionMode></WLANProfile>", false)]
+    [InlineData("not xml", false)]
+    public void IsAutoConnectXml_ReadsConnectionMode(string xml, bool expected) =>
+        Assert.Equal(expected, WifiNetsh.IsAutoConnectXml(xml));
+
+    [Fact]
+    public void ToastGate_AllowsOnePerTenMinutes()
+    {
+        var gate = new ToastGate();
+        Assert.True(gate.TryAcquire(T0));
+        Assert.False(gate.TryAcquire(T0.AddMinutes(9)));
+        Assert.True(gate.TryAcquire(T0.AddMinutes(10)));
+    }
+
+    [Fact]
+    public void Settings_NotifyDefaultsOn_AndIsStored()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "afs-ws-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            Assert.True(WifiWatcherSetup.GetNotify(path));
+            WifiWatcherSetup.SetNotify(false, path);
+            Assert.False(WifiWatcherSetup.GetNotify(path));
+            File.WriteAllText(path, "garbage");
+            Assert.True(WifiWatcherSetup.GetNotify(path));
+        }
+        finally { File.Delete(path); }
+    }
+
     // ---- the file ----
 
     private static string TempFile() => Path.Combine(Path.GetTempPath(), "afs-watch-" + Guid.NewGuid().ToString("N") + ".json");

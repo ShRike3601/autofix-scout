@@ -53,7 +53,8 @@ Source: "{#SourceArm64}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdir
 Source: "{#SourceX64}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: not IsArm64
 
 [Icons]
-Name: "{group}\AutoFix Scout"; Filename: "{app}\AutoFixScout.UI.exe"
+; AppUserModelID: lets the Wi-Fi watcher show its "Wi-Fi reconnected" toast under this name (same id as WifiToast.cs).
+Name: "{group}\AutoFix Scout"; Filename: "{app}\AutoFixScout.UI.exe"; AppUserModelID: "ShRike3601.AutoFixScout"
 Name: "{group}\Uninstall AutoFix Scout"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\AutoFix Scout"; Filename: "{app}\AutoFixScout.UI.exe"; Tasks: desktopicon
 

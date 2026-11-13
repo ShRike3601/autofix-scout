@@ -5,7 +5,7 @@ namespace AutoFixScout.Watching;
 
 /// <summary>
 /// Glue between Windows and <see cref="WifiWatchLogic"/>: listens to the WLAN-AutoConfig log (8003 disconnect, 8001 connect),
-/// checks the connection every few seconds while an outage is open, and runs "netsh wlan connect" when the logic says so.
+/// checks the connection every few seconds while an outage is open, and reconnects through the Native Wifi API (netsh only as a fallback) when the logic says so.
 /// Only the saved profile that was connected before is ever reconnected. Nothing is sent anywhere.
 /// </summary>
 internal sealed class WifiWatcher : IDisposable
@@ -13,6 +13,8 @@ internal sealed class WifiWatcher : IDisposable
     private const string Log = "Microsoft-Windows-WLAN-AutoConfig/Operational";
     private readonly WifiWatchLogic _logic = new();
     private readonly WifiWatchStore _store;
+    private readonly WifiWatchSettings _settings = new();
+    private readonly ToastGate _toastGate = new();
     private readonly object _gate = new();
     private EventLogWatcher? _events;
     private Timer? _timer;
@@ -20,7 +22,11 @@ internal sealed class WifiWatcher : IDisposable
     public WifiWatcher(WifiWatchStore store)
     {
         _store = store;
-        _logic.Completed += r => { try { _store.Add(r, DateTime.UtcNow); } catch (Exception) { /* a full disk must not stop the watcher */ } };
+        _logic.Completed += r =>
+        {
+            try { _store.Add(r, DateTime.UtcNow); } catch (Exception) { /* a full disk must not stop the watcher */ }
+            if (r.ReconnectedByWatcher) WifiToast.ShowReconnected(_settings, _toastGate);
+        };
     }
 
     public void Start()
@@ -64,16 +70,25 @@ internal sealed class WifiWatcher : IDisposable
             }
             var connected = ReadInterfaces().Connected;
             lock (_gate) decision = _logic.Tick(DateTime.UtcNow, connected, IsAutoConnect);
-            if (decision is WatchDecision.Reconnect r && WifiNetsh.ConnectArguments(r.Profile) is { } args)
-                RunNetsh(args, out _);
+            if (decision is WatchDecision.Reconnect r && !WifiNative.Reconnect(r.Profile) && WifiNetsh.ConnectArguments(r.Profile) is { } args)
+                RunNetsh(args, out _); // netsh only as a fallback when the API failed
         }
         catch (Exception) { /* try again at the next tick */ }
     }
 
     private static bool IsAutoConnect(string profile) =>
+        WifiNative.IsAutoConnect(profile) ?? IsAutoConnectNetsh(profile);
+
+    private static bool IsAutoConnectNetsh(string profile) =>
         WifiNetsh.ShowProfileArguments(profile) is { } args && RunNetsh(args, out var text) && WifiNetsh.IsAutoConnect(text);
 
-    private static (bool Connected, string? Profile) ReadInterfaces() =>
+    private static (bool Connected, string? Profile) ReadInterfaces()
+    {
+        var api = WifiNative.ReadState();
+        return api.Ok ? (api.Connected, api.Profile) : ReadInterfacesNetsh();
+    }
+
+    private static (bool Connected, string? Profile) ReadInterfacesNetsh() =>
         RunNetsh("wlan show interfaces", out var text) ? WifiNetsh.ParseInterfaces(text) : (false, null);
 
     private static bool RunNetsh(string arguments, out string output)

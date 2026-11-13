@@ -55,6 +55,10 @@ public static class WifiWatcherSetup
         return (true, $"Wi-Fi watcher removed from start-up; {stopped} running copy stopped");
     }
 
+    /// <summary>Whether the watcher shows a toast after it reconnects Wi-Fi (on by default).</summary>
+    public static bool GetNotify(string? settingsPath = null) => new WifiWatchSettings(settingsPath).Notify;
+    public static void SetNotify(bool on, string? settingsPath = null) => new WifiWatchSettings(settingsPath).SetNotify(on);
+
     public static (bool Ok, string Detail) TurnOn() => TurnOn(Registry.CurrentUser, ExePath(), start: true);
     public static (bool Ok, string Detail) TurnOff() => TurnOff(Registry.CurrentUser, stop: true);
 }
