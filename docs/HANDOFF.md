@@ -500,3 +500,12 @@ Core only; the UI session wires it (see the UI requests in the g9 report). Files
   silent install v0.2.0 setup, then the rc1 setup silently; expect one Uninstall entry (DisplayVersion 0.3.0-rc1),
   one Start menu entry, no old files; then interactive uninstall data prompt by hand. (2) merge the UI session's
   branch when it reports its hash. (3) merge perf -> main, tag v0.3.0. AutoFix Scout is currently not installed here.
+- Bench upgrade test 2026-11-14 01:34 (v0.2.0 -> 0.3.0-rc1, silent, elevated runner): PASS for one copy only (1 uninstall
+  entry "AutoFix Scout 0.3.0-rc1", same 2 Start menu shortcuts, 486 -> 276 files, 0.2.0-only
+  Microsoft.Xaml.Behaviors.dll removed) and for the watcher (Run value kept, watcher restarted by [Run] WatcherWasOn).
+  Not run: the silent downgrade refusal. Harness lesson: PowerShell 5.1 `Start-Process -Wait` also waits for child
+  processes, so it hung on the restarted watcher (elevated, because the runner is elevated; a normal install starts it
+  as the user). Use `$p = Start-Process ... -PassThru; $p.WaitForExit()` instead. The hung runner + elevated watcher
+  go away with a restart. 0.3.0-rc1 stays installed on the bench.
+- UI session status: tiles for performance and graphics done locally (not pushed); stress screens, update banner,
+  What's new, History, settings NOT done. Do not tag v0.3.0 until they are pushed and merged.
