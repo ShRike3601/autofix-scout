@@ -63,9 +63,11 @@ Name: "{autodesktop}\AutoFix Scout"; Filename: "{app}\AutoFixScout.UI.exe"; Task
 Filename: "{app}\AutoFixScout.UI.exe"; Description: "Start AutoFix Scout now"; Flags: nowait postinstall skipifsilent runasoriginaluser
 ; After an update, start the Wi-Fi watcher again if the person had switched it on.
 Filename: "{app}\AutoFixScout.Watch.exe"; Flags: nowait runasoriginaluser; Check: WatcherWasOn
+; After a silent update (/RELAUNCH=1 is passed by the app's own "Update and restart") the new version starts again.
+Filename: "{app}\AutoFixScout.UI.exe"; Flags: nowait runasoriginaluser; Check: RelaunchRequested
 
-; Uninstall leaves %LOCALAPPDATA%\AutoFixScout (session log, reports) and C:\ProgramData\AutoFixScout (driver save
-; points) on purpose: a save point may still be needed to put a driver back.
+; An interactive uninstall asks whether to delete %LOCALAPPDATA%\AutoFixScout (session log, reports) and C:\ProgramData\AutoFixScout
+; (driver save points); the answer is No by default. A silent uninstall (an update) always keeps both.
 
 ; The optional Wi-Fi watcher (AutoFixScout.Watch.exe, in the same folder as the app) is switched on by the person inside AutoFix
 ; Scout, which writes a per-user Run value. Uninstalling stops the process and removes that value. Inno runs this for the account
@@ -137,4 +139,24 @@ end;
 function WatcherWasOn(): Boolean;
 begin
   Result := WatcherRun <> '';
+end;
+
+// Relaunch after a silent update: only when the app itself started this setup with /RELAUNCH=1.
+function RelaunchRequested: Boolean;
+begin
+  Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
+end;
+
+// Interactive uninstall only: ask whether history, reports and backups should go too. A silent uninstall is what
+// an update does first, and it must keep that data.
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if (CurUninstallStep = usPostUninstall) and not UninstallSilent then
+    if MsgBox('Also delete AutoFix Scout''s history, reports and saved backups?' + #13#10 + #13#10 +
+              'The saved backups are needed to put drivers and settings back. After they are deleted, changes made by AutoFix Scout can no longer be undone.',
+              mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
+    begin
+      DelTree(ExpandConstant('{localappdata}\AutoFixScout'), True, True, True);
+      DelTree(ExpandConstant('{commonappdata}\AutoFixScout'), True, True, True);
+    end;
 end;
