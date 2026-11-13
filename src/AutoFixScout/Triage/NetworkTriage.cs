@@ -6,6 +6,10 @@ namespace AutoFixScout.Triage;
 /// </summary>
 public static class NetworkTriage
 {
+    /// <summary>A Wi-Fi driver older than two years (from the adapter's class key).</summary>
+    public static bool OldWifiDriver(NetworkState s, DateTime? now = null) =>
+        s.WifiDriverDate is { } d && (now ?? DateTime.Now) - d > Repair.WifiTuning.OldDriver;
+
     private static Finding F(FindingCode code, string plain, string detail) => new(code, plain, detail);
 
     private const string Incomplete = "AutoFix Scout could not complete the network check.";
@@ -70,8 +74,10 @@ public static class NetworkTriage
         if (s.WifiDrops is { Unintentional: >= WifiDrops.Threshold } d)
             list.Add(F(FindingCode.NetWifiDrops,
                 $"Your Wi-Fi has disconnected {d.Unintentional} times in the last {WifiDrops.Days} days without being switched off by a person." +
-                (d.SignInFailures > 0 ? " Windows could not always sign in to the network again by itself." : ""),
-                $"{d.Describe()}; power saving may turn the adapter off: {s.WifiPowerSavingMayTurnOff}"));
+                (d.SignInFailures > 0 ? " Windows could not always sign in to the network again by itself." : "") +
+                (OldWifiDriver(s) ? $" The Wi-Fi driver is from {s.WifiDriverDate:MMMM yyyy}, which is old." : ""),
+                $"{d.Describe()}; sign-in failures {d.SignInFailures}; power saving may turn the adapter off: {s.WifiPowerSavingMayTurnOff}; " +
+                $"driver {s.WifiDriverVersion} ({s.WifiDriverDate:yyyy-MM-dd}); enterprise {s.WifiEnterprise}; tuning pending: {string.Join(", ", s.WifiTuningPending)}"));
         if (s.Metered == Tri.Yes)
             list.Add(F(FindingCode.NetMetered, "Your connection is set as a \"Metered connection\", so Windows Update and OneDrive may pause.", "connection cost is fixed or variable"));
         return list;
@@ -167,17 +173,38 @@ public static class NetworkTriage
                             "Please save your network sign-in: press Windows+R, type ncpa.cpl and press Enter. Right-click \"Wi-Fi\", select \"Status\", then \"Wireless Properties\". " +
                             "On the \"Security\" tab, select \"Advanced settings\", tick \"Specify authentication mode\", choose \"User authentication\", select \"Save credentials\" " +
                             "and enter the user name and password for this network."));
+                    // Same bench case: an old driver on a busy enterprise network also needed these adapter settings.
+                    if (s.WifiTuningPending.Count > 0 && s.WifiInstanceId != null && (s.WifiEnterprise == Tri.Yes || OldWifiDriver(s)))
+                        rungs.Add(new("wifi_stability", "network.wifi_stability", 1,
+                            "AutoFix Scout can change Wi-Fi adapter settings that often cause drops on busy networks with older drivers: " +
+                            string.Join(", ", s.WifiTuningPending) + ". The current settings are saved first, the Wi-Fi reconnects within a few seconds, " +
+                            "and if it does not reconnect within four minutes the previous settings are restored automatically. Windows will ask for your permission.",
+                            s.WifiInstanceId));
+                    if (OldWifiDriver(s))
+                        rungs.Add(new("wifi_old_driver", "ui.open_settings_page", 0,
+                            $"The Wi-Fi driver is from {s.WifiDriverDate:MMMM yyyy}. A newer driver fixes many disconnects. AutoFix Scout will open \"Windows Update\". " +
+                            "Please choose \"Advanced options\", then \"Optional updates\", and install any driver listed for the Wi-Fi adapter. If none is listed, " +
+                            "the newest Wi-Fi driver is available from the computer maker's support page or the Wi-Fi chip maker (for example Intel).", "windowsupdate"));
                     if (s.WifiPowerSavingMayTurnOff != Tri.No)
                         rungs.Add(new("wifi_power_saving", "ui.human_step", 0,
                             "Windows may be turning your Wi-Fi adapter off to save power. Please open \"Device Manager\", open \"Network adapters\", " +
                             "double-click your Wi-Fi adapter, choose the \"Power Management\" tab and clear \"Allow the computer to turn off this device to save power\". " +
                             "Windows may ask for permission, because this change needs an administrator."));
+                    if (s.WifiEnterprise == Tri.Yes)
+                    {
+                        // A campus or office network has no router the person can restart; its support team can check the access points.
+                        rungs.Add(new("wifi_enterprise_support", "ui.human_step", 0,
+                            "If the drops continue in one particular building or room, please tell the network support team of your school or workplace " +
+                            "where and when they happen; they can check the access points there."));
+                        break;
+                    }
                     rungs.Add(new("wifi_distance_band", "ui.human_step", 0,
                         "Please move closer to your router, or move the router to a more open place. If your router offers both a 2.4 GHz and a 5 GHz network, " +
                         "try the other one: 5 GHz is faster at short range, 2.4 GHz reaches further through walls."));
-                    rungs.Add(new("wifi_driver_update", "ui.open_settings_page", 0,
-                        "A newer Wi-Fi driver may fix the disconnects. AutoFix Scout will open \"Windows Update\". " +
-                        "Please choose \"Advanced options\", then \"Optional updates\", and install any driver update listed for your Wi-Fi adapter.", "windowsupdate"));
+                    if (!OldWifiDriver(s))
+                        rungs.Add(new("wifi_driver_update", "ui.open_settings_page", 0,
+                            "A newer Wi-Fi driver may fix the disconnects. AutoFix Scout will open \"Windows Update\". " +
+                            "Please choose \"Advanced options\", then \"Optional updates\", and install any driver update listed for your Wi-Fi adapter.", "windowsupdate"));
                     rungs.Add(RestartRouter);
                     break;
                 case FindingCode.NetMetered:

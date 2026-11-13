@@ -59,6 +59,7 @@ Status: **Done** = built, unit-tested and checked on the test laptop (every admi
 | Slow start-up | boot and sign-in time, slow start-up items | guided, startup apps | Planned (G2) |
 | Keyboard types wrong characters | wrong or several keyboard layouts, switch hotkeys | guided | Planned (G3) |
 | Sound gets quieter during calls | communications ducking, separate call device | switch ducking off (backed up), guided | Planned (G4) |
+| Wi-Fi drops on a campus or office network | enterprise (802.1X) network, sign-ins that cannot reconnect by themselves, old Wi-Fi driver, adapter settings that drop on busy networks | save-sign-in guide, adapter tuning (admin: 802.11ac, gentler roaming, no radio power saving, prefer 5 GHz; backed up, automatic undo if no reconnect in 4 minutes), driver update guide, no router steps on campus | Done |
 
 ## Safety rules the code enforces
 - The UI never runs elevated; the executor accepts only allowlisted action ids with fixed or validated arguments.

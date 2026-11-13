@@ -411,3 +411,9 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
   802.11ac, roaming Medium-low, No SMPS, prefer 5 GHz (backup C:\afs-bench\out\wifi-advanced-backup.csv). The Wi-Fi
   drops check now counts 12013 and offers "save your network sign-in" first. Next: newer Intel driver (owner's OK needed
   to download it).
+- 2026-11-13 15:35: the owner's Wi-Fi problem is now a product capability (internet check, Wi-Fi drops): detects enterprise
+  Wi-Fi, failed 802.1X re-sign-ins (12013), old driver (>2 years) and pending adapter tuning (WifiTuning, shared with the
+  executor). New admin action network.wifi_stability <adapter instance id>: changes only those 4 values to supported
+  targets, backs up, restarts the adapter, restores automatically if no internet within 4 minutes (exit 4); 3 = already
+  tuned. Verified on the bench: no-op exit 3, bad arg 2, and a real run (original values restored first) exit 0 after
+  7 s with backup written. No UI changes were needed (no new tile).

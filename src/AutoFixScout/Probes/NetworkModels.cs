@@ -32,6 +32,15 @@ public sealed class NetworkState
     public WifiDropStats? WifiDrops { get; set; }
     /// <summary>Yes when Windows may turn the Wi-Fi adapter off to save power (PnPCapabilities); Unknown when not read.</summary>
     public Tri WifiPowerSavingMayTurnOff { get; set; } = Tri.Unknown;
+    /// <summary>Wi-Fi driver date and version (adapter class key); null when not read.</summary>
+    public DateTime? WifiDriverDate { get; set; }
+    public string? WifiDriverVersion { get; set; }
+    /// <summary>Instance id of the Wi-Fi adapter, for the admin tuning step (never shown to the person).</summary>
+    public string? WifiInstanceId { get; set; }
+    /// <summary>Settings the Wi-Fi tuning would change (empty = already tuned or not supported by this driver).</summary>
+    public IReadOnlyList<string> WifiTuningPending { get; set; } = new List<string>();
+    /// <summary>Yes when connected to an enterprise (802.1X) Wi-Fi network such as a campus or office.</summary>
+    public Tri WifiEnterprise { get; set; } = Tri.Unknown;
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
     /// <summary>Failures of the extra checks above. Kept apart so they never replace the main result with "could not complete".</summary>
     public IReadOnlyList<string> ExtraProbeErrors { get; set; } = new List<string>();

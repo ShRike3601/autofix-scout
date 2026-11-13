@@ -311,6 +311,77 @@ public static class Repairs
         return 1;
     }
 
+
+    // ---- Wi-Fi stability on enterprise networks ----
+
+    private const string NetClass = @"SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}";
+
+    /// <summary>
+    /// network.wifi_stability: applies <see cref="WifiTuning"/> to one Wi-Fi adapter (validated instance id), only for
+    /// values its driver supports. Saves the old values, restarts the adapter, and puts everything back (exit 4) if the
+    /// connection is not back within 4 minutes. 3 = already tuned or not supported. Same steps that fixed the test bench.
+    /// </summary>
+    public static int WifiStability(string instanceId)
+    {
+        using var a = new ManagementObjectSearcher($"SELECT GUID FROM Win32_NetworkAdapter WHERE PNPDeviceID = '{instanceId.Replace(@"\", @"\\")}'");
+        var guid = a.Get().Cast<ManagementBaseObject>().Select(x => x["GUID"] as string).FirstOrDefault(g => g != null);
+        if (guid is null) return 1;
+        using var cls = Registry.LocalMachine.OpenSubKey(NetClass);
+        var keyName = cls?.GetSubKeyNames().FirstOrDefault(n =>
+        {
+            using var k = cls.OpenSubKey(n);
+            return string.Equals(k?.GetValue("NetCfgInstanceId") as string, guid, StringComparison.OrdinalIgnoreCase);
+        });
+        if (keyName is null) return 1;
+        using var key = cls!.OpenSubKey(keyName, writable: true)!;
+        var current = new Dictionary<string, string>();
+        var supported = new Dictionary<string, IReadOnlyCollection<string>>();
+        foreach (var (kw, _, _) in WifiTuning.Targets)
+        {
+            if (key.GetValue(kw) is { } v) current[kw] = v.ToString()!;
+            using var e = key.OpenSubKey($@"Ndi\Params\{kw}\Enum");
+            if (e != null) supported[kw] = e.GetValueNames();
+        }
+        var plan = WifiTuning.Plan(current, supported);
+        if (plan.Count == 0) return 3;
+        Backup("wifi-stability", string.Join("\n", plan.Select(p => $"{p.Keyword}={p.From} (set to {p.To})")) + "\n");
+        foreach (var p in plan) key.SetValue(p.Keyword, p.To, RegistryValueKind.String);
+        RestartAdapter(instanceId);
+        if (WaitForInternet(guid, TimeSpan.FromMinutes(4))) return 0;
+        Log("network.wifi_stability", "no connection after 4 minutes: restoring the previous values");
+        foreach (var p in plan) key.SetValue(p.Keyword, p.From, RegistryValueKind.String);
+        RestartAdapter(instanceId);
+        return 4;
+    }
+
+    private static void RestartAdapter(string instanceId)
+    {
+        // pnputil /restart-device exists on Windows 10 2004+; otherwise disable and enable.
+        if (Program.Pnputil("/restart-device", instanceId) != 0)
+        {
+            Program.Pnputil("/disable-device", instanceId);
+            Program.Pnputil("/enable-device", instanceId);
+        }
+    }
+
+    private static bool WaitForInternet(string adapterGuid, TimeSpan limit)
+    {
+        var until = DateTime.UtcNow + limit;
+        while (DateTime.UtcNow < until)
+        {
+            Thread.Sleep(3000);
+            var up = global::System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                .Any(n => string.Equals(n.Id, adapterGuid, StringComparison.OrdinalIgnoreCase) && n.OperationalStatus == global::System.Net.NetworkInformation.OperationalStatus.Up);
+            if (!up) continue;
+            try
+            {
+                using var c = new global::System.Net.Sockets.TcpClient();
+                if (c.ConnectAsync("www.msftconnecttest.com", 80).Wait(TimeSpan.FromSeconds(5)) && c.Connected) return true;
+            }
+            catch (Exception) { }
+        }
+        return false;
+    }
     // ---- Windows Update, search ----
 
     private static readonly string[] UpdateServices = { "wuauserv", "BITS", "CryptSvc" };
