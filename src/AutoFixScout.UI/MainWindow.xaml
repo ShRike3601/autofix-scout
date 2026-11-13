@@ -23,7 +23,7 @@
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,16,0,22">
                     <ContentControl Template="{StaticResource ArtLogo}" Width="24" Height="24" Focusable="False"/>
                     <TextBlock Text="AutoFix Scout" Margin="10,0,0,0" VerticalAlignment="Center" FontFamily="{StaticResource DisplayFont}"
-                               FontSize="14" FontWeight="SemiBold"/>
+                               FontSize="14"/>
                 </StackPanel>
 
                 <StackPanel DockPanel.Dock="Bottom">
@@ -33,12 +33,18 @@
                     <TextBlock x:Name="VersionText" Style="{StaticResource OverlineText}" FontWeight="Normal" Margin="12,8,0,0"/>
                 </StackPanel>
 
-                <StackPanel KeyboardNavigation.DirectionalNavigation="Contained">
-                    <RadioButton x:Name="NavHome" Style="{StaticResource NavItem}" Content="Troubleshoot" Tag="&#xE90F;"
-                                 IsChecked="True" Checked="OnNavHomeClicked"/>
-                    <RadioButton x:Name="NavHistory" Style="{StaticResource NavItem}" Content="History and settings" Tag="&#xE81C;"
-                                 Checked="OnSettingsClicked"/>
-                </StackPanel>
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" KeyboardNavigation.DirectionalNavigation="Contained">
+                        <RadioButton x:Name="NavHome" Style="{StaticResource NavItem}" Content="Troubleshoot" Tag="&#xE90F;"
+                                     IsChecked="True" Checked="OnNavHomeClicked"/>
+                        <RadioButton x:Name="NavHistory" Style="{StaticResource NavItem}" Content="History and settings" Tag="&#xE81C;"
+                                     Checked="OnSettingsClicked"/>
+                    </StackPanel>
+                    <!-- "This computer" and "Recent activity", foldable (MainWindow.Sidebar.cs). -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False" Margin="0,18,0,8">
+                        <StackPanel x:Name="SidebarSections"/>
+                    </ScrollViewer>
+                </DockPanel>
             </DockPanel>
         </Border>
 
@@ -49,7 +55,8 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+            <!-- Own caption buttons for the solid look; with glass, Windows draws its native ones (ThemeManager). -->
+            <StackPanel x:Name="CaptionButtons" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
                 <Button Style="{StaticResource CaptionButton}" Content="&#xE921;" Click="OnMinimizeClicked" AutomationProperties.Name="Minimize"/>
                 <Button x:Name="MaximizeButton" Style="{StaticResource CaptionButton}" Content="&#xE922;" Click="OnMaximizeClicked" AutomationProperties.Name="Maximize"/>
                 <Button Style="{StaticResource CaptionCloseButton}" Content="&#xE8BB;" Click="OnCloseClicked" AutomationProperties.Name="Close"/>
@@ -99,7 +106,7 @@
                                 <Button DockPanel.Dock="Right" Style="{StaticResource StandardButton}" Content="Close" MinWidth="0" MinHeight="30"
                                         Padding="14,4" Margin="12,0,0,0" VerticalAlignment="Top" Click="OnWhatsNewCloseClicked"/>
                                 <StackPanel>
-                                    <TextBlock x:Name="WhatsNewTitle" FontSize="{StaticResource CardTitleSize}" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="WhatsNewTitle" FontSize="{StaticResource CardTitleSize}"/>
                                     <ScrollViewer MaxHeight="130" Margin="0,6,0,0" VerticalScrollBarVisibility="Auto" Focusable="False">
                                         <TextBlock x:Name="WhatsNewText" Style="{StaticResource CaptionText}"/>
                                     </ScrollViewer>
@@ -153,7 +160,7 @@
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock x:Name="StatusGlyph" Style="{StaticResource Icon}" FontSize="14"/>
                                 <TextBlock x:Name="StatusLabel" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="{StaticResource CaptionSize}"
-                                           FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                           TextWrapping="Wrap"/>
                             </StackPanel>
                         </Border>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">

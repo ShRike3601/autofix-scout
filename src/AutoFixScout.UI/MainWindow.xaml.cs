@@ -24,6 +24,7 @@ public partial class MainWindow : Window, IFixHost
         Loaded += async (_, _) =>
         {
             CloseUnfinishedSessions();
+            _ = BuildSidebarAsync();
             await RecoverOpenSavePointsAsync();
             await ShowStartupNoticesAsync();
         };

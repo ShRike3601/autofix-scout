@@ -1,6 +1,6 @@
 <!--
   Shared styles. Colours come from the palette (Dark.xaml / Light.xaml / high contrast) through DynamicResource.
-  The look is flat: solid surfaces, 1 px borders, no shadows or gradients. Movement (press, page entrance) lives in
+  The look is frosted glass on Windows 11 (acrylic backdrop, translucent surfaces, hairline borders), solid on Windows 10 and high contrast. No bold type anywhere: hierarchy comes from size, colour and the light display weight. Movement (press, page entrance) lives in
   Motion.cs so it can honour the Windows "Animation effects" setting; colour changes here are instant.
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -14,31 +14,31 @@
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
     <!-- Type scale: page title / card heading / tile title / body / caption / label. -->
-    <system:Double x:Key="DisplaySize">22</system:Double>
-    <system:Double x:Key="TitleSize">17</system:Double>
+    <system:Double x:Key="DisplaySize">24</system:Double>
+    <system:Double x:Key="TitleSize">19</system:Double>
     <system:Double x:Key="CardTitleSize">14</system:Double>
     <system:Double x:Key="BodySize">13.5</system:Double>
     <system:Double x:Key="ButtonTextSize">13</system:Double>
     <system:Double x:Key="CaptionSize">12</system:Double>
     <system:Double x:Key="OverlineSize">11</system:Double>
 
-    <CornerRadius x:Key="CardRadius">8</CornerRadius>
-    <CornerRadius x:Key="ControlRadius">5</CornerRadius>
+    <CornerRadius x:Key="CardRadius">12</CornerRadius>
+    <CornerRadius x:Key="ControlRadius">7</CornerRadius>
 
     <!-- Text styles. -->
     <Style x:Key="DisplayText" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource DisplayFont}"/>
         <Setter Property="FontSize" Value="{StaticResource DisplaySize}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontWeight" Value="Light"/>
         <Setter Property="TextWrapping" Value="Wrap"/>
-        <Setter Property="LineHeight" Value="28"/>
+        <Setter Property="LineHeight" Value="31"/>
     </Style>
     <Style x:Key="TitleText" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource DisplayFont}"/>
         <Setter Property="FontSize" Value="{StaticResource TitleSize}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontWeight" Value="Normal"/>
         <Setter Property="TextWrapping" Value="Wrap"/>
-        <Setter Property="LineHeight" Value="24"/>
+        <Setter Property="LineHeight" Value="27"/>
     </Style>
     <Style x:Key="BodyText" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource TextFont}"/>
@@ -56,7 +56,7 @@
     <Style x:Key="OverlineText" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource TextFont}"/>
         <Setter Property="FontSize" Value="{StaticResource OverlineSize}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontWeight" Value="Normal"/>
         <Setter Property="TextWrapping" Value="Wrap"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
     </Style>
@@ -116,24 +116,23 @@
         <Setter Property="MinHeight" Value="118"/>
         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
         <Setter Property="VerticalContentAlignment" Value="Top"/>
+        <Setter Property="ui:Motion.HoverLift" Value="2"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Chrome" CornerRadius="{StaticResource CardRadius}"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                    <Grid>
+                        <Border x:Name="Chrome" CornerRadius="{StaticResource CardRadius}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
+                        <!-- Hover glow: faded in and out by Motion (smooth), not switched by a trigger. -->
+                        <Border x:Name="Hover" CornerRadius="{StaticResource CardRadius}" Opacity="0" IsHitTestVisible="False"
+                                Background="{DynamicResource CardHoverBrush}"
+                                BorderBrush="{DynamicResource CardHoverBorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
                         <ContentPresenter Margin="{TemplateBinding Padding}"
                                           HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
-                    </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource CardHoverBrush}"/>
-                            <Setter TargetName="Chrome" Property="BorderBrush" Value="{DynamicResource CardHoverBorderBrush}"/>
-                        </Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource CardHoverBrush}"/>
-                        </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource CardPressedBrush}"/>
                         </Trigger>
@@ -193,7 +192,7 @@
         <Setter Property="BorderBrush" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="FontSize" Value="{StaticResource ButtonTextSize}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontWeight" Value="Normal"/>
         <Setter Property="Padding" Value="18,6"/>
         <Setter Property="MinHeight" Value="34"/>
         <Setter Property="MinWidth" Value="112"/>
@@ -234,7 +233,7 @@
         <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="FontSize" Value="{StaticResource ButtonTextSize}"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontWeight" Value="Normal"/>
         <Setter Property="Padding" Value="18,6"/>
         <Setter Property="MinHeight" Value="34"/>
         <Setter Property="MinWidth" Value="112"/>
@@ -305,6 +304,29 @@
         </Setter>
     </Style>
 
+    <!-- Header of a foldable sidebar section: full-width row, title left, chevron right (content built in code). -->
+    <Style x:Key="SectionHeader" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        <Setter Property="Padding" Value="12,0,10,0"/>
+        <Setter Property="MinHeight" Value="30"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Chrome" CornerRadius="{StaticResource ControlRadius}" Background="{TemplateBinding Background}">
+                        <ContentPresenter Margin="{TemplateBinding Padding}" VerticalAlignment="Center" HorizontalAlignment="Stretch" RecognizesAccessKey="False"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SubtleHoverBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Sidebar navigation item: the current page has a tinted background and an accent bar. Tag = icon glyph. -->
     <Style x:Key="NavItem" TargetType="RadioButton" BasedOn="{StaticResource ButtonBase}">
         <Setter Property="Background" Value="Transparent"/>
@@ -335,7 +357,7 @@
                             <Setter TargetName="Chrome" Property="Background" Value="{DynamicResource NavSelectedBrush}"/>
                             <Setter TargetName="Bar" Property="Visibility" Value="Visible"/>
                             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-                            <Setter Property="FontWeight" Value="SemiBold"/>
+                            <Setter Property="FontWeight" Value="Normal"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.4"/>

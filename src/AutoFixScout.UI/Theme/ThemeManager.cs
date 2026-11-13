@@ -25,14 +25,21 @@ public static class ThemeManager
         return Environment.GetEnvironmentVariable("AUTOFIXSCOUT_THEME")?.ToLowerInvariant() == "light" ? Mode.Light : Mode.Dark;
     }
 
+    private static readonly Uri DarkGlassUri = new("pack://application:,,,/AutoFixScout.UI;component/Theme/DarkGlass.xaml");
+
+    /// <summary>True while the window shows the Windows 11 acrylic backdrop (frosted glass).</summary>
+    public static bool Glass { get; private set; }
+
     /// <summary>Loads the palette for the current mode into the application resources.</summary>
-    public static void ApplyPalette()
+    public static void ApplyPalette(bool glass = false)
     {
         Current = Detect();
         var palette = Current switch
         {
             Mode.Light => new ResourceDictionary { Source = LightUri },
             Mode.HighContrast => HighContrastPalette(),
+            // Later merged dictionaries win, so the glass surfaces override the solid ones.
+            _ when glass => new ResourceDictionary { MergedDictionaries = { new ResourceDictionary { Source = DarkUri }, new ResourceDictionary { Source = DarkGlassUri } } },
             _ => new ResourceDictionary { Source = DarkUri },
         };
         var merged = Application.Current.Resources.MergedDictionaries;
@@ -55,7 +62,12 @@ public static class ThemeManager
 
     private static void ApplyAll(Window window, IntPtr hwnd)
     {
-        ApplyPalette();
+        Glass = Detect() == Mode.Dark && SetBackdrop(window, hwnd, on: true);
+        if (!Glass) SetBackdrop(window, hwnd, on: false);
+        // With the frame extended over the window, DWM draws the native Windows 11 caption buttons; use those and hide ours.
+        if (System.Windows.Shell.WindowChrome.GetWindowChrome(window) is { } chrome) chrome.UseAeroCaptionButtons = Glass;
+        if (window.FindName("CaptionButtons") is UIElement own) own.Visibility = Glass ? Visibility.Collapsed : Visibility.Visible;
+        ApplyPalette(Glass);
         // The app draws its own title bar; these only affect the system frame around it.
         var dark = Current == Mode.Dark ? 1 : 0;
         // Attribute 20 on Windows 10 20H1+ / 11, 19 on older Windows 10.
@@ -92,6 +104,47 @@ public static class ThemeManager
         d["OnAccentBrush"] = hiText;
         return d;
     }
+
+    /// <summary>
+    /// Frosted glass: the Windows 11 (22H2+) acrylic system backdrop behind the whole window. Needs the WPF surface to be
+    /// transparent and the DWM frame extended over the client area. Off on Windows 10, when "Transparency effects" is
+    /// off, and with AUTOFIXSCOUT_GLASS=0. Returns whether glass is now on.
+    /// </summary>
+    private static bool SetBackdrop(Window window, IntPtr hwnd, bool on)
+    {
+        var chrome = System.Windows.Shell.WindowChrome.GetWindowChrome(window);
+        var source = HwndSource.FromHwnd(hwnd);
+        if (on)
+        {
+            if (Environment.OSVersion.Version.Build < 22621 || Environment.GetEnvironmentVariable("AUTOFIXSCOUT_GLASS") == "0") return false;
+            if (!TransparencyEffectsOn()) return false;
+            var acrylic = 3; // DWMWA_SYSTEMBACKDROP_TYPE = 38, DWMSBT_TRANSIENTWINDOW (acrylic)
+            if (DwmSetWindowAttribute(hwnd, 38, ref acrylic, sizeof(int)) != 0) return false;
+            if (chrome != null) chrome.GlassFrameThickness = new Thickness(-1);
+            var all = new Margins { Left = -1, Right = -1, Top = -1, Bottom = -1 };
+            DwmExtendFrameIntoClientArea(hwnd, ref all);
+            if (source?.CompositionTarget != null) source.CompositionTarget.BackgroundColor = System.Windows.Media.Colors.Transparent;
+            return true;
+        }
+        var none = 1; // DWMSBT_NONE
+        DwmSetWindowAttribute(hwnd, 38, ref none, sizeof(int));
+        if (chrome != null) chrome.GlassFrameThickness = new Thickness(0);
+        var zero = new Margins();
+        DwmExtendFrameIntoClientArea(hwnd, ref zero);
+        return false;
+    }
+
+    private static bool TransparencyEffectsOn()
+    {
+        using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+        return k?.GetValue("EnableTransparency") is not int v || v != 0;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Margins { public int Left, Right, Top, Bottom; }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref Margins margins);
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);

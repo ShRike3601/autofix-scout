@@ -184,7 +184,7 @@ public partial class MainWindow
             var circle = new Ellipse { StrokeThickness = 1, Margin = new Thickness(3) };
             var number = new TextBlock
             {
-                Text = (i + 1).ToString(), FontSize = 11.5, FontWeight = FontWeights.SemiBold,
+                Text = (i + 1).ToString(), FontSize = 11.5, FontWeight = FontWeights.Normal,
                 HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
             };
             var tick = new Path
@@ -257,7 +257,7 @@ public partial class MainWindow
             s.Number.SetResourceReference(TextBlock.ForegroundProperty,
                 warnHere ? "OnStatusBrush" : active ? "OnAccentBrush" : "TextSecondaryBrush");
             s.Label.SetResourceReference(TextBlock.ForegroundProperty, done || active ? "TextPrimaryBrush" : "TextSecondaryBrush");
-            s.Label.FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal;
+            s.Label.FontWeight = active ? FontWeights.Normal : FontWeights.Normal;
             if (s.LineFill is { } fill)
             {
                 var to = i < current ? 1.0 : 0.0;
@@ -348,6 +348,7 @@ public partial class MainWindow
     {
         _historyOpen = false;
         HistoryPanel.Visibility = Visibility.Collapsed;
+        RefreshRecentActivity();
         _look = Look.Step;
         _shownText = "";
         SetTopic(null);
@@ -469,7 +470,7 @@ public partial class MainWindow
         stack.Children.Add(top);
         stack.Children.Add(new TextBlock
         {
-            Text = title, FontSize = 14, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0),
+            Text = title, FontSize = 14, FontWeight = FontWeights.Normal, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0),
         });
         stack.Children.Add(new TextBlock { Text = caption, Style = (Style)FindResource("CaptionText"), Margin = new Thickness(0, 2, 0, 0) });
 
@@ -545,7 +546,7 @@ public partial class MainWindow
         glyph.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
         var tile = new Border { Style = (Style)FindResource("IconTile"), Child = glyph, VerticalAlignment = VerticalAlignment.Center };
 
-        var title = new TextBlock { Text = choice.Title, FontSize = 14, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+        var title = new TextBlock { Text = choice.Title, FontSize = 14, FontWeight = FontWeights.Normal, TextWrapping = TextWrapping.Wrap };
         var caption = new TextBlock { Text = choice.Caption, Style = (Style)FindResource("CaptionText"), Margin = new Thickness(0, 2, 0, 0) };
         var text = new StackPanel { Margin = new Thickness(14, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
         text.Children.Add(title);
@@ -771,7 +772,7 @@ public partial class MainWindow
             c.Ring.Visibility = !done && !active ? Visibility.Visible : Visibility.Collapsed;
             c.Spinner.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
             c.Done.Visibility = done ? Visibility.Visible : Visibility.Collapsed;
-            c.Label.FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal;
+            c.Label.FontWeight = active ? FontWeights.Normal : FontWeights.Normal;
             c.Label.SetResourceReference(TextBlock.ForegroundProperty, active || done ? "TextPrimaryBrush" : "TextSecondaryBrush");
             c.Label.Opacity = !done && !active ? 0.8 : 1;
             Motion.Spin(c.SpinRotate, active, periodMs: 900, linear: true);

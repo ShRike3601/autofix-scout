@@ -62,9 +62,9 @@ public static class Motion
             return;
         }
         var from = TimeSpan.FromMilliseconds(delayMs);
-        element.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(240))
+        element.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(300))
         { BeginTime = from, EasingFunction = EaseOut, FillBehavior = FillBehavior.HoldEnd });
-        shift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(distance, 0, TimeSpan.FromMilliseconds(340))
+        shift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(distance, 0, TimeSpan.FromMilliseconds(520))
         { BeginTime = from, EasingFunction = EaseOutStrong });
         if (delayMs > 0) element.Opacity = 0; // hidden until its turn (the animation's base value)
     }
@@ -143,6 +143,8 @@ public static class Motion
         b.RenderTransform = new TransformGroup { Children = { new ScaleTransform(1, 1), new TranslateTransform() } };
         b.MouseEnter += (_, _) => Settle(b);
         b.MouseLeave += (_, _) => Settle(b);
+        b.GotKeyboardFocus += (_, _) => Settle(b);
+        b.LostKeyboardFocus += (_, _) => Settle(b);
         IsPressedDescriptor.AddValueChanged(b, (_, _) => Settle(b));
     }
 
@@ -151,9 +153,12 @@ public static class Motion
         if (b.RenderTransform is not TransformGroup { Children: [ScaleTransform s, TranslateTransform t] }) return;
         var target = b.IsPressed ? 0.975 : b.IsMouseOver ? GetHoverScale(b) : 1.0;
         var lift = b.IsPressed || !b.IsMouseOver ? 0 : -GetHoverLift(b);
-        var ms = b.IsPressed ? 100 : 220;
-        To(s, ScaleTransform.ScaleXProperty, target, ms);
-        To(s, ScaleTransform.ScaleYProperty, target, ms);
-        To(t, TranslateTransform.YProperty, lift, ms);
+        var ms = b.IsPressed ? 100 : 260;
+        To(s, ScaleTransform.ScaleXProperty, target, ms, EaseOutStrong);
+        To(s, ScaleTransform.ScaleYProperty, target, ms, EaseOutStrong);
+        To(t, TranslateTransform.YProperty, lift, ms, EaseOutStrong);
+        // Cards: the hover glow layer fades rather than switching (template part "Hover").
+        if (b is System.Windows.Controls.Control c && c.Template?.FindName("Hover", c) is UIElement glow)
+            To(glow, UIElement.OpacityProperty, b.IsMouseOver || b.IsKeyboardFocused ? 1 : 0, b.IsMouseOver ? 180 : 320);
     }
 }
