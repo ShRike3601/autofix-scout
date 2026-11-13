@@ -392,6 +392,43 @@
         </Setter>
     </Style>
 
+    <!-- Settings check box: small rounded box, accent fill and tick when on. -->
+    <Style x:Key="Check" TargetType="CheckBox">
+        <Setter Property="FontFamily" Value="{StaticResource TextFont}"/>
+        <Setter Property="FontSize" Value="{StaticResource BodySize}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Grid Background="Transparent">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="Box" Width="18" Height="18" CornerRadius="4" VerticalAlignment="Top" Margin="0,1,0,0"
+                                Background="{DynamicResource InputBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1">
+                            <TextBlock x:Name="Tick" Style="{StaticResource Icon}" Text="&#xE73E;" FontSize="11" Visibility="Collapsed"
+                                       Foreground="{DynamicResource OnAccentBrush}"/>
+                        </Border>
+                        <ContentPresenter Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Box" Property="Background" Value="{DynamicResource AccentFillBrush}"/>
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource AccentFillBrush}"/>
+                            <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Thin, rounded scroll bar (only appears when the window is small). -->
     <Style x:Key="ScrollThumb" TargetType="Thumb">
         <Setter Property="Template">

@@ -86,7 +86,7 @@ public partial class MainWindow
     /// <summary>"Troubleshoot" in the sidebar: closes the history page. During a check it is already the current page.</summary>
     private void OnNavHomeClicked(object sender, RoutedEventArgs e)
     {
-        if (_historyOpen) _choice?.TrySetResult(false);
+        if (_historyOpen) ShowHome();
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -120,7 +120,7 @@ public partial class MainWindow
     private static Look FindingLook(FindingCode code) => code switch
     {
         FindingCode.LooksNormal => Look.FindingOk,
-        FindingCode.ProbeIncomplete => Look.FindingInfo,
+        FindingCode.ProbeIncomplete or FindingCode.StressNotRun => Look.FindingInfo, // a stopped load test is not a problem
         FindingCode.Muted or FindingCode.VolumeVeryLow or FindingCode.DefaultIsHdmiOrBluetooth or FindingCode.AirplaneModeOn
             or FindingCode.NetAdapterDisabled or FindingCode.NotConnected or FindingCode.CameraDisabled
             or FindingCode.CameraPrivacyOff or FindingCode.CameraInUse => Look.FindingWarning,
@@ -151,6 +151,7 @@ public partial class MainWindow
             "display" => "Screen and display",
             "performance" => "Computer speed",
             "graphics" => "Graphics card",
+            "stress" => "Short load test",
             _ => null,
         };
     }
@@ -276,6 +277,8 @@ public partial class MainWindow
 
     private void PresentStep(Screen from, Look look)
     {
+        _historyOpen = false;
+        HistoryPanel.Visibility = Visibility.Collapsed;
         var full = StepText.Text;
         var textChanged = from.Text != full;
         var busy = look is Look.Busy or Look.Scan;
@@ -343,6 +346,8 @@ public partial class MainWindow
 
     private void PresentHome()
     {
+        _historyOpen = false;
+        HistoryPanel.Visibility = Visibility.Collapsed;
         _look = Look.Step;
         _shownText = "";
         SetTopic(null);
@@ -410,6 +415,7 @@ public partial class MainWindow
             new(0xEDA2, "Slow or full computer", "Slow start-up, slow in use, or the disk is nearly full.", OnStorageClicked),
             new(0xEC4A, "Computer or games running slowly", "Games stutter, the computer got slow, or the fans are loud.", OnPerfClicked),
             new(0xE7FC, "Games stutter or crash", "Graphics card, driver and overclock check.", OnGraphicsClicked),
+            new(0xE945, "Short load test", "Checks whether the computer slows down under full load (about 2 minutes).", OnStressClicked),
         ]),
         new(0xE71D, "Apps and programs", "Programs closing, installs, Microsoft Store, Office, OneDrive",
         [
@@ -597,6 +603,9 @@ public partial class MainWindow
         "update" => 0xE895,
         "printer" => 0xE749,
         "display" => 0xE7F4,
+        "performance" => 0xEC4A,
+        "graphics" => 0xE7FC,
+        "stress" => 0xE945,
         _ => 0xE946, // Info
     };
 
