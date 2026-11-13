@@ -127,6 +127,15 @@ public static partial class PerfTriage
         return findings;
     }
 
+    // Rungs shared with the stress test (same ids and sentences everywhere).
+    public static Rung PlugInRung() => new("perf_plug_in", "ui.human_step", 0,
+        "Please plug the computer into its charger. Many computers run at full speed only while plugged in.");
+    public static Rung PowerModeRung() => new("perf_power_mode", "ui.open_settings_page", 0,
+        "AutoFix Scout will open the \"Power\" settings. Please set \"Power mode\" to \"Best performance\" or \"Balanced\". You can change it back at any time.", "powersleep");
+    public static Rung CoolingRung() => new("perf_cooling", "ui.human_step", 0,
+        "Please make sure the air vents and fans are free of dust and that nothing blocks them. " +
+        "A laptop should stand on a hard, flat surface, not on a bed or a blanket. A cooling pad can also help.");
+
     /// <summary>Least risky first. Nothing here changes the computer; every rung is a Settings page or a step for the person.</summary>
     public static IReadOnlyList<Rung> Ladder(PerfState s, IReadOnlyList<Finding> findings)
     {
@@ -138,15 +147,11 @@ public static partial class PerfTriage
             rungs.Add(new("perf_battery_saver", "ui.open_settings_page", 0,
                 "AutoFix Scout will open the \"Battery\" settings. Please turn off \"Battery saver\", or plug the computer in. You can turn it on again at any time.", "batterysaver"));
         if (codes.Contains(FindingCode.PerfOnBattery))
-            rungs.Add(new("perf_plug_in", "ui.human_step", 0,
-                "Please plug the computer into its charger. Many computers run at full speed only while plugged in."));
+            rungs.Add(PlugInRung());
         if (codes.Contains(FindingCode.PerfPowerSaver) || codes.Contains(FindingCode.PerfProcessorThrottled) || codes.Contains(FindingCode.PerfOnBattery))
-            rungs.Add(new("perf_power_mode", "ui.open_settings_page", 0,
-                "AutoFix Scout will open the \"Power\" settings. Please set \"Power mode\" to \"Best performance\" or \"Balanced\". You can change it back at any time.", "powersleep"));
+            rungs.Add(PowerModeRung());
         if (codes.Contains(FindingCode.PerfProcessorThrottled))
-            rungs.Add(new("perf_cooling", "ui.human_step", 0,
-                "Please make sure the air vents and fans are free of dust and that nothing blocks them. " +
-                "A laptop should stand on a hard, flat surface, not on a bed or a blanket. A cooling pad can also help."));
+            rungs.Add(CoolingRung());
         if (codes.Contains(FindingCode.PerfBiosOld) || codes.Contains(FindingCode.PerfIntelMicrocode))
             rungs.Add(new("perf_bios_update", "ui.human_step", 0,
                 "Please look for a BIOS update on the website of the maker of this computer or of its motherboard, and follow their instructions. " +

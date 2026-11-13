@@ -47,14 +47,14 @@ public sealed class RealPerfProbe : IPerfProbe
 
     // ---- performance counters (PDH; no extra package) ----
 
-    [DllImport("pdh.dll", CharSet = CharSet.Unicode)] private static extern uint PdhOpenQuery(string? source, IntPtr user, out IntPtr query);
-    [DllImport("pdh.dll", CharSet = CharSet.Unicode)] private static extern uint PdhAddEnglishCounterW(IntPtr query, string path, IntPtr user, out IntPtr counter);
-    [DllImport("pdh.dll")] private static extern uint PdhCollectQueryData(IntPtr query);
-    [DllImport("pdh.dll")] private static extern uint PdhGetFormattedCounterValue(IntPtr counter, uint format, out uint type, out PdhValue value);
-    [DllImport("pdh.dll")] private static extern uint PdhCloseQuery(IntPtr query);
+    [DllImport("pdh.dll", CharSet = CharSet.Unicode)] internal static extern uint PdhOpenQuery(string? source, IntPtr user, out IntPtr query);
+    [DllImport("pdh.dll", CharSet = CharSet.Unicode)] internal static extern uint PdhAddEnglishCounterW(IntPtr query, string path, IntPtr user, out IntPtr counter);
+    [DllImport("pdh.dll")] internal static extern uint PdhCollectQueryData(IntPtr query);
+    [DllImport("pdh.dll")] internal static extern uint PdhGetFormattedCounterValue(IntPtr counter, uint format, out uint type, out PdhValue value);
+    [DllImport("pdh.dll")] internal static extern uint PdhCloseQuery(IntPtr query);
 
-    [StructLayout(LayoutKind.Sequential)] private struct PdhValue { public uint Status; public double Double; }
-    private const uint PdhFmtDouble = 0x200;
+    [StructLayout(LayoutKind.Sequential)] internal struct PdhValue { public uint Status; public double Double; }
+    internal const uint PdhFmtDouble = 0x200;
 
     private static void SampleCounters(PerfState s)
     {
@@ -116,6 +116,12 @@ public sealed class RealPerfProbe : IPerfProbe
     [StructLayout(LayoutKind.Sequential)]
     private struct SystemPowerStatus { public byte AcLine, BatteryFlag, BatteryPercent, SystemStatusFlag; public int LifeTime, FullLifeTime; }
     [DllImport("kernel32.dll")] private static extern bool GetSystemPowerStatus(out SystemPowerStatus status);
+
+    /// <summary>True on battery, false on mains, null when unknown. Shared with the stress test.</summary>
+    internal static (bool? OnBattery, bool HasBattery) ReadPower() =>
+        GetSystemPowerStatus(out var p)
+            ? (p.AcLine switch { 0 => true, 1 => false, _ => null }, p.BatteryFlag is not (128 or 255))
+            : (null, true);
 
     private static void ReadBattery(PerfState s)
     {

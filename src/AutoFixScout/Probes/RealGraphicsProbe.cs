@@ -92,18 +92,30 @@ public sealed class RealGraphicsProbe : IGraphicsProbe
         return (p.ExitCode, outTask.GetAwaiter().GetResult());
     }
 
+    /// <summary>
+    /// One nvidia-smi query (about 100 to 300 ms). The throttle fields were renamed from clocks_throttle_reasons to
+    /// clocks_event_reasons; older drivers know only the first. Pass the prefix a previous call returned to skip the retry.
+    /// Shared with the stress test.
+    /// </summary>
+    internal static (IReadOnlyList<NvidiaReading> Rows, string? Prefix) QueryNvidia(string exe, string? knownPrefix = null)
+    {
+        foreach (var prefix in knownPrefix != null ? new[] { knownPrefix } : new[] { "clocks_throttle_reasons", "clocks_event_reasons" })
+        {
+            var (exit, text) = Run(exe, $"--query-gpu={GraphicsParsers.NvidiaQuery(prefix)}", "--format=csv,noheader,nounits");
+            var rows = exit == 0 ? GraphicsParsers.ParseNvidiaCsv(text) : new List<NvidiaReading>();
+            if (rows.Count > 0) return (rows, prefix);
+        }
+        return (new List<NvidiaReading>(), null);
+    }
+
+    internal static string? FindNvidiaSmi() => NvidiaSmiPath();
+
     private static void ReadNvidia(GraphicsState s)
     {
         var exe = NvidiaSmiPath();
         s.NvidiaToolPresent = exe != null;
         if (exe == null) return;
-        // The throttle fields were renamed from clocks_throttle_reasons to clocks_event_reasons; older drivers know only the first.
-        foreach (var prefix in new[] { "clocks_throttle_reasons", "clocks_event_reasons" })
-        {
-            var (exit, text) = Run(exe, $"--query-gpu={GraphicsParsers.NvidiaQuery(prefix)}", "--format=csv,noheader,nounits");
-            var rows = exit == 0 ? GraphicsParsers.ParseNvidiaCsv(text) : new List<NvidiaReading>();
-            if (rows.Count > 0) { s.Nvidia = rows; break; }
-        }
+        s.Nvidia = QueryNvidia(exe).Rows;
         var (e2, mem) = Run(exe, "-q", "-d", "MEMORY");
         if (e2 == 0)
         {
