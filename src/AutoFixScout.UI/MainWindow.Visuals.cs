@@ -146,7 +146,7 @@ public partial class MainWindow
             "input" => "Keyboard, mouse and touchpad",
             "storage" => "Slow or full computer",
             "update" => "Windows Update",
-            "printer" => "Printer",
+            "printer" => "Printer and scanner",
             "display" => "Screen and display",
             _ => null,
         };
@@ -446,30 +446,10 @@ public partial class MainWindow
         "store" => 0xE719,
         "office" => 0xE8A5,
         "onedrive" => 0xE753,
+        "scanner" => 0xE8FE,
+        "install" => 0xE896,
+        "notifications" => 0xEA8F,
         _ => TopicGlyph(area),
-    };
-
-    /// <summary>One line on what the check for a SymptomRouter area looks at, shown under its name on a choice screen.</summary>
-    private static string AreaCaption(string area) => area switch
-    {
-        "sound" => "Speakers, headphones and volume",
-        "camera" => "Webcam, privacy settings and camera apps",
-        "network" => "Wi-Fi, network cable and connection",
-        "microphone" => "Microphone, privacy settings and input level",
-        "bluetooth" => "Bluetooth adapter, pairing and connected devices",
-        "program" => "Programs that close, freeze or stop responding",
-        "storage" => "Disk space, startup programs and performance",
-        "update" => "Updates that fail, stall or do not install",
-        "printer" => "Printers and the print queue",
-        "display" => "Brightness, resolution and external monitors",
-        "shell" => "Start menu, taskbar and Windows search",
-        "store" => "Microsoft Store and installing apps",
-        "office" => "Microsoft Office programs",
-        "onedrive" => "OneDrive sign-in and file syncing",
-        "security" => "Windows Security, unwanted software and pop-ups",
-        "power" => "Battery, charging, sleep and power settings",
-        "input" => "Keyboard, mouse and touchpad",
-        _ => "The whole computer, for common software problems",
     };
 
     /// <summary>Segoe Fluent Icons / MDL2 Assets glyph for a topic (the icon tile on a step screen).</summary>

@@ -322,21 +322,22 @@ public partial class MainWindow : Window, IFixHost
     {
         var text = SymptomBox.Text.Trim();
         if (text.Length == 0) { SymptomBox.Focus(); return; }
-        // The three closest checks, best first; the full check-up is always offered as the way forward when none fits.
-        var areas = Areas.SymptomRouter.Scores(text).Select(s => s.Area).Distinct().Take(3).ToList();
-        var matched = areas.Count > 0;
-        var options = areas.Select(a => new Choice(AreaGlyph(a), Areas.SymptomRouter.Routes[a].Title, AreaCaption(a))).ToList();
+        // The closest checks, best first (SymptomRouter.Rank); the full check-up is always offered as the way forward when none fits.
+        var rank = Areas.SymptomRouter.Rank(text);
+        var matched = rank.Candidates.Any(c => c.Score > 0);
+        var areas = rank.Candidates.Select(c => c.Route.Area).ToList();
+        var options = rank.Candidates.Select(c => new Choice(AreaGlyph(c.Route.Area), c.Route.Title, c.Covers)).ToList();
         if (!areas.Contains("health"))
         {
             areas.Add("health");
-            options.Add(new Choice(TopicGlyph("health"), matched ? "None of these" : "Full computer check-up",
-                matched ? "Run the full computer check-up instead" : AreaCaption("health")));
+            options.Add(new Choice(AreaGlyph("health"), "None of these", "The full computer check-up examines the whole computer instead."));
         }
         SetTopic(null);
         _topicTitle = "Find a fix";
-        var pick = await ShowChoicesAsync(matched
-            ? "These checks are the closest match to your description. Please select the one that fits best."
-            : "AutoFix Scout could not match your description to a specific check. The full computer check-up is the best place to start.",
+        var pick = await ShowChoicesAsync(
+            !matched ? "AutoFix Scout could not match your description to a specific check. The full computer check-up is the best place to start."
+            : rank.NoGoodMatch ? "AutoFix Scout is not certain which check fits your description. Please select the nearest one, or run the full computer check-up."
+            : "These checks are the closest match to your description. Please select the one that fits best.",
             options, "Back");
         SymptomBox.Text = "";
         if (pick < 0) { ShowHome(); return; }

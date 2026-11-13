@@ -243,9 +243,9 @@ what the flow does. All in-app wording follows `docs/WRITING.md`.
   a check). An ending that did not resolve the problem marks the last step amber with "!".
   "History and reports" is disabled while a check is running; "Troubleshoot" closes the history page.
 - **Closest checks** (2026-11-13, owner approved): "Find a fix" no longer offers one guess. `OnSymptomSearch` shows the
-  top three `SymptomRouter.Scores` areas as rows (icon, name, `AreaCaption` line) plus "None of these", which runs the
-  full check-up; with no match it offers the check-up alone. `ShowChoicesAsync` (Visuals) is the reusable choice screen.
-  To switch to `SymptomRouter.Rank` (confidence, NoGoodMatch) when the capabilities session adds it.
+  top three `SymptomRouter.Rank` candidates as rows (icon, name, `Covers` line) plus "None of these", which runs the
+  full check-up; when `NoGoodMatch` it says so and offers the nearest check and the check-up. `ShowChoicesAsync`
+  (Visuals) is the reusable choice screen. Home has 18 "Other problems" tiles (scanner, install, notifications added).
 - **Step card** (the "stage": fills the page beside the progress panel, content centred, at most 560 wide): optional
   status banner (tinted strip, icon + label coloured by severity), a 56 px icon tile, the first sentence as a centred
   heading, any further sentences as supporting text (`Split`; "\n\n" also splits; centred when short, left aligned for

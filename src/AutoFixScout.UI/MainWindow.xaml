@@ -158,7 +158,9 @@
                                 <Button Style="{StaticResource TileButton}" Content="Full computer check-up" Tag="&#xE9D9;" Click="OnHealthClicked"/>
                                 <Button Style="{StaticResource TileButton}" Content="A program keeps closing" Tag="&#xE783;" Click="OnProgramClosingClicked"/>
                                 <Button Style="{StaticResource TileButton}" Content="Start menu, taskbar or search" Tag="&#xE8FC;" Click="OnShellClicked"/>
+                                <Button Style="{StaticResource TileButton}" Content="Notifications are missing" Tag="&#xEA8F;" Click="OnNotificationsClicked"/>
                                 <Button Style="{StaticResource TileButton}" Content="Microsoft Store or app installs" Tag="&#xE719;" Click="OnStoreClicked"/>
+                                <Button Style="{StaticResource TileButton}" Content="A program will not install" Tag="&#xE896;" Click="OnInstallClicked"/>
                                 <Button Style="{StaticResource TileButton}" Content="Word, Excel or Outlook" Tag="&#xE8A5;" Click="OnOfficeClicked"/>
                                 <Button Style="{StaticResource TileButton}" Content="OneDrive not syncing" Tag="&#xE753;" Click="OnOneDriveClicked"/>
                                 <Button Style="{StaticResource TileButton}" Content="Security, viruses or pop-ups" Tag="&#xE72E;" Click="OnSecurityClicked"/>
@@ -169,6 +171,7 @@
                                 <Button Style="{StaticResource TileButton}" Content="Slow or full computer" Tag="&#xEDA2;" Click="OnStorageClicked"/>
                                 <Button Style="{StaticResource TileButton}" Content="Windows Update problems" Tag="&#xE895;" Click="OnUpdateClicked"/>
                                 <Button Style="{StaticResource TileButton}" Content="Printer not working" Tag="&#xE749;" Click="OnPrinterClicked"/>
+                                <Button Style="{StaticResource TileButton}" Content="Scanner not working" Tag="&#xE8FE;" Click="OnScannerClicked"/>
                                 <Button Style="{StaticResource TileButton}" Content="Screen or display problem" Tag="&#xE7F4;" Click="OnDisplayClicked"/>
                             </UniformGrid>
                         </StackPanel>
