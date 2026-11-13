@@ -394,3 +394,14 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
 - F2/F3 entries: OnInstallClicked (Apps, Install focus) and OnNotificationsClicked (Shell, notification focus) in MainWindow.xaml.cs; search routes 'install' and 'notifications'. Tiles: UI session. Bench note: the full check-up/install focus reports a pending restart, most likely from tonight's SFC repair; a restart clears it.
 - F1/F4 found on the bench: the USB check first read the System log (no Kernel-PnP device events there: 0 vs 671) and then, with real data, flagged the built-in webcam because devices log events at every start-up/wake; fixed (Kernel-PnP Configuration log; threshold grows with starts and wakes). Wi-Fi drops subtract sleeps/shutdowns. The bench's Wi-Fi drops finding (about 28 in 3 days) is real: earlier test runs switched the adapter off and on.
 - Roadmap part 5 complete.
+- 2026-11-13 13:10: SymptomRouter.Rank (closest checks, confidence, Covers line, NoGoodMatch) added for the UI session's choice screen (owner approved via that session); commit 2f366cf.
+
+## Roadmap (part 6, from 2026-11-13 ~13:15 IST)
+- [ ] G1 Screen looks wrong (Display area): resolution below the screen's native one, refresh rate below the best supported
+      (e.g. 60 Hz on a 144 Hz screen), unusual scaling causing blurry text; guided Settings steps (no silent display changes).
+- [ ] G2 Slow start-up (Slow or full computer): boot and sign-in durations (Diagnostics-Performance event 100 where
+      readable, else start-up app count and Fast Startup state), with the slowest start-up items when Windows names them.
+- [ ] G3 Keyboard types the wrong characters (Keyboard area): several input languages/layouts installed, a different
+      layout active than the display language suggests, the Alt+Shift / Windows+Space switch hotkeys; guided steps.
+- [ ] G4 Sound gets quieter during calls (Sound area): communications "ducking" setting (reduce other sounds by 80%/50%/
+      mute), different default device for communications; non-admin switch to "Do nothing" with a backup.

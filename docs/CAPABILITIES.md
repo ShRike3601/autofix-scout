@@ -55,6 +55,10 @@ Status: **Done** = built, unit-tested and checked on the test laptop (every admi
 | Programs will not install | Windows Installer off, install failures explained, restart pending | service default, guided | Done |
 | Notifications missing | notifications or app notifications off, Do not disturb on | guided, switch back on | Done |
 | USB devices disconnecting | USB errors and frequent reconnects (beyond starts and wakes), selective suspend | guided | Done |
+| Screen looks wrong | resolution below native, low refresh rate, unusual scaling | guided | Planned (G1) |
+| Slow start-up | boot and sign-in time, slow start-up items | guided, startup apps | Planned (G2) |
+| Keyboard types wrong characters | wrong or several keyboard layouts, switch hotkeys | guided | Planned (G3) |
+| Sound gets quieter during calls | communications ducking, separate call device | switch ducking off (backed up), guided | Planned (G4) |
 
 ## Safety rules the code enforces
 - The UI never runs elevated; the executor accepts only allowlisted action ids with fixed or validated arguments.
