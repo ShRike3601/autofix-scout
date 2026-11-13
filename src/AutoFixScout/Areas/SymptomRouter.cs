@@ -5,7 +5,7 @@ namespace AutoFixScout.Areas;
 /// network and no AI, so it works offline and the same way every time. Text that matches nothing goes to the full
 /// check-up, which looks at the whole computer.
 /// </summary>
-public static class SymptomRouter
+public static partial class SymptomRouter
 {
     public sealed record Route(string Area, string Title, string Explanation);
 
