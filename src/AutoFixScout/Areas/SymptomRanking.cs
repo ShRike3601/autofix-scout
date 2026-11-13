@@ -27,6 +27,7 @@ public static partial class SymptomRouter
         ["printer"] = "Printers, the print queue and the print service.",
         ["scanner"] = "Scanners, the scanning service and the printer settings they share.",
         ["display"] = "Screens and projectors, brightness and the display adapter.",
+        ["graphics"] = "The graphics card, its driver, temperature, link to the motherboard and overclocking tools such as MSI Afterburner.",
         ["shell"] = "The Start menu, the taskbar, search and the parts of Windows that draw them.",
         ["store"] = "The Microsoft Store, its services and app downloads.",
         ["office"] = "Word, Excel, Outlook and the Office repair tool.",

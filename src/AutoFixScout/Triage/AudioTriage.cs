@@ -350,4 +350,15 @@ public enum FindingCode
     // Keyboard layouts
     InputSeveralLayouts,
     InputLayoutMismatch,
+    // Graphics card (Graphics area)
+    GpuOverheating,
+    GpuOverclockUnstable,
+    GpuOverclockActive,
+    GpuOverclockToolInstalled,
+    GpuDriverResets,
+    GpuDriverOld,
+    GpuPowerBrake,
+    GpuPcieLinkNarrow,
+    GpuMonitorOnIntegrated,
+    GpuResizableBarOff,
 }

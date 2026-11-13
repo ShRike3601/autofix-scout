@@ -257,7 +257,10 @@ public sealed class RealHealthProbe : IHealthProbe
     private static readonly System.Text.RegularExpressions.Regex LiveKernelCode =
         new(@"\bP1\s*:\s*(141|117)\b", System.Text.RegularExpressions.RegexOptions.Compiled);
 
-    private static void ReadGraphicsResets(HealthState s)
+    private static void ReadGraphicsResets(HealthState s) => s.GraphicsResets = CountGraphicsResets();
+
+    /// <summary>Graphics driver resets in the last 14 days (Display 4101, LiveKernelEvent 141 or 117). Shared with the graphics check.</summary>
+    public static int CountGraphicsResets()
     {
         var n = Query("System", "Provider[@Name='Display'] and EventID=4101").Count();
         foreach (var e in Query("Application", "Provider[@Name='Windows Error Reporting'] and EventID=1001"))
@@ -267,7 +270,7 @@ public sealed class RealHealthProbe : IHealthProbe
             if (text.Length == 0) text = string.Join(" ", e.Properties.Select(p => p.Value?.ToString() ?? ""));
             if (text.Contains("LiveKernelEvent", StringComparison.OrdinalIgnoreCase) && LiveKernelCode.IsMatch(text)) n++;
         }
-        s.GraphicsResets = n;
+        return n;
     }
 
     // ---- USB ----

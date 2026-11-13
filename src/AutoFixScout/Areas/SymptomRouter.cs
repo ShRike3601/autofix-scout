@@ -21,6 +21,7 @@ public static partial class SymptomRouter
         ["update"] = new("update", "Windows Update problems", "This sounds like a problem with Windows Update."),
         ["printer"] = new("printer", "Printer not working", "This sounds like a problem with printing."),
         ["display"] = new("display", "Screen or display problem", "This sounds like a problem with the screen or display."),
+        ["graphics"] = new("graphics", "Games stutter or the graphics card misbehaves", "This sounds like a problem with the graphics card or its settings."),
         ["shell"] = new("shell", "Start menu, taskbar or search not working", "This sounds like a problem with the Start menu, the taskbar or search."),
         ["store"] = new("store", "Microsoft Store or app installs", "This sounds like a problem with the Microsoft Store or with installing apps."),
         ["office"] = new("office", "Word, Excel or Outlook problems", "This sounds like a problem with Microsoft Office."),
@@ -74,6 +75,8 @@ public static partial class SymptomRouter
         ("scanner", new[] { "scanner", "cannot scan", "can't scan", "scanning", "scan a document" }, new[] { "scan", "scanner" }),
         ("printer", new[] { "won't print", "wont print", "will not print", "cannot print", "can't print", "printer offline", "print queue" },
                     new[] { "printer", "print", "printing", "scanner" }),
+        ("graphics", new[] { "graphics card", "game crash", "games crash", "game keeps crashing", "driver crashed", "driver stopped responding", "black screen in game", "artifacts", "artefacts", "afterburner", "overclock", "stutter", "gpu" },
+                     new[] { "gpu", "graphics", "afterburner", "overclock", "overclocking", "artifact", "artifacts", "nvidia", "geforce", "radeon", "fps", "game", "games", "gaming" }),
         ("display", new[] { "second monitor", "external monitor", "screen is dark", "screen too dark", "screen flickers", "no display", "projector not" },
                     new[] { "monitor", "display", "screen", "brightness", "hdmi", "projector", "resolution", "flicker", "flickering" }),
     };

@@ -50,6 +50,7 @@ public static class FixActions
                         "printers" => "ms-settings:printers",
                         "scanners" => "ms-settings:printers",
                         "display" => "ms-settings:display",
+                        "graphics" => "ms-settings:display-advancedgraphics",
                         "apps" => "ms-settings:appsfeatures",
                         "updatehistory" => "ms-settings:windowsupdate-history",
                         "backup" => "ms-settings:backup",
