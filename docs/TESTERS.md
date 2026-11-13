@@ -5,6 +5,9 @@ Windows problems: sound, camera, microphone, internet and Wi-Fi, Bluetooth, prin
 a slow or full computer, Windows Update, start-up, and damaged Windows files or apps. This build is not yet digitally signed, so Windows will show a
 warning before it runs.
 
+Code signing policy: free code signing provided by SignPath.io, certificate by SignPath Foundation (applied for). See
+[CODE_SIGNING.md](https://github.com/ShRike3601/autofix-scout/blob/main/docs/CODE_SIGNING.md).
+
 ## Requirements
 
 - A Windows 10 or Windows 11 PC or laptop (Intel, AMD or ARM; the installer chooses the right version).
