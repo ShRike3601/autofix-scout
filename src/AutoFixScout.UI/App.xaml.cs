@@ -2,23 +2,14 @@ using System.Windows;
 
 namespace AutoFixScout.UI;
 
-/// <summary>
-/// Application entry point (section 5).
-/// </summary>
 public partial class App : Application
 {
-    public App()
-    {
-        // No global exception handlers yet — let errors surface for debugging
-    }
-
     protected override void OnStartup(StartupEventArgs e)
     {
+        // For screenshots on machines whose GPU path is unavailable (remote sessions, broken display driver).
+        if (Environment.GetEnvironmentVariable("AUTOFIXSCOUT_SOFTWARE_RENDER") == "1")
+            System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+        ThemeManager.ApplyPalette(); // before the window is built, so it never flashes the wrong theme
         base.OnStartup(e);
-
-        var orchestrator = new Orchestrator(new ProbesReal());  // read-only probes with real system access
-
-        var mainWindow = new MainWindow(orchestrator);
-        mainWindow.Show();
     }
 }

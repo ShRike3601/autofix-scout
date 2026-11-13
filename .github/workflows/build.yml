@@ -1,0 +1,65 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write   # only used by the release step, which runs on version tags (v*)
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet test AutoFixScout.sln -c Release
+      # Self-contained, so testers need nothing installed. The executor is published separately into the same folder:
+      # as a plain project reference it would be framework-dependent and fail on PCs without .NET.
+      - name: Publish win-x64 and win-arm64
+        run: |
+          $version = if ("${{ github.ref }}" -like 'refs/tags/v*') { "${{ github.ref_name }}".TrimStart('v') } else { "0.0.${{ github.run_number }}-dev" }
+          foreach ($rid in 'win-x64', 'win-arm64') {
+            $out = "publish/$rid"
+            dotnet publish src/AutoFixScout.UI/AutoFixScout.UI.csproj -c Release -r $rid --self-contained true -o $out "-p:Version=$version"
+            if ($LASTEXITCODE) { exit 1 }
+            dotnet publish src/AutoFixScout.Executor/AutoFixScout.Executor.csproj -c Release -r $rid --self-contained true -o $out "-p:Version=$version"
+            if ($LASTEXITCODE) { exit 1 }
+            if (!(Test-Path "$out/AutoFixScout.Executor.exe")) { Write-Error "executor missing ($rid)"; exit 1 }
+            if ((Get-Content "$out/AutoFixScout.Executor.runtimeconfig.json" -Raw) -notmatch 'includedFrameworks') { Write-Error "executor not self-contained ($rid)"; exit 1 }
+            Copy-Item docs/TESTERS.md "$out/READ ME FIRST.md"
+          }
+      # One setup for x64 and ARM64 PCs (installs to Program Files; see installer/AutoFixScout.iss).
+      - name: Build installer
+        id: setup
+        run: |
+          $version = if ("${{ github.ref }}" -like 'refs/tags/v*') { "${{ github.ref_name }}".TrimStart('v') } else { "0.0.${{ github.run_number }}-dev" }
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $iscc)) { choco install innosetup -y --no-progress; if ($LASTEXITCODE) { exit 1 } }
+          & $iscc /Q "/DAppVersion=$version" "/DSourceX64=$PWD\publish\win-x64" "/DSourceArm64=$PWD\publish\win-arm64" "/DOutDir=$PWD\dist" installer\AutoFixScout.iss
+          if ($LASTEXITCODE) { exit 1 }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Get-ChildItem dist | Format-Table Name, Length
+      - uses: actions/upload-artifact@v7
+        with:
+          name: AutoFixScout-Setup
+          path: dist/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: AutoFixScout-win-x64
+          path: publish/win-x64/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: AutoFixScout-win-arm64
+          path: publish/win-arm64/
+      # Push a tag like v0.1.0 to publish a GitHub Release anyone can download from (no GitHub account needed).
+      - name: GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $pre = if ("${{ github.ref_name }}" -like "*-*") { "--prerelease" } else { "--latest" }
+          gh release create "${{ github.ref_name }}" dist/*.exe $pre --title "AutoFix Scout ${{ steps.setup.outputs.version }}" --notes-file docs/TESTERS.md
+          if ($LASTEXITCODE) { exit 1 }

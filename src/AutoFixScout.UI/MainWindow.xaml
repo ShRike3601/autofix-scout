@@ -1,41 +1,201 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- MainWindow.xaml: Simple mode home screen (section 4) -->
 <Window x:Class="AutoFixScout.UI.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AutoFix Scout" Height="720" Width="540" WindowStyle="SingleBorderWindow"
-        ResizeMode="NoResize" Background="#F5F5F5">
+        Title="AutoFix Scout" Width="1100" Height="760" MinWidth="880" MinHeight="560"
+        WindowStartupLocation="CenterScreen" UseLayoutRounding="True"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}"
+        FontFamily="{StaticResource TextFont}" FontSize="{StaticResource BodySize}">
+    <!-- The app draws its own title bar: the top 36 px drag the window, the caption buttons are in the top right. -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="36" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
 
-    <!-- Large, high-contrast buttons (section 4.2) -->
-    <Grid Margin="20">
-        <TextBlock Text="What's wrong?" FontSize="32" FontWeight="Bold" HorizontalAlignment="Center"
-                   VerticalAlignment="Top" Margin="0,20,0,40" Foreground="#333333"/>
+    <Grid x:Name="Root">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <!-- Three large buttons -->
-        <Button Content="My sound isn't working" FontSize="24" FontWeight="SemiBold" Margin="0,10,0,15"
-                Padding="20,15" BorderThickness="2" BorderBrush="#0078D4" Background="White" Foreground="#333333"
-                Click="OnSoundClicked"/>
-        <Button Content="My camera isn't working" FontSize="24" FontWeight="SemiBold" Margin="0,5,0,15"
-                Padding="20,15" BorderThickness="2" BorderBrush="#D93F08" Background="White" Foreground="#333333"
-                Click="OnCameraClicked"/>
-        <Button Content="I can't get online" FontSize="24" FontWeight="SemiBold" Margin="0,10,0,15"
-                Padding="20,15" BorderThickness="2" BorderBrush="#107C10" Background="White" Foreground="#333333"
-                Click="OnNetworkClicked"/>
+        <!-- Sidebar: app mark, navigation, report and version. -->
+        <Border Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,1,0">
+            <DockPanel Margin="10,0,10,12">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,16,0,22">
+                    <ContentControl Template="{StaticResource ArtLogo}" Width="24" Height="24" Focusable="False"/>
+                    <TextBlock Text="AutoFix Scout" Margin="10,0,0,0" VerticalAlignment="Center" FontFamily="{StaticResource DisplayFont}"
+                               FontSize="14" FontWeight="SemiBold"/>
+                </StackPanel>
 
-        <!-- Something else (LLM text/voice input) -->
-        <Button Content="Something else" FontSize="18" Padding="20,12" Margin="0,5"
-                BorderBrush="#666666" Background="Transparent" Foreground="#555555"
-                Click="OnOtherClicked"/>
+                <StackPanel DockPanel.Dock="Bottom">
+                    <Border Height="1" Background="{DynamicResource DividerBrush}" Margin="0,0,0,8"/>
+                    <Button x:Name="HelperButton" Style="{StaticResource SubtleButton}" Content="Report for your helper"
+                            Tag="&#xE8A5;" Click="OnHelperDetailsClicked"/>
+                    <TextBlock x:Name="VersionText" Style="{StaticResource OverlineText}" FontWeight="Normal" Margin="12,8,0,0"/>
+                </StackPanel>
 
-        <!-- Footer: helper details link -->
-        <Button Content="Details for my helper" FontSize="14" Padding="20,10" Margin="0,30"
-                BorderBrush="#999999" Background="Transparent" Foreground="#666666" HorizontalAlignment="Center"
-                Click="OnHelperDetailsClicked"/>
+                <StackPanel KeyboardNavigation.DirectionalNavigation="Contained">
+                    <RadioButton x:Name="NavHome" Style="{StaticResource NavItem}" Content="Troubleshoot" Tag="&#xE90F;"
+                                 IsChecked="True" Checked="OnNavHomeClicked"/>
+                    <RadioButton x:Name="NavHistory" Style="{StaticResource NavItem}" Content="History and reports" Tag="&#xE81C;"
+                                 Checked="OnSettingsClicked"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
 
-        <!-- Settings icon -->
-        <Button Content="⚙️" FontSize="28" Width="44" Height="44" Margin="0,15" VerticalAlignment="Bottom"
-                HorizontalAlignment="Right" BorderBrush="#CCCCCC" Background="Transparent" Foreground="#666666"
-                Click="OnSettingsClicked"/>
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="36"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <Button Style="{StaticResource CaptionButton}" Content="&#xE921;" Click="OnMinimizeClicked" AutomationProperties.Name="Minimize"/>
+                <Button x:Name="MaximizeButton" Style="{StaticResource CaptionButton}" Content="&#xE922;" Click="OnMaximizeClicked" AutomationProperties.Name="Maximize"/>
+                <Button Style="{StaticResource CaptionCloseButton}" Content="&#xE8BB;" Click="OnCloseClicked" AutomationProperties.Name="Close"/>
+            </StackPanel>
+
+            <!-- Page header: greeting and question on the home page; topic and journey during a check. -->
+            <Grid Grid.Row="1" MaxWidth="1000" Margin="32,6,32,0">
+                <StackPanel x:Name="HeaderHome">
+                    <TextBlock x:Name="Greeting" Style="{StaticResource CaptionText}"/>
+                    <TextBlock Style="{StaticResource DisplayText}" Text="What would you like to check today?" Margin="0,2,0,4"
+                               AutomationProperties.HeadingLevel="Level1"/>
+                    <TextBlock Style="{StaticResource BodyText}"
+                               Text="Describe the problem, or select the part of the computer it concerns. AutoFix Scout checks first and does not change anything without your permission."/>
+                </StackPanel>
+
+                <StackPanel x:Name="HeaderStep" Visibility="Collapsed">
+                    <TextBlock x:Name="HeaderTitle" Style="{StaticResource DisplayText}" AutomationProperties.HeadingLevel="Level1"/>
+                </StackPanel>
+            </Grid>
+
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                <Grid MaxWidth="1000" Margin="32,20,32,28">
+
+                    <!-- Home: describe the problem, or browse the categories. -->
+                    <StackPanel x:Name="HomePanel" VerticalAlignment="Top" KeyboardNavigation.DirectionalNavigation="Contained">
+                        <!-- Describe the problem in your own words: routes to the best check (SymptomRouter). -->
+                        <Border CornerRadius="{StaticResource CardRadius}" Background="{DynamicResource InputBrush}"
+                                BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" Padding="14,4,4,4">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE721;" FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock x:Name="SymptomHint" Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" Text="Describe the problem in your own words"/>
+                                <TextBox x:Name="SymptomBox" Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center" Background="Transparent"
+                                         BorderThickness="0" Foreground="{DynamicResource TextPrimaryBrush}" CaretBrush="{DynamicResource TextPrimaryBrush}"
+                                         AutomationProperties.Name="Describe the problem" TextChanged="OnSymptomTextChanged" KeyDown="OnSymptomKeyDown"/>
+                                <Button Grid.Column="2" Style="{StaticResource AccentButton}" Content="Find a fix" MinWidth="0" MinHeight="30" Padding="16,4"
+                                        Click="OnSymptomSearch"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Categories (built in MainWindow.Visuals.cs, BuildCategories): each opens a short list of the problems inside it. -->
+                        <TextBlock Style="{StaticResource SectionLabel}" Text="Browse by category"/>
+                        <UniformGrid x:Name="CategoryGrid" Columns="3" Margin="-4,-4,-4,0"/>
+                    </StackPanel>
+
+                </Grid>
+            </ScrollViewer>
+
+            <!-- Step screen: one sentence, at most two choices (spec 4.2: one decision per screen). The stage card fills the page,
+                 its content is centred; the progress panel on the right shows during a check. -->
+            <Grid x:Name="StepPanel" Grid.Row="2" Visibility="Collapsed" MaxWidth="1000" Margin="32,20,32,28">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border CornerRadius="{StaticResource CardRadius}" Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1">
+                    <DockPanel>
+                        <!-- Status banner: colour and icon by severity (results and endings only). -->
+                        <Border x:Name="StatusBanner" DockPanel.Dock="Top" CornerRadius="7,7,0,0" Padding="20,9" BorderThickness="0,0,0,1" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="StatusGlyph" Style="{StaticResource Icon}" FontSize="14"/>
+                                <TextBlock x:Name="StatusLabel" Margin="10,0,0,0" VerticalAlignment="Center" FontSize="{StaticResource CaptionSize}"
+                                           FontWeight="SemiBold" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                            <StackPanel x:Name="StepContent" MaxWidth="560" VerticalAlignment="Center" Margin="28">
+                                <!-- One of: icon tile, scanner -->
+                                <Grid HorizontalAlignment="Center" Margin="0,0,0,18">
+                                    <Border x:Name="StepArt" Width="56" Height="56" CornerRadius="14" RenderTransformOrigin="0.5,0.5">
+                                        <TextBlock x:Name="StepArtGlyph" Style="{StaticResource Icon}" FontSize="26"/>
+                                    </Border>
+                                    <Viewbox x:Name="ScanVisual" Width="80" Height="80" Visibility="Collapsed">
+                                        <Grid Width="96" Height="96">
+                                            <Ellipse x:Name="Pulse1" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2" RenderTransformOrigin="0.5,0.5">
+                                                <Ellipse.RenderTransform><ScaleTransform x:Name="Pulse1Scale"/></Ellipse.RenderTransform>
+                                            </Ellipse>
+                                            <Ellipse x:Name="Pulse2" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2" RenderTransformOrigin="0.5,0.5">
+                                                <Ellipse.RenderTransform><ScaleTransform x:Name="Pulse2Scale"/></Ellipse.RenderTransform>
+                                            </Ellipse>
+                                            <Ellipse Width="66" Height="66" Fill="{DynamicResource AccentSoftBrush}"/>
+                                            <Ellipse Width="66" Height="66" Stroke="{DynamicResource RingTrackBrush}" StrokeThickness="4"/>
+                                            <Path Stroke="{DynamicResource AccentBrush}" StrokeThickness="4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                  Data="M 48,17 A 31,31 0 0 1 79,48">
+                                                <Path.RenderTransform><RotateTransform x:Name="ScanRotate" CenterX="48" CenterY="48"/></Path.RenderTransform>
+                                            </Path>
+                                            <Canvas Width="96" Height="96">
+                                                <Ellipse Canvas.Left="36" Canvas.Top="35" Width="21" Height="21" Stroke="{DynamicResource AccentBrush}" StrokeThickness="3.5"/>
+                                                <Path Data="M54,53 L60.5,59.5" Stroke="{DynamicResource AccentBrush}" StrokeThickness="4.5"
+                                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                            </Canvas>
+                                        </Grid>
+                                    </Viewbox>
+                                </Grid>
+
+                                <TextBlock x:Name="StepText" Style="{StaticResource TitleText}" TextAlignment="Center" AutomationProperties.LiveSetting="Assertive"/>
+                                <TextBlock x:Name="StepDetail" Style="{StaticResource BodyText}" Margin="0,8,0,0" Visibility="Collapsed"/>
+
+                                <!-- Checks being run (busy screen of a check). -->
+                                <StackPanel x:Name="ChecksPanel" Margin="0,16,0,0" HorizontalAlignment="Center" Visibility="Collapsed">
+                                    <TextBlock Style="{StaticResource CaptionText}" Margin="0,0,0,14" TextAlignment="Center"
+                                               Text="Checks in progress. The results will be shown when all checks are complete."/>
+                                    <StackPanel x:Name="ChecksList" HorizontalAlignment="Center"/>
+                                </StackPanel>
+
+                                <!-- Checks to choose from (closest matches to a description): built by ShowChoicesAsync. -->
+                                <StackPanel x:Name="ChoicesPanel" Margin="0,18,0,0" Visibility="Collapsed"
+                                            KeyboardNavigation.DirectionalNavigation="Contained"/>
+
+                                <WrapPanel x:Name="StepButtons" Margin="0,24,0,-8" HorizontalAlignment="Center">
+                                    <Button x:Name="PrimaryButton" Style="{StaticResource AccentButton}" Margin="4,0,4,8" IsDefault="True" Click="OnPrimaryClicked"/>
+                                    <Button x:Name="SecondaryButton" Style="{StaticResource StandardButton}" Margin="4,0,4,8" IsCancel="True" Click="OnSecondaryClicked"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
+
+                <!-- Progress: Check, Diagnosis, Fix, Confirm (built in MainWindow.Visuals.cs). Hidden outside a check. -->
+                <Border x:Name="JourneyRail" Grid.Column="1" Width="264" Margin="16,0,0,0" CornerRadius="{StaticResource CardRadius}"
+                        Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1">
+                    <DockPanel Margin="20">
+                        <TextBlock DockPanel.Dock="Top" Style="{StaticResource OverlineText}" FontSize="{StaticResource CaptionSize}" Text="Progress" Margin="0,0,0,16"/>
+                        <StackPanel DockPanel.Dock="Bottom">
+                            <Border Height="1" Background="{DynamicResource DividerBrush}" Margin="0,0,0,14"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xEA18;" FontSize="16" VerticalAlignment="Top" Margin="0,1,10,0"
+                                           Foreground="{DynamicResource AccentBrush}"/>
+                                <TextBlock Grid.Column="1" Style="{StaticResource CaptionText}"
+                                           Text="AutoFix Scout does not change anything without your permission."/>
+                            </Grid>
+                        </StackPanel>
+                        <StackPanel x:Name="JourneyBar"/>
+                    </DockPanel>
+                </Border>
+            </Grid>
+        </Grid>
     </Grid>
-
 </Window>

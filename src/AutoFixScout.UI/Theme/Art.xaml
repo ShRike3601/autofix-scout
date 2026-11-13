@@ -1,0 +1,21 @@
+<!--
+  The app mark, drawn as vector shapes on a 64 x 64 grid (scaled by a Viewbox, so any size is sharp).
+  Use: <ContentControl Template="{StaticResource ArtLogo}" Width="22" Height="22"/>.
+  Every other picture in the app is a Segoe Fluent Icons glyph on a tinted tile (see MainWindow.Visuals.cs).
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- App mark: a magnifier with a tick, on a blue tile. -->
+    <ControlTemplate x:Key="ArtLogo" TargetType="ContentControl">
+        <Viewbox>
+            <Canvas Width="64" Height="64">
+                <Rectangle Width="64" Height="64" RadiusX="15" RadiusY="15" Fill="{DynamicResource LogoBrush}"/>
+                <Ellipse Canvas.Left="13" Canvas.Top="12" Width="30" Height="30" Stroke="{DynamicResource LogoGlyphBrush}" StrokeThickness="5"/>
+                <Path Data="M39,38.5 L49.5,49" Stroke="{DynamicResource LogoGlyphBrush}" StrokeThickness="6.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                <Path Data="M21.5,27.5 L26.5,32.5 L35,23.5" Stroke="{DynamicResource LogoAccentBrush}" StrokeThickness="4"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+            </Canvas>
+        </Viewbox>
+    </ControlTemplate>
+</ResourceDictionary>

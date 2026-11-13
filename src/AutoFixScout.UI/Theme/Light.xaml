@@ -1,0 +1,66 @@
+<!-- Light palette (AUTOFIXSCOUT_THEME=light). Every key here must also exist in Dark.xaml and in ThemeManager.HighContrastPalette. -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Surfaces: flat and solid. -->
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#F5F6F8"/>
+    <SolidColorBrush x:Key="SidebarBrush" Color="#EBEDF1"/>
+    <SolidColorBrush x:Key="CardBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="CardHoverBrush" Color="#FAFBFD"/>
+    <SolidColorBrush x:Key="CardPressedBrush" Color="#F1F3F6"/>
+    <SolidColorBrush x:Key="CardBorderBrush" Color="#DEE1E7"/>
+    <SolidColorBrush x:Key="CardHoverBorderBrush" Color="#7AA7E8"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="DividerBrush" Color="#E1E4EA"/>
+    <SolidColorBrush x:Key="InputBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="InputBorderBrush" Color="#CDD2DA"/>
+
+    <!-- Text: primary ~16:1, secondary ~6.5:1 on the page background. -->
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#17181C"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#555A66"/>
+
+    <!-- Accent. -->
+    <SolidColorBrush x:Key="AccentBrush" Color="#1B63D6"/>
+    <SolidColorBrush x:Key="AccentFillBrush" Color="#1F66DB"/>
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="#2F74E4"/>
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="#1856BD"/>
+    <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#E3EDFC"/>
+
+    <SolidColorBrush x:Key="ButtonBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="ButtonHoverBrush" Color="#F3F5F8"/>
+    <SolidColorBrush x:Key="ButtonPressedBrush" Color="#E9ECF1"/>
+    <SolidColorBrush x:Key="ButtonBorderBrush" Color="#CDD2DA"/>
+    <SolidColorBrush x:Key="SubtleHoverBrush" Color="#0F000000"/>
+    <SolidColorBrush x:Key="SubtlePressedBrush" Color="#08000000"/>
+    <SolidColorBrush x:Key="NavSelectedBrush" Color="#12000000"/>
+    <SolidColorBrush x:Key="CloseHoverBrush" Color="#C42B1C"/>
+
+    <SolidColorBrush x:Key="FocusOuterBrush" Color="#E4000000"/>
+    <SolidColorBrush x:Key="FocusInnerBrush" Color="#B3FFFFFF"/>
+
+    <!-- App mark. -->
+    <LinearGradientBrush x:Key="LogoBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#1A7BE0" Offset="0"/>
+        <GradientStop Color="#0A4FA8" Offset="1"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="LogoGlyphBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="LogoAccentBrush" Color="#7FE3C4"/>
+
+    <!-- Journey (Check, Diagnosis, Fix, Confirm) and progress rings. -->
+    <SolidColorBrush x:Key="StepTrackBrush" Color="#CDD2DA"/>
+    <SolidColorBrush x:Key="StepPendingFillBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="RingTrackBrush" Color="#D5D9E0"/>
+
+    <!-- Status (ok / info / warning / error / neutral). Tile = soft background, Brush = icon, label and line. -->
+    <SolidColorBrush x:Key="SuccessTileBrush" Color="#DFF6DD"/>
+    <SolidColorBrush x:Key="SuccessBrush" Color="#0F7B0F"/>
+    <SolidColorBrush x:Key="InfoTileBrush" Color="#E3EDFC"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="#1B63D6"/>
+    <SolidColorBrush x:Key="CautionTileBrush" Color="#FFF1CC"/>
+    <SolidColorBrush x:Key="CautionBrush" Color="#8A5100"/>
+    <SolidColorBrush x:Key="ProblemTileBrush" Color="#FDE7E9"/>
+    <SolidColorBrush x:Key="ProblemBrush" Color="#C42B1C"/>
+    <SolidColorBrush x:Key="NeutralTileBrush" Color="#E9ECF1"/>
+    <SolidColorBrush x:Key="NeutralGlyphBrush" Color="#3B3F48"/>
+    <SolidColorBrush x:Key="OnStatusBrush" Color="#FFFFFF"/>
+</ResourceDictionary>

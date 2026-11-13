@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Management" Version="8.0.0" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.0" />
+    <!-- Same code as the app, so both agree on what "the previous driver" is. -->
+    <Compile Include="../AutoFixScout/Drivers/DriverStore.cs" Link="DriverStore.cs" />
+    <Compile Include="../AutoFixScout/Repair/ServiceDefaults.cs" Link="Repair/ServiceDefaults.cs" />
+    <Compile Include="../AutoFixScout/Repair/HostsFile.cs" Link="Repair/HostsFile.cs" />
+    <Compile Include="../AutoFixScout/Repair/SystemPath.cs" Link="Repair/SystemPath.cs" />
+    <Compile Include="../AutoFixScout/Repair/WifiTuning.cs" Link="Repair/WifiTuning.cs" />
+    <Compile Include="../AutoFixScout/Repair/OfficeClickToRun.cs" Link="Repair/OfficeClickToRun.cs" />
+    <Compile Include="../AutoFixScout/Repair/BrowserPolicies.cs" Link="Repair/BrowserPolicies.cs" />
+  </ItemGroup>
+
+</Project>
