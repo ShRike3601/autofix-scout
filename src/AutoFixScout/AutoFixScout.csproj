@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <!-- Packaging for portable installer -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!-- English only: drops the localized resource folders of the packages from the install -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>
