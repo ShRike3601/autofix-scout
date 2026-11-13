@@ -20,11 +20,12 @@ public sealed class RealDisplayProbe : IDisplayProbe
 
         try
         {
-            using var q = new ManagementObjectSearcher(@"root\wmi", "SELECT Active FROM WmiMonitorBasicDisplayParams");
+            using var q = Wmi.Searcher(@"root\wmi", "SELECT Active FROM WmiMonitorBasicDisplayParams");
             state.ConnectedScreens = q.Get().Cast<ManagementBaseObject>().Count(m => m["Active"] is true);
         }
         catch (Exception ex) { errors.Add($"WmiMonitorBasicDisplayParams: {ex.Message}"); }
 
+        Activity.Report(ActivityKind.Command, "Counting the screens that show the desktop (EnumDisplayDevices, EnumDisplaySettings)");
         try { state.ShowingScreens = CountShowingScreens(); }
         catch (Exception ex) { errors.Add($"EnumDisplayDevices: {ex.Message}"); }
 
@@ -34,7 +35,7 @@ public sealed class RealDisplayProbe : IDisplayProbe
         // Desktops have no software brightness ("Not supported"): that is normal, not a probe error.
         try
         {
-            using var q = new ManagementObjectSearcher(@"root\wmi", "SELECT CurrentBrightness, Active FROM WmiMonitorBrightness");
+            using var q = Wmi.Searcher(@"root\wmi", "SELECT CurrentBrightness, Active FROM WmiMonitorBrightness");
             state.BrightnessPercent = q.Get().Cast<ManagementBaseObject>()
                 .Where(m => m["Active"] is true).Select(m => (int?)Convert.ToInt32(m["CurrentBrightness"])).FirstOrDefault();
         }
@@ -44,7 +45,7 @@ public sealed class RealDisplayProbe : IDisplayProbe
 
     private static List<DisplayAdapterInfo> ReadAdapters()
     {
-        using var q = new ManagementObjectSearcher(
+        using var q = Wmi.Searcher(
             "SELECT Name, DeviceID, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE PNPClass = 'Display'");
         return q.Get().Cast<ManagementBaseObject>()
             .Select(d => new DisplayAdapterInfo(
@@ -163,7 +164,9 @@ public sealed class RealDisplayProbe : IDisplayProbe
         catch (Exception) { /* fall through to the registry */ }
         try
         {
+            Activity.ReadingRegistry("HKCU", @"Control Panel\Desktop", "(display scaling)");
             using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop\WindowMetrics");
+
             if (k?.GetValue("AppliedDPI") is int dpi && dpi > 0) return (int)Math.Round(dpi * 100.0 / 96);
             using var d = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Control Panel\Desktop");
             if (d?.GetValue("LogPixels") is int lp && lp > 0) return (int)Math.Round(lp * 100.0 / 96);

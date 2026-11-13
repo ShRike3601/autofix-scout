@@ -40,7 +40,9 @@ public sealed class RealCameraProbe : ICameraProbe
         catch (Exception ex) { errors.Add($"WMI: {ex.Message}"); }
         try
         {
+            Activity.ReadingRegistry("HKLM and HKCU", ConsentKey, "(app access to the camera)");
             using var hklm = Registry.LocalMachine.OpenSubKey(ConsentKey);
+
             using var hkcu = Registry.CurrentUser.OpenSubKey(ConsentKey);
             using var desktop = hkcu?.OpenSubKey("NonPackaged");
             state.DeviceAccess = Allowed(hklm);
@@ -56,7 +58,7 @@ public sealed class RealCameraProbe : ICameraProbe
     private static List<CameraDeviceInfo> ReadDevices()
     {
         // Spec 11: match cameras by PNPClass, not by name text.
-        using var q = new ManagementObjectSearcher(
+        using var q = Wmi.Searcher(
             "SELECT Name, DeviceID, PNPClass, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE PNPClass = 'Camera' OR PNPClass = 'Image'");
         return q.Get().Cast<ManagementBaseObject>().Select(d => new CameraDeviceInfo(
             d["Name"] as string ?? "(unnamed)",

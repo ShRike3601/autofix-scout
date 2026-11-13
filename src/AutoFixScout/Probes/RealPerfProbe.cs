@@ -27,6 +27,7 @@ public sealed class RealPerfProbe : IPerfProbe
             catch (Exception ex) { errors.Add($"{name}: {ex.Message}"); }
         }
 
+        Activity.Report(ActivityKind.Analyze, "Reading processor speed, power settings, memory and stability signals");
         Part("processor speed counters", () => SampleCounters(s));
         Part("processor speed events", () => s.FirmwareLimitEvents = CountFirmwareLimitEvents());
         Part("processor", () => ReadCpu(s));
@@ -42,6 +43,7 @@ public sealed class RealPerfProbe : IPerfProbe
             s.BlueScreens = blue; s.UnexpectedShutdowns = shut; s.HardwareErrors = whea; s.InstabilityRead = true;
         });
         s.ProbeErrors = errors;
+        Activity.Report(ActivityKind.Analyze, errors.Count == 0 ? "Read all parts of the performance check" : $"{Activity.Count(errors.Count, "part")} of the performance check could not be read");
         return s;
     }
 
@@ -58,6 +60,7 @@ public sealed class RealPerfProbe : IPerfProbe
 
     private static void SampleCounters(PerfState s)
     {
+        Activity.Report(ActivityKind.Load, $"Sampling processor counters for {Activity.Seconds(SampleTime)} (% Performance Limit, % Processor Performance)");
         if (PdhOpenQuery(null, IntPtr.Zero, out var q) != 0) throw new InvalidOperationException("counters not available");
         try
         {
@@ -77,10 +80,11 @@ public sealed class RealPerfProbe : IPerfProbe
     private static int CountFirmwareLimitEvents()
     {
         const long week = 7L * 24 * 3600 * 1000;
-        using var r = new EventLogReader(new EventLogQuery("System", PathType.LogName,
-            $"*[System[Provider[@Name='Microsoft-Windows-Kernel-Processor-Power'] and EventID=37 and TimeCreated[timediff(@SystemTime) <= {week}]]]"));
+        using var r = EventLogs.Open("System",
+            $"*[System[Provider[@Name='Microsoft-Windows-Kernel-Processor-Power'] and EventID=37 and TimeCreated[timediff(@SystemTime) <= {week}]]]", TimeSpan.FromDays(7));
         var n = 0;
         while (n < 5000 && r.ReadEvent() is { } e) { using (e) n++; }
+        Activity.Report(ActivityKind.EventLog, $"Found {(n == 0 ? "no events" : Activity.Count(n, "event"))}: Kernel-Processor-Power 37, last 7 days");
         return n;
     }
 
@@ -88,19 +92,20 @@ public sealed class RealPerfProbe : IPerfProbe
 
     private static void ReadCpu(PerfState s)
     {
-        using var q = new ManagementObjectSearcher("SELECT Name FROM Win32_Processor");
+        using var q = Wmi.Searcher("SELECT Name FROM Win32_Processor");
         s.CpuName = q.Get().Cast<ManagementBaseObject>().Select(m => m["Name"] as string).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n))?.Trim();
     }
 
     private static uint? ReadMicrocode()
     {
+        Activity.ReadingRegistry("HKLM", @"HARDWARE\DESCRIPTION\System\CentralProcessor\0", "(microcode revision)");
         using var k = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
         return PerfTriage.ParseMicrocode(k?.GetValue("Update Revision") as byte[]);
     }
 
     private static DateTime? ReadBiosDate()
     {
-        using var q = new ManagementObjectSearcher("SELECT ReleaseDate FROM Win32_BIOS");
+        using var q = Wmi.Searcher("SELECT ReleaseDate FROM Win32_BIOS");
         foreach (ManagementBaseObject m in q.Get())
             if (m["ReleaseDate"] is string d && d.Length >= 14)
                 return ManagementDateTimeConverter.ToDateTime(d).ToUniversalTime();
@@ -111,7 +116,11 @@ public sealed class RealPerfProbe : IPerfProbe
 
     [DllImport("powrprof.dll")] private static extern uint PowerGetEffectiveOverlayScheme(out Guid scheme);
 
-    private static string? ReadOverlay() => PowerGetEffectiveOverlayScheme(out var g) == 0 ? g.ToString() : null;
+    private static string? ReadOverlay()
+    {
+        Activity.Report(ActivityKind.Command, "Calling PowerGetEffectiveOverlayScheme (power mode)");
+        return PowerGetEffectiveOverlayScheme(out var g) == 0 ? g.ToString() : null;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct SystemPowerStatus { public byte AcLine, BatteryFlag, BatteryPercent, SystemStatusFlag; public int LifeTime, FullLifeTime; }
@@ -125,8 +134,10 @@ public sealed class RealPerfProbe : IPerfProbe
 
     private static void ReadBattery(PerfState s)
     {
+        Activity.Report(ActivityKind.Command, "Calling GetSystemPowerStatus (battery and Battery Saver)");
         if (!GetSystemPowerStatus(out var p)) throw new InvalidOperationException("power status not available");
-        s.HasBattery = p.BatteryFlag is not (128 or 255);
+        s.HasBattery
+ = p.BatteryFlag is not (128 or 255);
         s.OnBattery = p.AcLine switch { 0 => true, 1 => false, _ => null };
         s.BatterySaverOn = p.SystemStatusFlag == 1;
     }
@@ -135,7 +146,7 @@ public sealed class RealPerfProbe : IPerfProbe
 
     private static IReadOnlyList<RamModule> ReadRam()
     {
-        using var q = new ManagementObjectSearcher("SELECT Capacity, Speed, ConfiguredClockSpeed, FormFactor, SMBIOSMemoryType FROM Win32_PhysicalMemory");
+        using var q = Wmi.Searcher("SELECT Capacity, Speed, ConfiguredClockSpeed, FormFactor, SMBIOSMemoryType FROM Win32_PhysicalMemory");
         return q.Get().Cast<ManagementBaseObject>().Select(m => new RamModule(
             m["Capacity"] is { } c ? Convert.ToInt64(c) : 0,
             Speed(m["Speed"]), Speed(m["ConfiguredClockSpeed"]),

@@ -16,7 +16,9 @@ public sealed class RealPrinterProbe : IPrinterProbe
         ReadScanners(state);
         try
         {
+            Activity.Report(ActivityKind.Command, "Reading the state of the Print Spooler service (Spooler)");
             using var sc = new ServiceController("Spooler");
+
             state.SpoolerRunning = sc.Status == ServiceControllerStatus.Running ? Tri.Yes : Tri.No;
         }
         catch (Exception ex) { errors.Add($"Spooler service: {ex.Message}"); return state; }
@@ -58,7 +60,7 @@ public sealed class RealPrinterProbe : IPrinterProbe
     private static List<ScannerDevice> ReadScannerDevices()
     {
         var list = new List<ScannerDevice>();
-        using var q = new ManagementObjectSearcher(
+        using var q = Wmi.Searcher(
             "SELECT Name, DeviceID, PNPClass, Service, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE PNPClass = 'Image' OR PNPClass = 'WIA' OR PNPClass = 'ScannerDevice'");
         foreach (var d in q.Get())
         {
@@ -73,7 +75,7 @@ public sealed class RealPrinterProbe : IPrinterProbe
     private static List<PrinterInfo> ReadPrinters()
     {
         var list = new List<PrinterInfo>();
-        using var q = new ManagementObjectSearcher(
+        using var q = Wmi.Searcher(
             "SELECT Name, Default, WorkOffline, PrinterStatus, ExtendedPrinterStatus, DetectedErrorState, PrinterState, PortName FROM Win32_Printer");
         foreach (var p in q.Get())
         {
@@ -95,7 +97,7 @@ public sealed class RealPrinterProbe : IPrinterProbe
     private static List<PrintJobInfo> ReadJobs()
     {
         var list = new List<PrintJobInfo>();
-        using var q = new ManagementObjectSearcher("SELECT Name, StatusMask, TimeSubmitted FROM Win32_PrintJob");
+        using var q = Wmi.Searcher("SELECT Name, StatusMask, TimeSubmitted FROM Win32_PrintJob");
         foreach (var j in q.Get())
         {
             // Name is "<printer name>, <job id>"; printer names cannot contain commas.

@@ -20,9 +20,10 @@ public static class MicrophoneFlow
 
     public static Task<Diagnosis> DiagnoseAsync() => Task.Run(() =>
     {
+        using var _ = Activity.Scope(Topic);
         var s = new RealMicrophoneProbe().Read();
-        var f = MicrophoneTriage.Evaluate(s);
-        return new Diagnosis(s, f, MicrophoneTriage.Ladder(s, f), MicrophoneTriage.ProbablyHardware(s), MicrophoneTriage.NotFixedHint(f));
+        var f = Analysis.Judge(() => MicrophoneTriage.Evaluate(s));
+        return new Diagnosis(s, f, Analysis.Plan(MicrophoneTriage.Ladder(s, f)), MicrophoneTriage.ProbablyHardware(s), MicrophoneTriage.NotFixedHint(f));
     });
 
     /// <summary>

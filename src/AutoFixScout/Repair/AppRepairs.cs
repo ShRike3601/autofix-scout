@@ -37,8 +37,10 @@ public static class AppRepairs
     {
         var exe = Path.Combine(Environment.SystemDirectory, "WSReset.exe");
         if (!File.Exists(exe)) return (false, "WSReset.exe not found");
+        Commands.Running(exe, "", "clears the Microsoft Store cache");
         using var p = Process.Start(new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true })!;
-        if (!p.WaitForExit(60_000)) return (true, "WSReset still running after 60 s; the Store opens when it has finished");
+        if (!p.WaitForExit(60_000))
+ return (true, "WSReset still running after 60 s; the Store opens when it has finished");
         return (p.ExitCode == 0, $"WSReset exit code {p.ExitCode}");
     }
 
@@ -61,6 +63,7 @@ public static class AppRepairs
     {
         if (FindOneDrive() is not { } exe) return (false, "OneDrive not found");
         var psi = new ProcessStartInfo(exe) { UseShellExecute = false };
+        Commands.Running(exe, "/reset", "OneDrive sync reset, files are kept");
         psi.ArgumentList.Add("/reset");
         using (var p = Process.Start(psi)!)
             if (!p.WaitForExit(60_000)) return (false, "OneDrive /reset did not finish within 60 s");

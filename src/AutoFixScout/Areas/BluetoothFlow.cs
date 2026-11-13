@@ -17,9 +17,10 @@ public static class BluetoothFlow
 
     public static Task<Diagnosis> DiagnoseAsync() => Task.Run(() =>
     {
+        using var _ = Activity.Scope(Topic);
         var s = Probe.Read();
-        var f = BluetoothTriage.Evaluate(s);
-        return new Diagnosis(s, f, BluetoothTriage.Ladder(s, f), BluetoothTriage.ProbablyHardware(s), BluetoothTriage.NotFixedHint(f));
+        var f = Analysis.Judge(() => BluetoothTriage.Evaluate(s));
+        return new Diagnosis(s, f, Analysis.Plan(BluetoothTriage.Ladder(s, f)), BluetoothTriage.ProbablyHardware(s), BluetoothTriage.NotFixedHint(f));
     });
 
     public static Task<bool> AutoTestAsync() => Task.Run(() =>

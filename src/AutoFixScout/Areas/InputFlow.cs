@@ -17,10 +17,11 @@ public static class InputFlow
     /// <summary>With typingFocus the layout findings come first (the person reported wrong characters).</summary>
     public static Task<Diagnosis> DiagnoseAsync(bool typingFocus) => Task.Run(() =>
     {
+        using var _ = Activity.Scope(Topic);
         var s = Read();
         s.TypingFocus = typingFocus;
-        var f = InputTriage.Evaluate(s);
-        return new Diagnosis(s, f, InputTriage.Ladder(s, f), InputTriage.ProbablyHardware(s), InputTriage.NotFixedHint(f));
+        var f = Analysis.Judge(() => InputTriage.Evaluate(s));
+        return new Diagnosis(s, f, Analysis.Plan(InputTriage.Ladder(s, f)), InputTriage.ProbablyHardware(s), InputTriage.NotFixedHint(f));
     });
 
     /// <summary>Read-only, no admin; failures are in <see cref="InputState.ProbeErrors"/>.</summary>

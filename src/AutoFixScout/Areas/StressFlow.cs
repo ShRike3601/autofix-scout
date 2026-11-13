@@ -33,8 +33,8 @@ public static class StressFlow
 
     public static Diagnosis Diagnose(StressResult r)
     {
-        var f = StressAnalysis.Evaluate(r);
-        return new Diagnosis(r, f, StressAnalysis.Ladder(r, f), StressAnalysis.ProbablyHardware(f), StressAnalysis.NotFixedHint(f));
+        var f = Analysis.Judge(() => StressAnalysis.Evaluate(r));
+        return new Diagnosis(r, f, Analysis.Plan(StressAnalysis.Ladder(r, f)), StressAnalysis.ProbablyHardware(f), StressAnalysis.NotFixedHint(f));
     }
 
     /// <summary>Runs the test (call only after the person agreed) and returns the diagnosis. State is the StressResult.</summary>

@@ -15,6 +15,7 @@ public sealed record DriverStatus(string? Version, DateTime? StagedUtc, string? 
     {
         try
         {
+            Activity.Report(ActivityKind.Driver, "Reading the installed driver of a device and looking for a previous version in the driver store");
             var d = DriverStore.Read(instanceId);
             if (d is null) return null;
             return new DriverStatus(d.Version, DriverStore.StagedUtc(d.InfName), DriverStore.FindPrevious(d)?.Version.ToString());

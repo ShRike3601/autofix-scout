@@ -16,6 +16,7 @@ public sealed class RealAudioProbe : IAudioProbe
     {
         var errors = new List<string>();
         var state = new AudioState { ProbeErrors = errors };
+        Activity.Report(ActivityKind.Command, $"Reading the state of {Activity.Count(AudioServices.Length, "audio service")} through the Service Control Manager");
 
         state.Services = AudioServices.Select(name =>
         {
@@ -39,6 +40,8 @@ public sealed class RealAudioProbe : IAudioProbe
 
     private static void ReadEndpoints(AudioState state)
     {
+        Activity.Report(ActivityKind.Command, "Listing the sound outputs through Core Audio (names, volume and mute state)");
+
         using var enumerator = new MMDeviceEnumerator();
         string? defaultId = null;
         if (enumerator.HasDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia))
@@ -151,7 +154,7 @@ public sealed class RealAudioProbe : IAudioProbe
         var driversTask = Task.Run(() =>
         {
             var map = new Dictionary<string, ManagementBaseObject>(StringComparer.OrdinalIgnoreCase);
-            using var q = new ManagementObjectSearcher(
+            using var q = Wmi.Searcher(
                 "SELECT DeviceID, DriverVersion, DriverDate, DriverProviderName FROM Win32_PnPSignedDriver WHERE DeviceClass = 'MEDIA'");
             foreach (var d in q.Get())
                 if (d["DeviceID"] is string id) map[id] = d;
@@ -159,7 +162,7 @@ public sealed class RealAudioProbe : IAudioProbe
         });
 
         var found = new List<ManagementBaseObject>();
-        using (var devices = new ManagementObjectSearcher(
+        using (var devices = Wmi.Searcher(
             "SELECT Name, DeviceID, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE PNPClass = 'MEDIA'"))
             foreach (var dev in devices.Get()) found.Add(dev);
         var drivers = driversTask.GetAwaiter().GetResult();

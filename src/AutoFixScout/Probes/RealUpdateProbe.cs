@@ -23,6 +23,7 @@ public sealed class RealUpdateProbe : IUpdateProbe
     {
         var errors = new List<string>();
         var s = new UpdateState { ProbeErrors = errors };
+        Activity.Report(ActivityKind.Command, $"Reading the state of {Activity.Count(ServiceNames.Length, "Windows Update service")} through the Service Control Manager");
         s.Services = ServiceNames.Select(ReadService).ToList();
         if (s.Services.All(x => x.Status == "Unknown")) errors.Add("services: none could be read");
         s.RebootPending = ReadRebootPending();
@@ -51,6 +52,8 @@ public sealed class RealUpdateProbe : IUpdateProbe
 
     private static Tri ReadRebootPending()
     {
+        Activity.ReadingRegistry("HKLM", @"SOFTWARE\Microsoft\Windows\CurrentVersion", "(restart-pending flags of Windows Update and servicing)");
+
         try
         {
             foreach (var path in RebootKeys)
@@ -75,7 +78,7 @@ public sealed class RealUpdateProbe : IUpdateProbe
         catch (Exception) { /* fall back */ }
         try
         {
-            using var q = new ManagementObjectSearcher("SELECT InstalledOn FROM Win32_QuickFixEngineering");
+            using var q = Wmi.Searcher("SELECT InstalledOn FROM Win32_QuickFixEngineering");
             DateTime? newest = null;
             foreach (var h in q.Get())
             {

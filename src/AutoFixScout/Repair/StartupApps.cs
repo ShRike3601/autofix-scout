@@ -127,7 +127,9 @@ public static class StartupApps
     public static List<StartupEntry> ReadAll()
     {
         var list = new List<StartupEntry>();
+        Activity.Report(ActivityKind.Registry, "Reading the Run keys (HKCU and HKLM) and the Startup folders for programs that start with Windows");
         ReadRun(list, Registry.CurrentUser, RunKey, "Run", StartupScope.UserRun);
+
         ReadRun(list, Registry.LocalMachine, RunKey, "Run", StartupScope.MachineRun);
         ReadRun(list, Registry.LocalMachine, Run32Key, "Run32", StartupScope.MachineRun32);
         ReadFolder(list, Environment.GetFolderPath(Environment.SpecialFolder.Startup), Registry.CurrentUser, StartupScope.UserFolder);

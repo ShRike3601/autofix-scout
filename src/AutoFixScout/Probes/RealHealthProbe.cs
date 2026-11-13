@@ -27,21 +27,28 @@ public sealed class RealHealthProbe : IHealthProbe
         var parts = new List<(string Name, Action Read)>();
         void Part(string name, Action read) => parts.Add((name, read));
 
+        Activity.Report(ActivityKind.Analyze, "Running the full check-up: event logs, registry, services, drives and devices, read side by side");
         Part("event log (programs)", () => ReadAppEvents(s));
         Part("event log (system)", () => ReadSystemEvents(s));
         Part("clock", () => s.ClockOffsetSeconds = ReadClockOffset());
         Part("clock settings", () =>
         {
+            Activity.ReadingRegistry("HKLM", @"SYSTEM\CurrentControlSet\Services\W32Time\Parameters", "(automatic time setting)");
             using var k = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\W32Time\Parameters");
             s.AutoTimeOff = string.Equals(k?.GetValue("Type") as string, "NoSync", StringComparison.OrdinalIgnoreCase);
         });
         Part("proxy", () => ReadUserProxy(s));
         Part("system proxy", () => ReadWinHttpProxy(s));
-        Part("hosts file", () => s.HostsHijacks = HostsFile.Suspicious(File.ReadAllLines(HostsPath)).Select(e => new HostsHijack(e.Host, e.Ip)).ToList());
+        Part("hosts file", () => s.HostsHijacks = ReadHostsHijacks());
         Part("network add-ons", () => s.ThirdPartyWinsock = ReadWinsock());
         Part("system PATH", () => s.MissingPathEntries = SystemPath.Missing(ReadMachinePath(), Environment.GetFolderPath(Environment.SpecialFolder.Windows)));
         Part("temporary folder", () => s.TempFolderMissing = !Directory.Exists(Environment.GetEnvironmentVariable("TEMP") ?? ""));
-        Part("services", () => s.Services = ServiceDefaults.All.Select(d => ReadService(d.Name)).ToList());
+        Part("services", () =>
+        {
+            Activity.Report(ActivityKind.Command, $"Reading the state of {Activity.Count(ServiceDefaults.All.Count, "Windows service")} through the Service Control Manager");
+            s.Services = ServiceDefaults.All.Select(d => ReadService(d.Name)).ToList();
+        });
+
         Part("Store apps", () => s.BrokenStoreApps = ReadBrokenStoreApps());
         Part("restart flag", () => s.RebootPending = ReadRebootPending());
         Part("drives", () => s.Drives = ReadDrives());
@@ -63,6 +70,7 @@ public sealed class RealHealthProbe : IHealthProbe
         })).ToArray());
 
         s.ProbeErrors = errors.Where(e => e != null).Select(e => e!).ToList();
+        Activity.Report(ActivityKind.Analyze, s.ProbeErrors.Count == 0 ? "All parts of the check-up were read" : $"{Activity.Count(s.ProbeErrors.Count, "part")} of the check-up could not be read");
         return s;
     }
 
@@ -89,9 +97,15 @@ public sealed class RealHealthProbe : IHealthProbe
         }
         Part("proxy", () => ReadUserProxy(s));
         Part("system proxy", () => ReadWinHttpProxy(s));
-        Part("hosts file", () => s.HostsHijacks = HostsFile.Suspicious(File.ReadAllLines(HostsPath)).Select(e => new HostsHijack(e.Host, e.Ip)).ToList());
+        Part("hosts file", () => s.HostsHijacks = ReadHostsHijacks());
         s.ProbeErrors = errors;
         return s;
+    }
+
+    private static List<HostsHijack> ReadHostsHijacks()
+    {
+        Activity.Report(ActivityKind.Files, "Reading the hosts file (only the count of redirected well-known sites is kept)");
+        return HostsFile.Suspicious(File.ReadAllLines(HostsPath)).Select(e => new HostsHijack(e.Host, e.Ip)).ToList();
     }
 
     public static string HostsPath => Path.Combine(Environment.SystemDirectory, "drivers", "etc", "hosts");
@@ -102,9 +116,11 @@ public sealed class RealHealthProbe : IHealthProbe
 
     private static IEnumerable<EventRecord> Query(string log, string filter, int max = 2000)
     {
-        using var reader = new EventLogReader(new EventLogQuery(log, PathType.LogName, $"*[System[{filter} and {Since}]]"));
-        for (var i = 0; i < max && reader.ReadEvent() is { } e; i++)
+        using var reader = EventLogs.Open(log, $"*[System[{filter} and {Since}]]", Window);
+        var n = 0;
+        for (; n < max && reader.ReadEvent() is { } e; n++)
             using (e) yield return e;
+        Activity.Report(ActivityKind.EventLog, $"Found {(n == 0 ? "no events" : Activity.Count(n, "event"))}: {Activity.DescribeEvents(filter, Window)}");
     }
 
     private static string? Prop(EventRecord e, int i) => e.Properties.Count > i ? e.Properties[i].Value?.ToString() : null;
@@ -189,7 +205,7 @@ public sealed class RealHealthProbe : IHealthProbe
     {
         bool? automatic = null;
         long ramMb = 0;
-        using (var q = new System.Management.ManagementObjectSearcher("SELECT AutomaticManagedPagefile, TotalPhysicalMemory FROM Win32_ComputerSystem"))
+        using (var q = Wmi.Searcher("SELECT AutomaticManagedPagefile, TotalPhysicalMemory FROM Win32_ComputerSystem"))
             foreach (System.Management.ManagementObject o in q.Get())
                 using (o)
                 {
@@ -197,12 +213,12 @@ public sealed class RealHealthProbe : IHealthProbe
                     ramMb = ToLong(o["TotalPhysicalMemory"]) / 1048576;
                 }
         var settings = new List<PageFileSetting>();
-        using (var q = new System.Management.ManagementObjectSearcher("SELECT Name, InitialSize, MaximumSize FROM Win32_PageFileSetting"))
+        using (var q = Wmi.Searcher("SELECT Name, InitialSize, MaximumSize FROM Win32_PageFileSetting"))
             foreach (System.Management.ManagementObject o in q.Get())
                 using (o)
                     settings.Add(new(o["Name"] as string ?? "", ToLong(o["InitialSize"]), ToLong(o["MaximumSize"])));
         var usage = new List<PageFileUse>();
-        using (var q = new System.Management.ManagementObjectSearcher("SELECT Name, AllocatedBaseSize, CurrentUsage FROM Win32_PageFileUsage"))
+        using (var q = Wmi.Searcher("SELECT Name, AllocatedBaseSize, CurrentUsage FROM Win32_PageFileUsage"))
             foreach (System.Management.ManagementObject o in q.Get())
                 using (o)
                     usage.Add(new(o["Name"] as string ?? "", ToLong(o["AllocatedBaseSize"]), ToLong(o["CurrentUsage"])));
@@ -216,15 +232,18 @@ public sealed class RealHealthProbe : IHealthProbe
     private static IEnumerable<EventRecord> QueryWindow(string log, string filter, TimeSpan window, int max = 500)
     {
         var since = $"TimeCreated[timediff(@SystemTime) <= {(long)window.TotalMilliseconds}]";
-        using var reader = new EventLogReader(new EventLogQuery(log, PathType.LogName, $"*[System[{filter} and {since}]]"));
-        for (var i = 0; i < max && reader.ReadEvent() is { } e; i++)
+        using var reader = EventLogs.Open(log, $"*[System[{filter} and {since}]]", window);
+        var n = 0;
+        for (; n < max && reader.ReadEvent() is { } e; n++)
             using (e) yield return e;
+        Activity.Report(ActivityKind.EventLog, $"Found {(n == 0 ? "no events" : Activity.Count(n, "event"))}: {Activity.DescribeEvents(filter, window)}");
     }
 
     private static void ReadRecentChanges(HealthState s)
     {
         var list = new List<RecentChange>();
         var cutoff = DateTime.UtcNow - ChangeWindow;
+        Activity.ReadingRegistry("HKLM", @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", "(programs installed in the last 7 days)");
         // Programs: the Uninstall keys (machine, 32-bit on 64-bit Windows, current user).
         const string Uninstall = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
         foreach (var (hive, view) in new[] { (RegistryHive.LocalMachine, RegistryView.Registry64), (RegistryHive.LocalMachine, RegistryView.Registry32), (RegistryHive.CurrentUser, RegistryView.Default) })
@@ -269,7 +288,7 @@ public sealed class RealHealthProbe : IHealthProbe
         try
         {
             var dates = new List<DateTime>();
-            using var q = new System.Management.ManagementObjectSearcher(@"root\default", "SELECT CreationTime FROM SystemRestore");
+            using var q = Wmi.Searcher(@"root\default", "SELECT CreationTime FROM SystemRestore");
             foreach (System.Management.ManagementObject o in q.Get())
                 using (o)
                     if (o["CreationTime"] is string t) dates.Add(System.Management.ManagementDateTimeConverter.ToDateTime(t).ToUniversalTime());
@@ -328,7 +347,7 @@ public sealed class RealHealthProbe : IHealthProbe
         string? name = null, cls = null;
         try
         {
-            using var q = new System.Management.ManagementObjectSearcher(
+            using var q = Wmi.Searcher(
                 "SELECT Name, PNPClass FROM Win32_PnPEntity WHERE DeviceID='" + instanceId.Replace(@"\", @"\\").Replace("'", @"\'") + "'");
             foreach (System.Management.ManagementObject d in q.Get())
                 using (d) { name = d["Name"] as string; cls = d["PNPClass"] as string; }
@@ -341,7 +360,7 @@ public sealed class RealHealthProbe : IHealthProbe
     private static IReadOnlyList<DeviceProblem> ReadDeviceProblems()
     {
         var list = new List<DeviceProblem>();
-        using var q = new System.Management.ManagementObjectSearcher(
+        using var q = Wmi.Searcher(
             "SELECT Name, DeviceID, PNPClass, ConfigManagerErrorCode, Present FROM Win32_PnPEntity WHERE ConfigManagerErrorCode <> 0");
         foreach (System.Management.ManagementObject d in q.Get())
             using (d)
@@ -360,8 +379,8 @@ public sealed class RealHealthProbe : IHealthProbe
         var parts = new List<string>();
         if (TempProfiles.IsTemporaryPath(path)) parts.Add("profile folder is a TEMP folder");
         var n = 0;
-        using (var reader = new EventLogReader(new EventLogQuery("Application", PathType.LogName,
-            "*[System[Provider[@Name='Microsoft-Windows-User Profiles Service'] and (EventID=1511 or EventID=1515) and TimeCreated[timediff(@SystemTime) <= 172800000]]]")))
+        using (var reader = EventLogs.Open("Application",
+            "*[System[Provider[@Name='Microsoft-Windows-User Profiles Service'] and (EventID=1511 or EventID=1515) and TimeCreated[timediff(@SystemTime) <= 172800000]]]", TimeSpan.FromDays(2)))
             while (n < 50 && reader.ReadEvent() is { } e) using (e) n++;
         if (n > 0) parts.Add($"User Profile Service events 1511/1515 in 2 days: {n}");
         s.TempProfile = parts.Count > 0;
@@ -374,13 +393,13 @@ public sealed class RealHealthProbe : IHealthProbe
     private static IReadOnlyList<PhysicalDriveInfo> ReadDrives()
     {
         var predict = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        using (var q = new System.Management.ManagementObjectSearcher("SELECT Model, Status FROM Win32_DiskDrive"))
+        using (var q = Wmi.Searcher("SELECT Model, Status FROM Win32_DiskDrive"))
             foreach (System.Management.ManagementObject d in q.Get())
                 using (d)
                     if (string.Equals(d["Status"] as string, "Pred Fail", StringComparison.OrdinalIgnoreCase)) predict.Add((d["Model"] as string ?? "").Trim());
 
         var list = new List<PhysicalDriveInfo>();
-        using var s = new System.Management.ManagementObjectSearcher(@"root\Microsoft\Windows\Storage",
+        using var s = Wmi.Searcher(@"root\Microsoft\Windows\Storage",
             "SELECT FriendlyName, MediaType, HealthStatus, OperationalStatus FROM MSFT_PhysicalDisk");
         foreach (System.Management.ManagementObject d in s.Get())
             using (d)
@@ -400,6 +419,7 @@ public sealed class RealHealthProbe : IHealthProbe
     /// <summary>Compares the clock with the Date header of Microsoft's connectivity test (plain HTTP, so a wrong clock cannot break the check itself).</summary>
     private static double? ReadClockOffset()
     {
+        Activity.Report(ActivityKind.Network, "HTTP HEAD http://www.msftconnecttest.com/connecttest.txt (comparing the clock with the Date header)");
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         var sent = DateTime.UtcNow;
         using var r = http.Send(new HttpRequestMessage(HttpMethod.Head, "http://www.msftconnecttest.com/connecttest.txt"));
@@ -415,6 +435,7 @@ public sealed class RealHealthProbe : IHealthProbe
 
     private static void ReadUserProxy(HealthState s)
     {
+        Activity.ReadingRegistry("HKCU", @"Software\Microsoft\Windows\CurrentVersion\Internet Settings", "(proxy settings)");
         using var k = Registry.CurrentUser.OpenSubKey(InternetSettings);
         s.UserProxyEnabled = k?.GetValue("ProxyEnable") is int e && e != 0;
         s.UserProxyServer = k?.GetValue("ProxyServer") as string;
@@ -428,6 +449,7 @@ public sealed class RealHealthProbe : IHealthProbe
     /// <summary>WinHttpSettings: DWORD size, DWORD counter, DWORD flags (1 = direct), DWORD length, proxy string (ANSI).</summary>
     private static void ReadWinHttpProxy(HealthState s)
     {
+        Activity.ReadingRegistry("HKLM", @"Software\Microsoft\Windows\CurrentVersion\Internet Settings\Connections", "(system proxy)");
         using var k = Registry.LocalMachine.OpenSubKey(InternetSettings + @"\Connections");
         if (k?.GetValue("WinHttpSettings") is not byte[] b || b.Length < 16) return;
         var flags = BitConverter.ToInt32(b, 8);
@@ -454,6 +476,7 @@ public sealed class RealHealthProbe : IHealthProbe
     {
         var servers = ParseProxyList(value);
         if (servers.Count == 0) return Tri.Unknown;
+        Activity.Report(ActivityKind.Network, $"Testing a TCP connection to the configured proxy ({Activity.Count(servers.Count, "server")})");
         foreach (var (host, port) in servers)
         {
             try
@@ -470,6 +493,7 @@ public sealed class RealHealthProbe : IHealthProbe
     {
         try
         {
+            Activity.Report(ActivityKind.Network, "HTTP GET of the automatic proxy configuration script");
             using var http = new HttpClient(new HttpClientHandler { UseProxy = false }) { Timeout = TimeSpan.FromSeconds(5) };
             using var r = http.Send(new HttpRequestMessage(HttpMethod.Get, url));
             return r.IsSuccessStatusCode ? Tri.Yes : Tri.No;
@@ -484,6 +508,7 @@ public sealed class RealHealthProbe : IHealthProbe
     private static IReadOnlyList<string> ReadWinsock()
     {
         var found = new List<string>();
+        Activity.ReadingRegistry("HKLM", @"SYSTEM\CurrentControlSet\Services\WinSock2\Parameters\Protocol_Catalog9", "(network add-ons)");
         foreach (var catalog in new[] { "Catalog_Entries64", "Catalog_Entries" })
         {
             using var k = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\WinSock2\Parameters\Protocol_Catalog9\{catalog}");
@@ -501,6 +526,7 @@ public sealed class RealHealthProbe : IHealthProbe
 
     public static string? ReadMachinePath()
     {
+        Activity.ReadingRegistry("HKLM", @"SYSTEM\CurrentControlSet\Control\Session Manager\Environment", "(system PATH)");
         using var k = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Environment");
         return k?.GetValue("Path", null, RegistryValueOptions.DoNotExpandEnvironmentNames) as string;
     }
@@ -524,6 +550,7 @@ public sealed class RealHealthProbe : IHealthProbe
         foreach (var a in new[] { "-NoProfile", "-NonInteractive", "-Command",
             "[Console]::OutputEncoding=[Text.Encoding]::UTF8; @(Get-AppxPackage | Where-Object { $_.Status -ne 'Ok' } | Select-Object PackageFullName,Name,@{n='Status';e={[string]$_.Status}}) | ConvertTo-Json -Compress" })
             psi.ArgumentList.Add(a);
+        Commands.Running("powershell.exe", "Get-AppxPackage", "looking for Store apps whose status is not OK");
         using var p = Process.Start(psi)!;
         var json = p.StandardOutput.ReadToEnd();
         if (!p.WaitForExit(60_000)) { try { p.Kill(); } catch { } throw new System.TimeoutException("Get-AppxPackage did not finish"); }
@@ -543,6 +570,7 @@ public sealed class RealHealthProbe : IHealthProbe
 
     private static Tri ReadRebootPending()
     {
+        Activity.ReadingRegistry("HKLM", @"SOFTWARE\Microsoft\Windows\CurrentVersion", "(restart-pending flags of Windows Update and servicing)");
         foreach (var path in new[] { @"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired",
                                      @"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending" })
         {

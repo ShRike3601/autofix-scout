@@ -106,6 +106,7 @@ public sealed class UpdateService
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(ApiTimeout);
+            Activity.Report(ActivityKind.Network, "HTTP GET https://api.github.com/repos/.../releases/latest (checking for a newer AutoFix Scout; nothing about this computer is sent)");
             using var resp = await _http.GetAsync(LatestReleaseUrl, cts.Token);
             if (resp.StatusCode == HttpStatusCode.NotFound) return new Fetched(null);   // no release yet
             if (!resp.IsSuccessStatusCode) return null;                                  // rate limit (403/429), outage
@@ -174,6 +175,7 @@ public sealed class UpdateService
                 expectedHash = ParseSha256File(await _http.GetStringAsync(update.Sha256Url, ct));
                 if (expectedHash is null) return null;   // a hash file that cannot be read is a failed check, not a skipped one
             }
+            Activity.Report(ActivityKind.Network, $"Downloading AutoFix Scout {v} from github.com ({update.SizeBytes / 1048576} MB), then verifying the size and SHA-256");
             Directory.CreateDirectory(UpdatesDir);
             CleanOldDownloads();
             // The file name is built here, never taken from the web.
@@ -192,7 +194,12 @@ public sealed class UpdateService
                     if (total > 0) progress?.Report(Math.Min(1.0, (double)done / total));
                 }
             }
-            if (Verify(target, update.SizeBytes, expectedHash)) return target;
+            if (Verify(target, update.SizeBytes, expectedHash))
+            {
+                Activity.Report(ActivityKind.Files, "The download matches the published size and SHA-256");
+                return target;
+            }
+            Activity.Report(ActivityKind.Files, "The download does not match the published size or SHA-256 and was deleted");
             File.Delete(target);
             return null;
         }
@@ -251,8 +258,10 @@ public sealed class UpdateService
             var full = Path.GetFullPath(setupPath);
             var inUpdates = string.Equals(Path.GetDirectoryName(full), Path.GetFullPath(UpdatesDir), StringComparison.OrdinalIgnoreCase);
             if (!inUpdates || !Regex.IsMatch(Path.GetFileName(full), @"^AutoFixScout-Setup-[0-9][0-9A-Za-z.\-]*\.exe$") || !File.Exists(full)) return false;
+            Activity.Report(ActivityKind.Change, "Starting the verified setup silently (Windows asks for permission)");
             using var p = Process.Start(SetupStartInfo(full));
             return p is not null;
+
         }
         catch (Exception) { return false; }   // includes the declined permission prompt (error 1223)
     }

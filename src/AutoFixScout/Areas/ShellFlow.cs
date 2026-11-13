@@ -21,10 +21,11 @@ public static class ShellFlow
 
     public static Task<Diagnosis> DiagnoseAsync(bool notificationFocus) => Task.Run(() =>
     {
+        using var _ = Activity.Scope(Topic);
         var s = Read();
         s.NotificationFocus = notificationFocus;
-        var f = ShellTriage.Evaluate(s);
-        return new Diagnosis(s, f, ShellTriage.Ladder(s, f), false, ShellTriage.NotFixedHint(f));
+        var f = Analysis.Judge(() => ShellTriage.Evaluate(s));
+        return new Diagnosis(s, f, Analysis.Plan(ShellTriage.Ladder(s, f)), false, ShellTriage.NotFixedHint(f));
     });
 
     /// <summary>Read-only: shell crashes from the health probe's event reading, WSearch, and the shell packages.</summary>
@@ -34,6 +35,7 @@ public static class ShellFlow
         var errors = new List<string>();
         try
         {
+            Activity.Report(ActivityKind.Analyze, "Reading shell crashes from the Application event log");
             var h = RealHealthProbe.ReadEventLogs();
             s.ShellCrashes = HealthTriage.ShellCrashes(h);
             errors.AddRange(h.ProbeErrors.Where(e => e.StartsWith("event log", StringComparison.Ordinal)));
@@ -41,6 +43,7 @@ public static class ShellFlow
         catch (Exception ex) { errors.Add("event log: " + ex.Message); }
         try
         {
+            Activity.Report(ActivityKind.Command, "Reading the state of the Windows Search service (WSearch)");
             using var sc = new ServiceController("WSearch");
             s.Search = new UpdateServiceInfo("WSearch", sc.Status == ServiceControllerStatus.Running ? "Running" : sc.Status == ServiceControllerStatus.Stopped ? "Stopped" : sc.Status.ToString(), sc.StartType.ToString());
         }
@@ -56,6 +59,8 @@ public static class ShellFlow
     /// <summary>Read-only: the global toggle, Do not disturb and the per-app choices of the current user.</summary>
     public static void ReadNotifications(ShellState s)
     {
+        Activity.ReadingRegistry("HKCU", @"Software\Microsoft\Windows\CurrentVersion\Notifications", "(notification switches, per-app choices are counted only)");
+
         using var push = Registry.CurrentUser.OpenSubKey(NotificationRepairs.PushKey);
         using var settings = Registry.CurrentUser.OpenSubKey(NotificationRepairs.SettingsKey);
         var apps = new List<(string Id, int? Enabled, int? ShowBanner)>();

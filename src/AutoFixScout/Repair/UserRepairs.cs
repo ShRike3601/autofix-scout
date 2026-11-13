@@ -50,6 +50,7 @@ public static class UserRepairs
     /// <summary>Proxy off and setup script removed for the current user. Values are saved first as a .reg-style text.</summary>
     public static (bool Ok, string Detail) ResetUserProxy()
     {
+        Activity.Report(ActivityKind.Change, @"Writing HKCU\" + InternetSettings + " (proxy off; the previous values are saved first)");
         using var k = Registry.CurrentUser.OpenSubKey(InternetSettings, writable: true);
         if (k is null) return (false, "internet settings key not found");
         var before = $"ProxyEnable={k.GetValue("ProxyEnable")}\nProxyServer={k.GetValue("ProxyServer")}\nProxyOverride={k.GetValue("ProxyOverride")}\nAutoConfigURL={k.GetValue("AutoConfigURL")}\n";
@@ -113,6 +114,9 @@ public static class UserRepairs
         var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, @"WindowsPowerShell\v1.0\powershell.exe"))
         { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8 };
         foreach (var a in new[] { "-NoProfile", "-NonInteractive", "-Command", "& { " + script + " }" }.Concat(args)) psi.ArgumentList.Add(a);
+        // The first cmdlet of the fixed script names what it does; arguments (package names) are not reported.
+        var cmdlet = System.Text.RegularExpressions.Regex.Match(script, @"\b(Get|Add|Remove|Set|Restart|Stop|Start|Reset|Register)-[A-Za-z]+");
+        Commands.Running("powershell.exe", cmdlet.Success ? cmdlet.Value : "(fixed script)");
         using var p = Process.Start(psi)!;
         var stdout = p.StandardOutput.ReadToEndAsync();
         var stderr = p.StandardError.ReadToEndAsync();
@@ -124,6 +128,7 @@ public static class UserRepairs
     /// <summary>Ends the Start menu, search and shell-experience processes; Windows starts them again on demand.</summary>
     public static (bool Ok, string Detail) RestartStartMenu()
     {
+        Activity.Report(ActivityKind.Change, "Ending the Start menu and search host processes; Windows starts them again on demand");
         var ended = 0;
         foreach (var name in new[] { "StartMenuExperienceHost", "SearchHost", "SearchApp", "ShellExperienceHost" })
             foreach (var p in Process.GetProcessesByName(name))
@@ -137,6 +142,7 @@ public static class UserRepairs
     /// <summary>Ends and restarts the taskbar/File Explorer process. Open programs are not affected.</summary>
     public static (bool Ok, string Detail) RestartExplorer()
     {
+        Activity.Report(ActivityKind.Change, "Ending and restarting the taskbar process (explorer.exe); open programs stay open");
         foreach (var p in Process.GetProcessesByName("explorer"))
         {
             try { p.Kill(); p.WaitForExit(10_000); } catch (Exception) { }
@@ -153,6 +159,8 @@ public static class UserRepairs
     /// <summary>Deletes the icon and thumbnail cache files (Windows rebuilds them), then restarts Explorer so they are rebuilt.</summary>
     public static (bool Ok, string Detail) RebuildIconCache()
     {
+        Activity.Report(ActivityKind.Change, @"Deleting the icon and thumbnail cache files in %LOCALAPPDATA%\Microsoft\Windows\Explorer; Windows rebuilds them");
+
         var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var dir = Path.Combine(local, "Microsoft", "Windows", "Explorer");
         var files = new List<string> { Path.Combine(local, "IconCache.db") };
@@ -181,6 +189,7 @@ public static class UserRepairs
     private static (int Code, string Output) MpCmdRun(int timeoutMinutes, params string[] args)
     {
         if (!File.Exists(MpCmdRunPath)) return (-1, "MpCmdRun.exe not found");
+        Commands.Running(MpCmdRunPath, string.Join(' ', args), "Microsoft Defender command line tool");
         var psi = new ProcessStartInfo(MpCmdRunPath) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var a in args) psi.ArgumentList.Add(a);
         using var p = Process.Start(psi)!;
