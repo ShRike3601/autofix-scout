@@ -15,7 +15,7 @@ public static class WifiNetsh
     public static string? ShowProfileArguments(string profile) =>
         Unsafe(profile) ? null : $"wlan show profile name=\"{profile}\"";
 
-    /// <summary>True when "Connection mode" of "netsh wlan show profile" says the profile connects automatically (English Windows; anything else fails closed).</summary>
+    /// <summary>True when "Connection mode" of "netsh wlan show profile" says the profile connects automatically (English Windows only, so only the fallback; anything else fails closed).</summary>
     public static bool IsAutoConnect(string showProfileOutput)
     {
         foreach (var line in showProfileOutput.Split('\n'))
@@ -26,6 +26,24 @@ public static class WifiNetsh
             return value.Equals("Connect automatically", StringComparison.OrdinalIgnoreCase);
         }
         return false;
+    }
+
+    private static readonly XNamespace ProfileNs = "http://www.microsoft.com/networking/WLAN/profile/v1";
+
+    /// <summary>
+    /// True when the WLAN profile XML (from the Native Wifi API, language independent) has connectionMode "auto".
+    /// A missing element, another value, another namespace or broken XML is false.
+    /// </summary>
+    public static bool IsAutoConnectXml(string profileXml)
+    {
+        try
+        {
+            var root = XDocument.Parse(profileXml).Root;
+            if (root is null || root.Name != ProfileNs + "WLANProfile") return false;
+            var mode = root.Element(ProfileNs + "connectionMode")?.Value.Trim();
+            return string.Equals(mode, "auto", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (System.Xml.XmlException) { return false; }
     }
 
     /// <summary>State and profile from "netsh wlan show interfaces". The profile is null unless connected.</summary>

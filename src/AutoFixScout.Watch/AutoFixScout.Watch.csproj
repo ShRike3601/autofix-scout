@@ -3,7 +3,7 @@
   <PropertyGroup>
     <!-- WinExe: no console window. No UI either: it runs quietly as the signed-in person, without administrator rights. -->
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>AutoFixScout.Watch</AssemblyName>
@@ -17,6 +17,8 @@
     <Compile Include="../AutoFixScout/Watch/WifiWatchLogic.cs" Link="Shared/WifiWatchLogic.cs" />
     <Compile Include="../AutoFixScout/Watch/WifiWatchStore.cs" Link="Shared/WifiWatchStore.cs" />
     <Compile Include="../AutoFixScout/Watch/WifiNetsh.cs" Link="Shared/WifiNetsh.cs" />
+    <Compile Include="../AutoFixScout/Watch/WifiNative.cs" Link="Shared/WifiNative.cs" />
+    <Compile Include="../AutoFixScout/Watch/WifiWatchSettings.cs" Link="Shared/WifiWatchSettings.cs" />
   </ItemGroup>
 
 </Project>
