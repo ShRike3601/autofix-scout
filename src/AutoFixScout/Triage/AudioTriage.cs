@@ -350,4 +350,15 @@ public enum FindingCode
     // Keyboard layouts
     InputSeveralLayouts,
     InputLayoutMismatch,
+    // Slow PC, games stutter (Performance area)
+    PerfProcessorThrottled,
+    PerfHardwareInstability,
+    PerfIntelMicrocode,
+    PerfPowerSaver,
+    PerfOnBattery,
+    PerfBatterySaver,
+    PerfBiosOld,
+    PerfRamBelowRated,
+    PerfRamSingleChannel,
+    PerfLowRam,
 }
