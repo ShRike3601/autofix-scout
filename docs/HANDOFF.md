@@ -448,3 +448,17 @@ Working copies: C:\afs belongs to the UI session (branch ui-overhaul). This sess
 - Merged g2-boot (slow start-up: boot times, slow items, Fast Startup) and g3-layout (several keyboard layouts with a switch hotkey, layout vs display language). 873 tests pass; live read-only tests pass on the bench.
 - Known limit: the Diagnostics-Performance log (boot times) is readable only by administrators, so without elevation the slow start-up check reports Unknown and raises no finding. A later part can read it through the elevated executor.
 - InputFlow.DiagnoseAsync(typingFocus: true) puts layout steps first; the UI does not call it yet (UI session to wire when the symptom is about wrong characters). The search words route "wrong characters", "keyboard layout" and similar to the keyboard check.
+
+## Roadmap (part 8, from 2026-11-13 evening; owner away, heartbeat every 20 min, agents on Sonnet)
+Owner's goals: find why games/PCs suddenly run slowly (throttling, Resizable BAR, power/voltage instability,
+crashing or corrupt drivers, GPU overclocks from MSI Afterburner), a short opt-in stress test, a background
+Wi-Fi watcher that reconnects, and a faster/smaller app. Rust rewrite: declined (bottleneck is Windows calls).
+Branch `perf` (from main 9f5f3f5) collects the work; agents work in C:\afs-wt\g5..g8 and are merged into `perf`.
+- g5-perf: new area "performance" (CPU/system): throttling (perf counters, Kernel-Processor-Power), power plan,
+  battery, BIOS age, Intel 13th/14th gen microcode, RAM speed vs rated (XMP), single-channel RAM; reuses health readings.
+- g6-gpu: new area "graphics": GPU, driver age, NVIDIA readings via nvidia-smi (temperature, clocks, throttle
+  reasons, PCIe link, BAR1 = Resizable BAR), driver resets, MSI Afterburner overclock profiles, monitor on the wrong GPU.
+- g7-watch: opt-in background Wi-Fi watcher (AutoFixScout.Watch.exe, HKCU Run), reconnects saved networks.
+- g8-speed: ReadyToRun, parallel probes, smaller installer; measure before/after.
+- then: opt-in stress test (CPU + GPU load ~60 s with live readings, stops on heat), bench live tests, CI, v0.3.0 tag.
+- UI tiles: ask the UI session (one Problem line each in Categories() in MainWindow.Visuals.cs).
