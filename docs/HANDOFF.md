@@ -525,3 +525,9 @@ Core only; the UI session wires it (see the UI requests in the g9 report). Files
   go away with a restart. 0.3.0-rc1 stays installed on the bench.
 - UI session status: tiles for performance and graphics done locally (not pushed); stress screens, update banner,
   What's new, History, settings NOT done. Do not tag v0.3.0 until they are pushed and merged.
+- 2026-11-14 ~02:30: UI session's ff42645 (all part 8 screens) merged into perf. Fixed: History names for every area,
+  stress wording ("about two minutes"), CS8604. LiveReleaseChecks (AFS_LIVE) on the bench: real update check offered
+  0.2.0 to a 0.1.0 build and verified the 95.7 MB download (no .sha256 on 0.2.0; 0.3.0 onwards has one); full load test
+  105 s, Completed, GPU max 82 C, CPU limit 100 %, LooksNormal; ChangeHistory read the real log. Not exercised on the
+  bench: Undo on a real change, watcher Switch off from the UI, update bar end-to-end (needs a newer release than the
+  installed one), silent downgrade refusal.
