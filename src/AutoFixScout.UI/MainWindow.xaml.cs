@@ -27,7 +27,13 @@ public partial class MainWindow : Window, IFixHost
             CloseUnfinishedSessions();
             _ = BuildSidebarAsync();
             // For screenshots and testing: AUTOFIXSCOUT_OPEN=settings opens the settings panel at start.
-            if (Environment.GetEnvironmentVariable("AUTOFIXSCOUT_OPEN") == "settings") SetSettingsOpen(true);
+            // "graphics" starts the read-only graphics check; "graphics-log" also unfolds the activity list.
+            switch (Environment.GetEnvironmentVariable("AUTOFIXSCOUT_OPEN"))
+            {
+                case "settings": SetSettingsOpen(true); break;
+                case "graphics": OnGraphicsClicked(this, new RoutedEventArgs()); break;
+                case "graphics-log": OnGraphicsClicked(this, new RoutedEventArgs()); EnsureActivityPanel(); SetActivityOpen(true); break;
+            }
             await RecoverOpenSavePointsAsync();
             await ShowStartupNoticesAsync();
         };

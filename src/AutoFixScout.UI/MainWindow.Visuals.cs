@@ -129,6 +129,7 @@ public partial class MainWindow
 
     private void SetTopic(string? topic)
     {
+        if (topic is not null && topic != _topic) ResetActivity();
         _topic = topic;
         _glyphOverride = null;
         _topicTitle = topic switch
@@ -282,6 +283,7 @@ public partial class MainWindow
         var full = StepText.Text;
         var textChanged = from.Text != full;
         var busy = look is Look.Busy or Look.Scan;
+        UpdateActivityPanel(busy);
         var stillBusy = !from.Home && (from.Look is Look.Busy or Look.Scan) && busy;
         var lookChanged = from.Look != look;
         _look = look;
