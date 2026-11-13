@@ -469,3 +469,12 @@ Branch `perf` (from main 9f5f3f5) collects the work; agents work in C:\afs-wt\g5
   (needs privacy note), "What's new" after an update, "Did this fix it?" feedback kept locally and added to the
   helper report, changes history with Undo buttons, watcher toast "Wi-Fi reconnected", optional weekly check-up
   with a toast only when something is wrong, uninstall option to also delete AutoFix Scout data.
+- Status ~22:30 IST: merged into perf: g5-perf (performance area, 10 Perf codes), g6-gpu (graphics area, Gpu codes;
+  Afterburner .cfg keys unverified against a real install), g7-watch (watcher). 1018 tests pass. Installer fix: silent
+  upgrade kept removing the watcher Run value -> PrepareToInstall saves/restores it and [Run] restarts the watcher.
+  Running: g8-speed, g9-qol (update check, What's new, history+undo, uninstall-data prompt), g10-stress (stress test),
+  g11-watch2 (watcher via wlanapi instead of English netsh text, "Wi-Fi reconnected" toast).
+  Bench live (this laptop): PerfBiosOld (BIOS 2020); GpuDriverResets (2 in 14 days), GpuResizableBarOff (BAR1 256 MiB).
+- UI tile requests to send in one message when all agents are merged: performance (PerfFlow, "Computer or games
+  running slowly"), graphics (GraphicsFlow, "Games stutter or crash"), stress (StressFlow), update banner, What's new,
+  History with Undo, watcher on/off + toast switch.
