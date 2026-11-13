@@ -16,7 +16,7 @@ public static class FixActions
         "service.restart", "device.disable_enable", "device.enable", "network.reset_dns", "network.renew_address", "device.rescan", "service.set_manual", "printer.clear_queue", "printer.set_online",
         "repair.dism", "repair.sfc", "time.resync", "network.reset_winhttp_proxy", "network.clean_hosts", "service.restore_default",
         "system.repair_path", "network.reset_winsock", "update.reset_components", "search.rebuild_index", "runtime.install_vcredist", "disk.scan",
-        "storage.cleanup_components", "office.quick_repair", "security.firewall_on", "security.uac_on", "security.remove_browser_policies", "system.pagefile_auto",
+        "storage.cleanup_components", "office.quick_repair", "network.wifi_stability", "security.firewall_on", "security.uac_on", "security.remove_browser_policies", "system.pagefile_auto",
     };
 
     public static async Task<(bool Ok, string Detail)> RunAsync(Rung rung)
@@ -27,6 +27,12 @@ public static class FixActions
             {
                 case "ui.open_settings_page":
                     // Only fixed pages; the person flips the setting themselves (spec 8.1).
+                    if (rung.Arg == "sound_classic")
+                    {
+                        // Fixed command, no argument from outside; only the classic panel has "Set as Default Communication Device".
+                        Process.Start(new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "control.exe"), "mmsys.cpl") { UseShellExecute = false });
+                        return (true, "control.exe mmsys.cpl");
+                    }
                     var uri = rung.Arg switch
                     {
                         "sound" => "ms-settings:sound",
@@ -65,6 +71,8 @@ public static class FixActions
                     return (true, "person was asked to do it");
                 case "audio.unmute_and_set_volume":
                     return (true, Unmute());
+                case "audio.ducking_off":
+                    return await Task.Run(CallSound.DuckingOff);
                 case "audio.unmute_app":
                     return await Task.Run(() => AppSound.Unmute(rung.Arg));
                 case "audio.unmute_microphone":

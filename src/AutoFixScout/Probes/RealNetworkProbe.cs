@@ -81,8 +81,16 @@ public sealed class RealNetworkProbe : INetworkProbe
             {
                 var wguid = ReadAdapterGuid(wifiAdapter.InstanceId);
                 if (wguid != null) state.WifiPowerSavingMayTurnOff = NetworkChecks.ReadWifiPowerSaving(wguid);
+                if (wguid != null)
+                {
+                    var (date, version, pending) = NetworkChecks.ReadWifiDriver(wguid);
+                    state.WifiDriverDate = date; state.WifiDriverVersion = version; state.WifiTuningPending = pending;
+                    state.WifiInstanceId = wifiAdapter.InstanceId;
+                }
             }
             catch (Exception ex) { errors.Add($"Wi-Fi power setting: {ex.Message}"); }
+            try { if (wifiAdapter.Connected) state.WifiEnterprise = NetworkChecks.ReadWifiEnterprise(); }
+            catch (Exception ex) { errors.Add($"Wi-Fi security type: {ex.Message}"); }
         }
         try { state.IpConflictRecent = NetworkChecks.ReadRecentIpConflict(); }
         catch (Exception ex) { errors.Add($"Event log: {ex.Message}"); }

@@ -15,7 +15,7 @@ public class WifiDropsTests
         (reason != null ? $"<Data Name=\"Reason\">{reason}</Data>" : "") +
         (code != null ? $"<Data Name=\"ReasonCode\">{code}</Data>" : "") + "</EventData></Event>";
 
-    private static NetworkState Working(int unintentional, int person = 0, Tri power = Tri.Unknown) => new()
+    internal static NetworkState Working(int unintentional, int person = 0, Tri power = Tri.Unknown) => new()
     {
         Adapters = new[] { Wifi }, AirplaneMode = Tri.No,
         GatewayReachable = Tri.Yes, DnsResolving = Tri.Yes, InternetReachable = Tri.Yes,
@@ -174,4 +174,30 @@ public class WifiSleepTests
         Assert.Equal(2, s.Unintentional);
         Assert.Equal(0, (s with { SleepsAndShutdowns = 20 }).Unintentional);
     }
+}
+
+public class WifiSignInTests
+{
+    private static AutoFixScout.Probes.NetworkState WithDrops(int signInFailures)
+    {
+        var s = WifiDropsTests.Working(12);
+        s.WifiDrops = s.WifiDrops! with { SignInFailures = signInFailures };
+        return s;
+    }
+
+    // Regression from the bench: enterprise Wi-Fi without a saved sign-in turned short drops into long outages.
+    [Fact]
+    public void SignInFailures_PutTheSaveSignInStepFirst()
+    {
+        var s = WithDrops(3);
+        var f = AutoFixScout.Triage.NetworkTriage.Evaluate(s);
+        var drop = Assert.Single(f, x => x.Code == AutoFixScout.Triage.FindingCode.NetWifiDrops);
+        Assert.Contains("sign in", drop.PlainMessage);
+        var ladder = AutoFixScout.Triage.NetworkTriage.Ladder(s, f).Select(r => r.Id).ToList();
+        Assert.True(ladder.IndexOf("wifi_save_signin") >= 0 && ladder.IndexOf("wifi_save_signin") < ladder.IndexOf("wifi_driver_update"));
+    }
+
+    [Fact]
+    public void NoSignInFailures_NoSaveSignInStep() =>
+        Assert.DoesNotContain(AutoFixScout.Triage.NetworkTriage.Ladder(WithDrops(0), AutoFixScout.Triage.NetworkTriage.Evaluate(WithDrops(0))), r => r.Id == "wifi_save_signin");
 }

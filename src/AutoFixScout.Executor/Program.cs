@@ -40,6 +40,7 @@ public static class Program
                 (_, "device.disable_enable") when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) => ToggleDevice(args[1]),
                 (_, "device.enable") when IsValidInstanceId(args[1]) && IsToggleableDevice(args[1]) => Pnputil("/enable-device", args[1]) == 0 ? 0 : 1,
                 (_, "network.reset_dns") when IsValidInstanceId(args[1]) && IsNetAdapter(args[1]) => ResetDns(args[1]),
+                (_, "network.wifi_stability") when IsValidInstanceId(args[1]) && IsNetAdapter(args[1]) => Repairs.WifiStability(args[1]),
                 (_, "network.renew_address") when IsValidInstanceId(args[1]) && IsNetAdapter(args[1]) => RenewAddress(args[1]),
                 // The area is only recorded; the scan itself takes no input.
                 (_, "device.rescan") when RescanAreas.Contains(args[1]) => ScanForHardwareChanges(),

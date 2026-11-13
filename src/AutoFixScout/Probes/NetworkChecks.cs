@@ -66,7 +66,16 @@ public static class NetworkChecks
             for (var ev = r.ReadEvent(); ev != null; ev = r.ReadEvent()) using (ev) transitions++;
         }
         catch (EventLogException) { }
-        return WifiDrops.Count(events) with { SleepsAndShutdowns = transitions };
+        // Event 12013: an enterprise (802.1X) sign-in failed, e.g. because Windows has no saved sign-in to reconnect with.
+        var signIn = 0;
+        try
+        {
+            var q = $"*[System[EventID=12013 and TimeCreated[timediff(@SystemTime) <= {(long)TimeSpan.FromDays(WifiDrops.Days).TotalMilliseconds}]]]";
+            using var r = new EventLogReader(new EventLogQuery("Microsoft-Windows-WLAN-AutoConfig/Operational", PathType.LogName, q));
+            for (var ev = r.ReadEvent(); ev != null; ev = r.ReadEvent()) using (ev) signIn++;
+        }
+        catch (EventLogException) { }
+        return WifiDrops.Count(events) with { SleepsAndShutdowns = transitions, SignInFailures = signIn };
     }
 
     /// <summary>Whether Windows may turn the adapter with this connection GUID off to save power (class key PnPCapabilities). Unknown when no key matches.</summary>
@@ -83,6 +92,52 @@ public static class NetworkChecks
         return Tri.Unknown;
     }
 
+
+    /// <summary>Driver date/version and the Wi-Fi tuning still pending, from the adapter's class key (read-only).</summary>
+    public static (DateTime? Date, string? Version, IReadOnlyList<string> Pending) ReadWifiDriver(string adapterGuid)
+    {
+        using var cls = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e972-e325-11ce-bfc1-08002be10318}");
+        if (cls is null) return (null, null, Array.Empty<string>());
+        foreach (var name in cls.GetSubKeyNames().Where(n => n.Length == 4 && n.All(char.IsDigit)))
+        {
+            using var k = cls.OpenSubKey(name);
+            if (k?.GetValue("NetCfgInstanceId") is not string id || !string.Equals(id, adapterGuid, StringComparison.OrdinalIgnoreCase)) continue;
+            var (current, supported) = ReadTuningValues(k);
+            var pending = Repair.WifiTuning.Plan(current, supported)
+                .Select(p => Repair.WifiTuning.Targets.First(t => t.Keyword == p.Keyword).Meaning).ToList();
+            return (Repair.WifiTuning.ParseDriverDate(k.GetValue("DriverDate") as string), k.GetValue("DriverVersion") as string, pending);
+        }
+        return (null, null, Array.Empty<string>());
+    }
+
+    internal static (Dictionary<string, string> Current, Dictionary<string, IReadOnlyCollection<string>> Supported) ReadTuningValues(Microsoft.Win32.RegistryKey k)
+    {
+        var current = new Dictionary<string, string>();
+        var supported = new Dictionary<string, IReadOnlyCollection<string>>();
+        foreach (var (kw, _, _) in Repair.WifiTuning.Targets)
+        {
+            if (k.GetValue(kw) is { } v) current[kw] = v.ToString()!;
+            using var e = k.OpenSubKey($@"Ndi\Params\{kw}\Enum");
+            if (e != null) supported[kw] = e.GetValueNames();
+        }
+        return (current, supported);
+    }
+
+    /// <summary>Yes when the current Wi-Fi connection uses enterprise (802.1X) sign-in. "WPA2-Enterprise" is not translated by Windows.</summary>
+    public static Tri ReadWifiEnterprise()
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "netsh.exe"))
+        { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true };
+        foreach (var a in new[] { "wlan", "show", "interfaces" }) psi.ArgumentList.Add(a);
+        using var p = System.Diagnostics.Process.Start(psi)!;
+        var text = p.StandardOutput.ReadToEnd();
+        p.WaitForExit(10_000);
+        return IsEnterprise(text);
+    }
+
+    public static Tri IsEnterprise(string netshOutput) =>
+        netshOutput.Contains("-Enterprise", StringComparison.OrdinalIgnoreCase) || netshOutput.Contains("802.1X", StringComparison.OrdinalIgnoreCase) ? Tri.Yes
+        : netshOutput.Contains("-Personal", StringComparison.OrdinalIgnoreCase) || netshOutput.Contains("Open", StringComparison.Ordinal) ? Tri.No : Tri.Unknown;
     /// <summary>Address state of the adapter with this connection GUID (Win32_NetworkAdapter.GUID).</summary>
     public static Tri ReadAddressObtained(string adapterGuid)
     {

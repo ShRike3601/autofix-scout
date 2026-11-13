@@ -45,11 +45,21 @@ public sealed class RealAudioProbe : IAudioProbe
         {
             using var def = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
             defaultId = def.ID;
+            state.MultimediaDeviceId = def.ID;
+            state.MultimediaDeviceName = def.FriendlyName;
             state.DefaultMuted = def.AudioEndpointVolume.Mute ? Tri.Yes : Tri.No;
             state.DefaultVolumePercent = (int)Math.Round(def.AudioEndpointVolume.MasterVolumeLevelScalar * 100);
             try { state.Sessions = AppSound.ReadSessions(def); }
             catch (Exception ex) { state.SessionError = ex.Message; }
         }
+
+        if (enumerator.HasDefaultAudioEndpoint(DataFlow.Render, Role.Communications))
+        {
+            using var comms = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Communications);
+            state.CommsDeviceId = comms.ID;
+            state.CommsDeviceName = comms.FriendlyName;
+        }
+        try { state.Ducking = CallSound.Read(); } catch (Exception) { state.Ducking = null; }
 
         // NotPresent is excluded: Windows keeps every endpoint ever seen, which would flood the list.
         var states = DeviceState.Active | DeviceState.Unplugged | DeviceState.Disabled;

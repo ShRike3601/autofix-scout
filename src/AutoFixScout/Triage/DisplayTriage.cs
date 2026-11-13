@@ -11,6 +11,11 @@ public static class DisplayTriage
 
     private const string Incomplete = "AutoFix Scout could not complete the screen check.";
     public const int LowBrightness = 10;
+    /// <summary>The refresh rate counts as low when it is at least this many Hz below the best one at the same resolution.</summary>
+    public const int LowRefreshGapHz = 20;
+    /// <summary>Scale above this percent on a screen narrower than <see cref="SmallScreenWidth"/> is reported (info only).</summary>
+    public const int HighScalePercent = 200;
+    public const int SmallScreenWidth = 2560;
 
     private const string HelperHint =
         "The display adapter in this computer reports a problem. AutoFix Scout does not change display adapters, " +
@@ -37,10 +42,35 @@ public static class DisplayTriage
                 $"connected={s.ConnectedScreens} showing={s.ShowingScreens}"));
         if (s.BrightnessPercent is < LowBrightness)
             findings.Add(F(FindingCode.BrightnessVeryLow, "The screen brightness is set very low.", $"brightness={s.BrightnessPercent}%"));
+        AddPictureQualityFindings(s, findings);
         if (findings.Count == 0)
             findings.Add(F(FindingCode.LooksNormal, "Windows reports no problem with your screens.",
                 $"connected={s.ConnectedScreens} showing={s.ShowingScreens} brightness={s.BrightnessPercent?.ToString() ?? "n/a"}"));
         return findings;
+    }
+
+    private static readonly int[] RecommendedScales = { 100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 450, 500 };
+
+    private static string Size(DisplayMode m) => $"{m.Width} x {m.Height}";
+
+    /// <summary>Resolution, refresh rate and scaling of each active screen. Read-only; screens with no mode list are skipped.</summary>
+    private static void AddPictureQualityFindings(DisplayState s, List<Finding> findings)
+    {
+        foreach (var scr in s.Screens)
+        {
+            if (scr.Native is { } native && scr.Current.Pixels > 0 && scr.Current.Pixels < native.Pixels)
+                findings.Add(F(FindingCode.DisplayNotNativeResolution,
+                    $"The screen is set to {Size(scr.Current)}, but it can show {Size(native)}. Text and pictures may look blurry.",
+                    $"{scr.Name} current={Size(scr.Current)} native={Size(native)}"));
+            if (scr.BestRefresh is { } best && scr.Current.Refresh > 1 && best - scr.Current.Refresh >= LowRefreshGapHz)
+                findings.Add(F(FindingCode.DisplayLowRefreshRate,
+                    $"The screen is running at {scr.Current.Refresh} Hz, but it can run at {best} Hz at this size. Motion may look less smooth than it could.",
+                    $"{scr.Name} refresh={scr.Current.Refresh} best={best} at {Size(scr.Current)}"));
+            if (scr.ScalePercent is { } pct && (!RecommendedScales.Contains(pct) || (pct > HighScalePercent && scr.Current.Width < SmallScreenWidth)))
+                findings.Add(F(FindingCode.DisplayUnusualScaling,
+                    $"Text and apps are scaled to {pct} percent, which is unusual for a screen of this size. Some text may look blurry or too large.",
+                    $"{scr.Name} scale={pct}% at {Size(scr.Current)}"));
+        }
     }
 
     /// <summary>Least risky first. Nothing here touches a display adapter or driver.</summary>
@@ -52,6 +82,21 @@ public static class DisplayTriage
         // Fail closed: nothing is changed when the screens could not be read, but the person may still check the cable.
         if (codes.Contains(FindingCode.ProbeIncomplete))
             return adapterProblem ? new[] { CheckCable() } : rungs;
+
+        var qualityOnly = !codes.Contains(FindingCode.BrightnessVeryLow) && !codes.Contains(FindingCode.ExternalDisplayNotShown) && !adapterProblem;
+        if (codes.Contains(FindingCode.DisplayNotNativeResolution))
+            rungs.Add(new("display_resolution", "ui.open_settings_page", 0,
+                "AutoFix Scout will open the \"Display\" settings. Under \"Display resolution\", please choose the one marked \"Recommended\". " +
+                "Windows asks to keep the change; if the picture looks wrong, it goes back by itself after a few seconds.", "display"));
+        if (codes.Contains(FindingCode.DisplayLowRefreshRate))
+            rungs.Add(new("display_refresh", "ui.open_settings_page", 0,
+                "AutoFix Scout will open the \"Display\" settings. Please select \"Advanced display\", then under \"Choose a refresh rate\" " +
+                "pick the highest rate in the list.", "display"));
+        if (codes.Contains(FindingCode.DisplayUnusualScaling))
+            rungs.Add(new("display_scale", "ui.open_settings_page", 0,
+                "AutoFix Scout will open the \"Display\" settings. Under \"Scale\", please choose the value marked \"Recommended\", " +
+                "if text looks blurry or too large.", "display"));
+        if (qualityOnly) return rungs;
 
         if (codes.Contains(FindingCode.BrightnessVeryLow))
             rungs.Add(new("brightness", "display.set_brightness", 1,
