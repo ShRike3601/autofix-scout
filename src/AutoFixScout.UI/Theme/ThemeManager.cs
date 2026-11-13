@@ -67,6 +67,8 @@ public static class ThemeManager
         // With the frame extended over the window, DWM draws the native Windows 11 caption buttons; use those and hide ours.
         if (System.Windows.Shell.WindowChrome.GetWindowChrome(window) is { } chrome) chrome.UseAeroCaptionButtons = Glass;
         if (window.FindName("CaptionButtons") is UIElement own) own.Visibility = Glass ? Visibility.Collapsed : Visibility.Visible;
+        if (window.FindName("AmbientField") is System.Windows.Controls.Canvas field && (field.Visibility == Visibility.Visible) != Glass)
+            Ambient.Attach(field, Glass);
         ApplyPalette(Glass);
         // The app draws its own title bar; these only affect the system frame around it.
         var dark = Current == Mode.Dark ? 1 : 0;

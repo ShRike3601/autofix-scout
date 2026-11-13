@@ -109,6 +109,10 @@
 
     <!-- Home cards (the three common problems): icon, title and caption; the border lights up on hover. -->
     <Style x:Key="CardButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+        <Setter Property="ui:Motion.HoverScale" Value="1.012"/>
+        <Setter Property="ui:Motion.Glow" Value="#555AA2FF"/>
+        <Setter Property="ui:Motion.Ripple" Value="#2EFFFFFF"/>
+        <Setter Property="ui:Motion.RippleRadius" Value="12"/>
         <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
@@ -116,14 +120,18 @@
         <Setter Property="MinHeight" Value="118"/>
         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
         <Setter Property="VerticalContentAlignment" Value="Top"/>
-        <Setter Property="ui:Motion.HoverLift" Value="2"/>
+        <Setter Property="ui:Motion.HoverLift" Value="3"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Grid>
                         <Border x:Name="Chrome" CornerRadius="{StaticResource CardRadius}"
                                 Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="22" ShadowDepth="6" Direction="270" Opacity="0.22" Color="#000000" RenderingBias="Performance"/>
+                            </Border.Effect>
+                        </Border>
                         <!-- Hover glow: faded in and out by Motion (smooth), not switched by a trigger. -->
                         <Border x:Name="Hover" CornerRadius="{StaticResource CardRadius}" Opacity="0" IsHitTestVisible="False"
                                 Background="{DynamicResource CardHoverBrush}"
@@ -144,6 +152,9 @@
 
     <!-- Compact tile (the other problem areas): icon and one line of text. Tag = icon glyph, Content = text. -->
     <Style x:Key="TileButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+        <Setter Property="ui:Motion.HoverScale" Value="1.02"/>
+        <Setter Property="ui:Motion.Glow" Value="#405AA2FF"/>
+        <Setter Property="ui:Motion.RippleRadius" Value="12"/>
         <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
@@ -187,6 +198,9 @@
 
     <!-- Primary answer on a step screen: solid accent. -->
     <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+        <Setter Property="ui:Motion.HoverScale" Value="1.045"/>
+        <Setter Property="ui:Motion.Glow" Value="#B02F7DFF"/>
+        <Setter Property="ui:Motion.Ripple" Value="#66FFFFFF"/>
         <Setter Property="Background" Value="{DynamicResource AccentFillBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
@@ -228,6 +242,9 @@
 
     <!-- Secondary answer ("No", "Not now"): same size, quieter. -->
     <Style x:Key="StandardButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+        <Setter Property="ui:Motion.HoverScale" Value="1.035"/>
+        <Setter Property="ui:Motion.Glow" Value="#40FFFFFF"/>
+        <Setter Property="ui:Motion.Ripple" Value="#40FFFFFF"/>
         <Setter Property="Background" Value="{DynamicResource ButtonBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrush}"/>
@@ -269,6 +286,7 @@
 
     <!-- Sidebar action: text with an icon, background only on hover. Tag = icon glyph. -->
     <Style x:Key="SubtleButton" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+        <Setter Property="ui:Motion.Ripple" Value="#30FFFFFF"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
@@ -306,6 +324,7 @@
 
     <!-- Header of a foldable sidebar section: full-width row, title left, chevron right (content built in code). -->
     <Style x:Key="SectionHeader" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
+        <Setter Property="ui:Motion.Ripple" Value="#24FFFFFF"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
         <Setter Property="Padding" Value="12,0,10,0"/>
@@ -329,6 +348,7 @@
 
     <!-- Sidebar navigation item: the current page has a tinted background and an accent bar. Tag = icon glyph. -->
     <Style x:Key="NavItem" TargetType="RadioButton" BasedOn="{StaticResource ButtonBase}">
+        <Setter Property="ui:Motion.Ripple" Value="#30FFFFFF"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
         <Setter Property="FontSize" Value="{StaticResource ButtonTextSize}"/>

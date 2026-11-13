@@ -16,6 +16,8 @@
             <ColumnDefinition Width="220"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
+        <!-- Soft drifting colour behind the glass (Theme/Ambient.cs); only with glass. -->
+        <Canvas x:Name="AmbientField" Grid.ColumnSpan="2" ClipToBounds="True" IsHitTestVisible="False" Visibility="Collapsed"/>
 
         <!-- Sidebar: app mark, navigation, report and version. -->
         <Border Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,0,1,0">
