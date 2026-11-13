@@ -62,10 +62,12 @@ public class SessionLogTests : IDisposable
     }
 
     [Fact]
-    public void SchemaRejectsUnknownSymptom()
+    public void SchemaAcceptsAnyTopic_ButNotEmptyOrHuge()
     {
         using var db = new SessionLog(_path);
-        Assert.Throws<SqliteException>(() => db.Start("fax"));
+        db.Start("performance"); db.Start("graphics");
+        Assert.Throws<SqliteException>(() => db.Start(""));
+        Assert.Throws<SqliteException>(() => db.Start(new string('x', 41)));
     }
 
     [Fact]
@@ -119,7 +121,8 @@ public class SessionLogTests : IDisposable
         Assert.Equal(1L, db.Scalar("SELECT COUNT(*) FROM step_log WHERE session_id = 'old1'"));
         Assert.Equal(0L, db.Scalar("SELECT COUNT(*) FROM pragma_foreign_key_check"));
         db.End(db.Start("printer"), Outcome.Fixed); // new problem areas are accepted after the migration
-        Assert.Throws<SqliteException>(() => db.Start("fax")); // other CHECKs still enforced
+        db.Start("graphics"); // any topic name after the migration
+        Assert.Throws<SqliteException>(() => db.Start("")); // the length CHECK is enforced
     }
 
     [Fact]
