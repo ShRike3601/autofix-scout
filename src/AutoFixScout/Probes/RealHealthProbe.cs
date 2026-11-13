@@ -22,12 +22,10 @@ public sealed class RealHealthProbe : IHealthProbe
     public HealthState Read()
     {
         var s = new HealthState();
-        var errors = new List<string>();
-        void Part(string name, Action read)
-        {
-            try { read(); }
-            catch (Exception ex) { errors.Add($"{name}: {ex.Message}"); }
-        }
+        // Every part reads its own fields of s and touches nothing else, so they run side by side (the slowest are
+        // the clock check over the network, Get-AppxPackage and the WMI/event log reads). Errors keep the order below.
+        var parts = new List<(string Name, Action Read)>();
+        void Part(string name, Action read) => parts.Add((name, read));
 
         Part("event log (programs)", () => ReadAppEvents(s));
         Part("event log (system)", () => ReadSystemEvents(s));
@@ -57,6 +55,24 @@ public sealed class RealHealthProbe : IHealthProbe
         Part("low memory events", () => s.LowMemoryEvents = Query("System", "Provider[@Name='Microsoft-Windows-Resource-Exhaustion-Detector'] and EventID=2004").Count());
         Part("USB devices", () => s.Usb = ReadUsb());
 
+        var errors = new string?[parts.Count];
+        Task.WaitAll(parts.Select((p, i) => Task.Run(() =>
+        {
+            try { p.Read(); }
+            catch (Exception ex) { errors[i] = $"{p.Name}: {ex.Message}"; }
+        })).ToArray());
+
+        s.ProbeErrors = errors.Where(e => e != null).Select(e => e!).ToList();
+        return s;
+    }
+
+    /// <summary>Only the two event log parts of <see cref="Read"/> (used by the Start menu / taskbar check, which needs nothing else).</summary>
+    public static HealthState ReadEventLogs()
+    {
+        var s = new HealthState();
+        var errors = new List<string>();
+        try { ReadAppEvents(s); } catch (Exception ex) { errors.Add($"event log (programs): {ex.Message}"); }
+        try { ReadSystemEvents(s); } catch (Exception ex) { errors.Add($"event log (system): {ex.Message}"); }
         s.ProbeErrors = errors;
         return s;
     }

@@ -5,6 +5,11 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- English only: drops the localized resource folders of the packages from the install -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- Faster start: precompiled code (applies to dotnet publish -r ...). Tiered PGO re-optimizes hot code after start. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <TieredPGO>true</TieredPGO>
   </PropertyGroup>
 
   <ItemGroup>

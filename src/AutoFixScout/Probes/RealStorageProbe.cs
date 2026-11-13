@@ -24,30 +24,45 @@ public sealed class RealStorageProbe : IStorageProbe
         }
         catch (Exception ex) { errors.Add($"system drive: {ex.Message}"); }
 
-        try
+        // The readings are independent (each sets its own fields), so they run side by side: the 2 second process
+        // sample, the folder walks and the WMI/event log reads used to add up one after another.
+        var tasks = new List<Task>
         {
-            var (total, old) = TempSize(Path.GetTempPath(), DateTime.UtcNow - TempAge);
-            s.UserTempBytes = total;
-            s.ReclaimableTempBytes = old;
-        }
-        catch (Exception) { /* unknown */ }
-        s.WindowsTempBytes = WindowsTempSize();
-        s.RecycleBinBytes = RecycleBinSize();
-        ReadBigUsers(s);
-        try
-        {
-            var entries = Repair.StartupApps.ReadAll();
-            s.StartupEntries = entries;
-            s.StartupAppCount = entries.Count(e => e.Enabled);
-        }
-        catch (Exception) { /* unknown */ }
-        try { s.TopProcesses = ProcessSampler.Sample(TimeSpan.FromSeconds(2), TotalMemory()); } catch (Exception) { /* unknown */ }
-        s.BootTimes = StartupTimings.ReadBoots();
-        s.SlowStartupItems = StartupTimings.ReadSlowItems();
-        s.FastStartup = StartupTimings.ReadFastStartup();
+            Task.Run(() =>
+            {
+                try
+                {
+                    var (total, old) = TempSize(Path.GetTempPath(), DateTime.UtcNow - TempAge);
+                    s.UserTempBytes = total;
+                    s.ReclaimableTempBytes = old;
+                }
+                catch (Exception) { /* unknown */ }
+            }),
+            Task.Run(() => s.WindowsTempBytes = WindowsTempSize()),
+            Task.Run(() => s.RecycleBinBytes = RecycleBinSize()),
+            Task.Run(() => ReadBigUsers(s)),
+            Task.Run(() =>
+            {
+                try
+                {
+                    var entries = Repair.StartupApps.ReadAll();
+                    s.StartupEntries = entries;
+                    s.StartupAppCount = entries.Count(e => e.Enabled);
+                }
+                catch (Exception) { /* unknown */ }
+            }),
+            Task.Run(() => { try { s.TopProcesses = ProcessSampler.Sample(TimeSpan.FromSeconds(2), TotalMemory()); } catch (Exception) { /* unknown */ } }),
+            Task.Run(() =>
+            {
+                s.BootTimes = StartupTimings.ReadBoots();
+                s.SlowStartupItems = StartupTimings.ReadSlowItems();
+                s.FastStartup = StartupTimings.ReadFastStartup();
+            }),
+            Task.Run(() => { try { s.ProblemDevices = ReadProblemDevices(); } catch (Exception) { /* unknown */ } }),
+        };
+        Task.WaitAll(tasks.ToArray());
         s.Uptime = TimeSpan.FromMilliseconds(Environment.TickCount64);
         s.MemoryLoadPercent = MemoryLoad();
-        try { s.ProblemDevices = ReadProblemDevices(); } catch (Exception) { /* unknown */ }
         return s;
     }
 
