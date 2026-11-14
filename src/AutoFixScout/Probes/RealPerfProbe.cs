@@ -116,7 +116,7 @@ public sealed class RealPerfProbe : IPerfProbe
 
     [DllImport("powrprof.dll")] private static extern uint PowerGetEffectiveOverlayScheme(out Guid scheme);
 
-    private static string? ReadOverlay()
+    internal static string? ReadOverlay()
     {
         Activity.Report(ActivityKind.Command, "Calling PowerGetEffectiveOverlayScheme (power mode)");
         return PowerGetEffectiveOverlayScheme(out var g) == 0 ? g.ToString() : null;

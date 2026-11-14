@@ -63,6 +63,8 @@ public static class FixActions
                         "scanners" => "ms-settings:printers",
                         "display" => "ms-settings:display",
                         "graphics" => "ms-settings:display-advancedgraphics",
+                        "gaming" => "ms-settings:gaming-gamemode",
+                        "capture" => "ms-settings:gaming-gamedvr",
                         "apps" => "ms-settings:appsfeatures",
                         "updatehistory" => "ms-settings:windowsupdate-history",
                         "backup" => "ms-settings:backup",
