@@ -46,7 +46,8 @@ public static class HealthTriage
 
     // ---- drive wear, errors and temperature (reliability counters, read through diag.read_drive_health) ----
 
-    public const int WearWornOutPercent = 90, WearWearingPercent = 70, HotDriveC = 70;
+    /// <summary>Hot: 65 C or more right now, or a recorded maximum of 85 C or more. A lifetime peak in the 70s is normal for an NVMe SSD under load (bench, 2026-11-14: 76 C), so it alone is not a problem.</summary>
+    public const int WearWornOutPercent = 90, WearWearingPercent = 70, HotNowC = 65, HotMaxC = 85;
 
     public static bool HasUncorrectedErrors(PhysicalDriveInfo d) => d.ReadErrorsUncorrected > 0 || d.WriteErrorsUncorrected > 0;
 
@@ -69,9 +70,13 @@ public static class HealthTriage
             yield return F(FindingCode.HealthDriveErrors,
                 $"The drive \"{bad.Name}\" has reported errors that it could not correct while reading or writing. Please copy important files to another drive or to cloud storage now.",
                 $"{bad.Name} uncorrected read errors={bad.ReadErrorsUncorrected?.ToString() ?? "unknown"} write errors={bad.WriteErrorsUncorrected?.ToString() ?? "unknown"}");
-        if (s.Drives.Where(d => d.TemperatureMaxC >= HotDriveC).OrderByDescending(d => d.TemperatureMaxC).FirstOrDefault() is { } hot)
+        if (s.Drives.Where(d => d.TemperatureC >= HotNowC || d.TemperatureMaxC >= HotMaxC)
+                .OrderByDescending(d => Math.Max(d.TemperatureC ?? 0, d.TemperatureMaxC ?? 0)).FirstOrDefault() is { } hot)
             yield return F(FindingCode.HealthDriveHot,
-                $"The drive \"{hot.Name}\" has reached {hot.TemperatureMaxC} degrees Celsius. Please make sure the air vents are free of dust, that nothing blocks the air flow, and that the computer is in a cool place.",
+                (hot.TemperatureC >= HotNowC
+                    ? $"The drive \"{hot.Name}\" is now at {hot.TemperatureC} degrees Celsius, which is too warm. "
+                    : $"The drive \"{hot.Name}\" has reached {hot.TemperatureMaxC} degrees Celsius, which is too warm. ") +
+                $"Please make sure the air vents are free of dust, that nothing blocks the air flow, and that the computer is in a cool place.",
                 $"{hot.Name} temperature={hot.TemperatureC?.ToString() ?? "unknown"} C max={hot.TemperatureMaxC} C");
     }
 

@@ -279,15 +279,19 @@ public class DriveHealthReadTests
     [Theory]
     [InlineData(null, false)]
     [InlineData(0, false)]
-    [InlineData(69, false)]
-    [InlineData(70, true)]
+    [InlineData(76, false)] // the bench SSD (2026-11-14): a lifetime peak in the 70s is normal under load
+    [InlineData(84, false)]
+    [InlineData(85, true)]
     [InlineData(95, true)]
     public void MaxTemperature_Thresholds(int? max, bool expected) =>
         Assert.Equal(expected, Codes(Drive() with { TemperatureMaxC = max }).Contains(FindingCode.HealthDriveHot));
 
-    [Fact]
-    public void CurrentTemperatureAlone_IsNotUsed() =>
-        Assert.DoesNotContain(FindingCode.HealthDriveHot, Codes(Drive() with { TemperatureC = 90 }));
+    [Theory]
+    [InlineData(53, false)] // the bench SSD now
+    [InlineData(64, false)]
+    [InlineData(65, true)]
+    public void CurrentTemperature_Thresholds(int now, bool expected) =>
+        Assert.Equal(expected, Codes(Drive() with { TemperatureC = now, TemperatureMaxC = 76 }).Contains(FindingCode.HealthDriveHot));
 
     [Fact]
     public void WornOut_WinsOverWearing_AndBothGetTheBackupRung()
@@ -302,7 +306,7 @@ public class DriveHealthReadTests
     [Fact]
     public void FindingMessages_FollowTheWritingRules()
     {
-        var s = Health(Drive() with { WearPercent = 92, ReadErrorsUncorrected = 3, TemperatureMaxC = 80 });
+        var s = Health(Drive() with { WearPercent = 92, ReadErrorsUncorrected = 3, TemperatureMaxC = 88 });
         var f = HealthTriage.Evaluate(s);
         var worn = f.Single(x => x.Code == FindingCode.HealthDriveWornOut);
         Assert.Equal("The SSD \"Samsung SSD\" has used about 92 percent of its expected life. Please copy important files to another drive or to cloud storage now, and plan to replace the SSD.", worn.PlainMessage);
