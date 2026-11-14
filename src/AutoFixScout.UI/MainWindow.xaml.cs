@@ -137,7 +137,9 @@ public partial class MainWindow : Window, IFixHost
             var report = HelperReport.Build(topic, before.State, before.Findings, log.Select(l => l.ToString()), outcome);
             var logError = FinishSession(sessionId, log, outcome);
             if (logError != null) report += $"\nSession log unavailable: {logError}\n";
-            _lastReportPath = HelperReport.Save(topic, report);
+            HelperReport.Save(topic, report); // the plain text copy stays for anyone who prefers it
+            try { _lastReportPath = HelperReport.SaveHtml(HelperReport.BuildHtmlNow(topic, before.Findings, log.Select(l => l.ToString()), outcome, AppVersion)); }
+            catch (Exception) { _lastReportPath = HelperReport.Save(topic, report); }
             var end = outcome == Outcome.NotFixed && after.NotFixedHint is { } hint ? hint : EndMessage(outcome, what);
             Journey(Stage.Done, warn: outcome is not (Outcome.Fixed or Outcome.NoFaultFound));
             await ShowStepAsync(end, "Finish", look: EndLook(outcome));
@@ -515,7 +517,7 @@ private async void OnScannerClicked(object sender, RoutedEventArgs e) =>        
         if (_lastReportPath is null)
             MessageBox.Show(this, "A report will be available here after a check has been completed.", AppName);
         else
-            Process.Start(new ProcessStartInfo("notepad.exe", $"\"{_lastReportPath}\""));
+            Process.Start(new ProcessStartInfo(_lastReportPath) { UseShellExecute = true }); // .html opens in the default browser
     }
 
     /// <summary>"History" in the sidebar: changes with Undo and recent checks (MainWindow.Extras.cs).</summary>
