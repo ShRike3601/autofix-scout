@@ -614,7 +614,6 @@ Quality of life:
 - Runs in parallel with the 15 s ping test in `RealConnectionQualityProbe` (`QualityState.Dns`). A DNS finding appears only when the pings are steady (it replaces the all-clear); when the pings are bad, the DNS numbers go into the technical detail only.
 - Slow = current median above 150 ms or more than 30 % failed. Public servers named as faster only at 50 ms and 2x. Public servers also slow = `NetQualityDnsSlowEverywhere` (no DNS blame); public servers that answer nothing (blocked UDP 53) are ignored. Codes `NetQualityDnsSlow`, `NetQualityDnsSlowEverywhere` at the end of the enum. Step `dns_change_server` opens `ms-settings:network-status` (new key `network_status`); nothing is changed by the app.
 
-<<<<<<< HEAD
 ## State at the end of the 2026-11-14 day session (owner: stop at the usage reset, leave pending work as is)
 - `next` (draft PR 15, not released, version not chosen) has everything since 0.3.1: battery health, connection
   quality + DNS speed, blue-screen explainer, game settings + one-click game fixes (undo), drive health and the
@@ -627,11 +626,9 @@ Quality of life:
   the beta checkbox. Nothing of this was run against real settings while the owner was away.
 - Roadmap: docs/ROADMAP.md (done items marked). Remaining: driver updates via Windows Update (changes drivers: needs
   bench time with the owner), component store clean-up, sound crackles (DPC latency), Hindi, tray icon, wider search.
-=======
 ## Browser hijack checks (g26-browser, 2026-11-14)
 - `Repair/BrowserHijackScan.cs`: read-only scan of Chrome and Edge through an `IBrowserRegistry` (real reader `RegistryBrowserReader`, fake in tests). Reads policy values (DefaultSearchProviderSearchURL, HomepageLocation, NewTabPageLocation), RestoreOnStartupURLs, ExtensionInstallForcelist, ExtensionInstallSources (HKLM incl. WOW6432Node, HKCU) and `Software\{Google\Chrome|Microsoft\Edge}\Extensions\<id>` (only the update_url value, never the path value). Only hosts (punycode, no path, query, port; IP addresses shown as "an IP address") and extension ids leave the scan.
 - Flagged: a host that is not google., bing.com, duckduckgo.com, yahoo., ecosia.org, startpage.com, brave.com, yandex. (plus msn.com, microsoft.com, live.com, office.com for start pages); extension ids matching `^[a-p]{32}$` that are not on `FirstPartyIds` (six Google app ids; no Edge ids because none is known for certain). Nothing is flagged on a managed device (`IsManagedDevice`: BrowserPolicies.IsManagedPc, or a GUID subkey under HKLM\SOFTWARE\Microsoft\Enrollments).
 - Findings (end of enum): `BrowserSearchHijacked`, `BrowserStartPageHijacked`, `BrowserForcedExtensions` (also ExtensionInstallSources), `BrowserExternalExtensions`. Produced by `SecurityTriage.BrowserHijackFindings`, scanned in `SecurityFlow` ("browser search, start pages and extensions"). The first three are in `Rechecked`.
 - Steps: human only (`browser_reset_settings`, `browser_uninstall_unknown` opens Installed apps). The existing guarded `security.remove_browser_policies` (admin, backs up first, skipped on managed PCs) still comes from `SecurityBrowserPolicy`, which fires for the same policy values. No new writer.
 - Not done: Firefox, UI wording check on a real hijacked machine, HKCU external extensions removal.
->>>>>>> g26-browser
