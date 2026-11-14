@@ -89,13 +89,13 @@ public partial class MainWindow
         var keys = new StackPanel();
         foreach (var (combo, what) in new[] { ("Ctrl + K", "Describe a problem"), ("Ctrl + ,", "Open or close the settings"), ("Ctrl + H", "History"), ("Esc", "Close this panel") })
         {
-            var row = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
+            var line = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
             var key = Text(combo, "CaptionText");
             key.Width = 90;
             DockPanel.SetDock(key, Dock.Left);
-            row.Children.Add(key);
-            row.Children.Add(new TextBlock { Text = what });
-            keys.Children.Add(row);
+            line.Children.Add(key);
+            line.Children.Add(new TextBlock { Text = what });
+            keys.Children.Add(line);
         }
         SettingsBody.Children.Add(Card(keys));
     }
