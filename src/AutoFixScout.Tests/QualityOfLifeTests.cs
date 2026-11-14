@@ -263,7 +263,7 @@ public class UpdateServiceTests : IDisposable
         v = "0.3.1";
         var next = wn.TakeOnce();                                   // new version, no notes fetched: built-in text
         Assert.NotNull(next);
-        Assert.Contains("One-click updates", next!.Text);
+        Assert.Contains("This computer", next!.Text);
         Assert.Null(wn.TakeOnce());
     }
 
