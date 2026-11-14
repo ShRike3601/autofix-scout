@@ -559,14 +559,14 @@ Capabilities:
 - Connection quality: latency, jitter and packet loss to the gateway and to the internet, separately for Wi-Fi, so
   "internet is slow / games lag online" gets an answer (Wi-Fi vs provider). [DONE, in the app under Internet and Bluetooth]
 - Blue screen explainer: stop code + the driver named in the crash report, in plain words, with what to do. [DONE; the driver name needs admin-only reports, next step: read them through the elevated helper]
-- Drive wear: SSD wear %, temperature and read errors from the storage reliability counters.
-- Slow start-up through the elevated helper (the boot-time log needs admin).
+- Drive wear: SSD wear %, temperature and read errors from the storage reliability counters. [started: agent g20-drives, via a diag.read_drive_health elevated read]
+- Slow start-up through the elevated helper (the boot-time log needs admin). [DONE: diag.read_boot_times, also diag.read_crash_reports for blue screens]
 - Game settings check: Game Mode, hardware-accelerated GPU scheduling, variable refresh rate, per-game GPU choice. [DONE, in the graphics check]
 Quality of life:
 - Keyboard shortcuts: Ctrl+K search, Ctrl+, settings, Esc back. Remember window size and position. [started here]
-- Optional weekly check-up from the tray, with a notification only when something is wrong.
-- Save a report as a file (HTML) to send to a helper. [started: agent g17-report]
-- First-run tour (three short cards) for new users.
+- Optional weekly check-up, with a notification only when something is wrong. [DONE: scheduled task, Settings checkbox]
+- Save a report as a file (HTML) to send to a helper. [DONE]
+- First-run tour (three short cards) for new users. [DONE]
 
 ## Blue screen explainer (g15-bsod, 2026-11-14)
 - `Probes/BlueScreenReports.cs` (pure): stop code to cause group (driver, memory, graphics, disk, damaged files, hardware),
