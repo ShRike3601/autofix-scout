@@ -613,3 +613,16 @@ Quality of life:
 - `Probes/DnsQuery.cs` (pure A-record query builder and reply parser), `Probes/DnsSpeedProbe.cs` (raw UDP port 53, 2 s timeout, 6 names x 2 rounds, the adapter's IPv4 DNS servers pooled as "current" plus 1.1.1.1 and 8.8.8.8, all at once; a server with no answer in its first 4 queries is given up and the rest count as failed), `Triage/DnsQualityTriage.cs` (pure analysis).
 - Runs in parallel with the 15 s ping test in `RealConnectionQualityProbe` (`QualityState.Dns`). A DNS finding appears only when the pings are steady (it replaces the all-clear); when the pings are bad, the DNS numbers go into the technical detail only.
 - Slow = current median above 150 ms or more than 30 % failed. Public servers named as faster only at 50 ms and 2x. Public servers also slow = `NetQualityDnsSlowEverywhere` (no DNS blame); public servers that answer nothing (blocked UDP 53) are ignored. Codes `NetQualityDnsSlow`, `NetQualityDnsSlowEverywhere` at the end of the enum. Step `dns_change_server` opens `ms-settings:network-status` (new key `network_status`); nothing is changed by the app.
+
+## State at the end of the 2026-11-14 day session (owner: stop at the usage reset, leave pending work as is)
+- `next` (draft PR 15, not released, version not chosen) has everything since 0.3.1: battery health, connection
+  quality + DNS speed, blue-screen explainer, game settings + one-click game fixes (undo), drive health and the
+  optional administrator reads (boot times, crash reports, drive health), start-up clean-up from boot data, weekly
+  check-up, HTML helper report, the app's own problem log, beta update channel, first-run tour, shortcuts, window
+  position. 1,629 tests pass; CI builds the installer.
+- Possibly unfinished at the reset (each on its own branch/worktree, NOT merged unless noted in git log of `next`):
+  g26-browser (read-only browser hijack check), g27-lightglass (light theme with glass). Review, test and merge them.
+- Not verified on screen: drive health result screen, the one-click game fix flow, the weekly check-up toast,
+  the beta checkbox. Nothing of this was run against real settings while the owner was away.
+- Roadmap: docs/ROADMAP.md (done items marked). Remaining: driver updates via Windows Update (changes drivers: needs
+  bench time with the owner), component store clean-up, sound crackles (DPC latency), Hindi, tray icon, wider search.
