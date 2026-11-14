@@ -271,6 +271,16 @@ public partial class MainWindow
         settings.Children.Add(updates);
         settings.Children.Add(Helper("AutoFix Scout asks github.com once at start whether a newer version exists. No personal data is sent."));
 
+        var beta = Check("Get test versions early", appSettings.BetaUpdates);
+        beta.Click += (_, _) =>
+        {
+            var s = AppSettings.Load();
+            s.BetaUpdates = beta.IsChecked == true;
+            s.Save();
+        };
+        settings.Children.Add(beta);
+        settings.Children.Add(Helper("Test versions arrive sooner but may have problems. Recommended only for people who help test AutoFix Scout."));
+
         Tri watcher;
         try { watcher = WifiWatcherSetup.ReadState(); } catch (Exception) { watcher = Tri.Unknown; }
         settings.Children.Add(Divider());

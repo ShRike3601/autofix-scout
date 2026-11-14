@@ -10,6 +10,8 @@ public sealed class UpdateState
     public string? LastSeenVersion { get; set; }
     /// <summary>The newest release found by the last successful check, even if it is not newer than this build.</summary>
     public UpdateInfo? Latest { get; set; }
+    /// <summary>Whether <see cref="Latest"/> came from the test version channel. A change of the setting makes the check due again.</summary>
+    public bool LatestWasBeta { get; set; }
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 
