@@ -300,6 +300,7 @@ public partial class MainWindow
         else
             settings.Children.Add(Row("The Wi-Fi watcher is off.",
                 "It can be switched on from the internet check when Wi-Fi keeps dropping.", new Border(), divider: false));
+        AddWeeklyCheckupRow(settings);
         SettingsBody.Children.Add(Card(settings));
         AddDataSettings();
 

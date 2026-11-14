@@ -63,6 +63,8 @@ Name: "{autodesktop}\AutoFix Scout"; Filename: "{app}\AutoFixScout.UI.exe"; Task
 Filename: "{app}\AutoFixScout.UI.exe"; Description: "Start AutoFix Scout now"; Flags: nowait postinstall skipifsilent runasoriginaluser
 ; After an update, start the Wi-Fi watcher again if the person had switched it on.
 Filename: "{app}\AutoFixScout.Watch.exe"; Flags: nowait runasoriginaluser; Check: WatcherWasOn
+; After an update, put the weekly check-up task back if the person had switched it on (the silent uninstall deletes it).
+Filename: "{app}\AutoFixScout.UI.exe"; Parameters: "--weekly-restore"; Flags: runhidden waituntilterminated runasoriginaluser; Check: WeeklyWasOn
 ; After a silent update (/RELAUNCH=1 is passed by the app's own "Update and restart") the new version starts again.
 Filename: "{app}\AutoFixScout.UI.exe"; Flags: nowait runasoriginaluser; Check: RelaunchRequested
 
@@ -77,6 +79,8 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: 
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/im AutoFixScout.Watch.exe /f"; Flags: runhidden skipifdoesntexist; RunOnceId: "StopWifiWatcher"
+; The optional weekly check-up is one per-user Task Scheduler task. Runs for the account that runs the uninstaller (the same person in a normal installation).
+Filename: "{sys}\schtasks.exe"; Parameters: "/delete /tn ""AutoFix Scout weekly check-up"" /f"; Flags: runhidden; RunOnceId: "RemoveWeeklyCheckup"
 
 [Code]
 // One copy only: a newer setup first removes the installed version silently (same AppId, same folder,
@@ -88,6 +92,7 @@ const
 
 var
   WatcherRun: String;
+  WeeklyOn: Boolean;
 
 function InstalledValue(Name: String): String;
 begin
@@ -129,11 +134,18 @@ begin
   Result := '';
   // The silent uninstall below removes the Wi-Fi watcher Run value (uninsdeletevalue); keep the person's choice.
   if not RegQueryStringValue(HKCU, RunKey, WatcherValue, WatcherRun) then WatcherRun := '';
+  // The same for the weekly check-up task: the silent uninstall deletes it, so note whether it exists (as the person, not as administrator).
+  WeeklyOn := ExecAsOriginalUser(ExpandConstant('{sys}\schtasks.exe'), '/query /tn "AutoFix Scout weekly check-up"', '', SW_HIDE, ewWaitUntilTerminated, Code) and (Code = 0);
   Uninst := RemoveQuotes(InstalledValue('UninstallString'));
   if (Uninst <> '') and FileExists(Uninst) then
     if not Exec(Uninst, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '', SW_HIDE, ewWaitUntilTerminated, Code) or (Code <> 0) then
       Log('Previous version could not be removed first (code ' + IntToStr(Code) + '); installing over it.');
   if WatcherRun <> '' then RegWriteStringValue(HKCU, RunKey, WatcherValue, WatcherRun);
+end;
+
+function WeeklyWasOn(): Boolean;
+begin
+  Result := WeeklyOn;
 end;
 
 function WatcherWasOn(): Boolean;
