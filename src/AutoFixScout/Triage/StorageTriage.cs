@@ -283,6 +283,8 @@ public static class StorageTriage
                 $"Your computer has been running for {(int)s.Uptime!.Value.TotalDays} days without a restart. " +
                 "Please save your work, then select \"Start\", then \"Power\", then \"Restart\". " +
                 "After the restart, please open AutoFix Scout again."));
+        // Optional and never automatic: only when Windows could not tell the boot times without administrator rights.
+        if (s.BootTimes is null) rungs.Add(ReadRungs.StartupTimes());
         return rungs;
     }
 

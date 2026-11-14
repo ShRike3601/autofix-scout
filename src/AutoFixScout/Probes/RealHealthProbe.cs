@@ -69,6 +69,7 @@ public sealed class RealHealthProbe : IHealthProbe
             catch (Exception ex) { errors[i] = $"{p.Name}: {ex.Message}"; }
         })).ToArray());
 
+        ElevatedDiagnostics.ApplyTo(s); // crash report data the elevated helper read earlier in this session
         s.ProbeErrors = errors.Where(e => e != null).Select(e => e!).ToList();
         Activity.Report(ActivityKind.Analyze, s.ProbeErrors.Count == 0 ? "All parts of the check-up were read" : $"{Activity.Count(s.ProbeErrors.Count, "part")} of the check-up could not be read");
         return s;

@@ -17,6 +17,8 @@ public static class FixActions
         "repair.dism", "repair.sfc", "time.resync", "network.reset_winhttp_proxy", "network.clean_hosts", "service.restore_default",
         "system.repair_path", "network.reset_winsock", "update.reset_components", "search.rebuild_index", "runtime.install_vcredist", "disk.scan",
         "storage.cleanup_components", "office.quick_repair", "network.wifi_stability", "security.firewall_on", "security.uac_on", "security.remove_browser_policies", "system.pagefile_auto",
+        // Read-only: no argument; the result comes back as a file the app validates and deletes (see ElevatedDiagnostics).
+        Probes.DiagResults.BootAction, Probes.DiagResults.CrashAction,
     };
 
     public static async Task<(bool Ok, string Detail)> RunAsync(Rung rung)
@@ -103,6 +105,8 @@ public static class FixActions
                     return await Task.Run(() => { var r = RunFixed("DisplaySwitch.exe", "/extend"); Thread.Sleep(3000); return r; });
                 case "display.set_brightness":
                     return await Task.Run(SetBrightness);
+                case Probes.DiagResults.BootAction or Probes.DiagResults.CrashAction:
+                    return await RunDiagAsync(rung.ActionId);
                 case var elevated when ElevatedActions.Contains(elevated):
                     var code = await Task.Run(() => RunElevated(rung.ActionId, rung.Arg!));
                     return (code == 0, code is null ? Declined : $"executor exit code {code}");
@@ -246,6 +250,15 @@ public static class FixActions
             Activity.Report(ActivityKind.Change, "The Windows permission prompt was declined, so nothing was changed");
             return null;
         }
+    }
+
+    /// <summary>The read-only helper actions take no argument. Exit 0 = data written, 3 = nothing to report (both are a success).</summary>
+    private static async Task<(bool Ok, string Detail)> RunDiagAsync(string actionId)
+    {
+        var code = await Task.Run(() => RunElevated(actionId));
+        if (code is null) return (false, Declined);
+        var (ok, detail) = ElevatedDiagnostics.Finish(actionId, code.Value);
+        return (ok, code is 0 or 3 ? detail : $"executor exit code {code}; {detail}");
     }
 
     private const string Declined = "The Windows permission prompt was declined, so nothing was changed.";

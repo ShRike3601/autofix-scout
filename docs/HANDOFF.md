@@ -585,3 +585,15 @@ Quality of life:
 - The UI project now targets `net8.0-windows10.0.19041.0` (needed for the toast API, same as the Wi-Fi watcher).
 - Installer: `[UninstallRun]` deletes the task. `PrepareToInstall` notes whether the task exists (`ExecAsOriginalUser schtasks /query`); a `[Run]` entry calls `AutoFixScout.UI.exe --weekly-restore` afterwards, which calls `WeeklyCheckupSetup.On()` (the schedule restarts at about 5 minutes after the update, so the weekday and time may change). NOT compiled with Inno Setup here: please build the installer once and test a silent upgrade.
 - Gaps: the uninstall deletes the task of the account that runs the uninstaller only (same person in a normal installation); a task of another Windows account is left behind and only fails to start a missing file.
+## Read-only elevated reads (g18-admin-read, 2026-11-14)
+- Executor actions `diag.read_boot_times` and `diag.read_crash_reports`: no argument (any argument = exit 2), change nothing. They write one JSON file
+  (`C:\ProgramData\AutoFixScout\logs\diag-boot-times.json` / `diag-crash-reports.json`; new file, protected ACL: SYSTEM and Administrators full, Users read and delete).
+  Exit 0 = written, 3 = nothing to report (no file), 1 = failed. Boot times: Diagnostics-Performance events 100 and 101 to 110, last 30 days, through the shared
+  `StartupTimings` parsers. Crash reports: `Report.wer` of type BlueScreen and LiveKernelEvent in `WER\ReportArchive` and `ReportQueue` through `BlueScreenReports.ParseReport`
+  (stop code, module file name, time; minidumps are never opened).
+- `Probes/DiagResults.cs` (linked into the executor, namespace `AutoFixScout.Executor.Shared` there): JSON shape, limits, validation and the privacy filter (anything with `\Users\` is dropped, paths are cut to the file name).
+  The app validates again (the file is untrusted input), deletes it after reading, and `ElevatedDiagnostics` keeps the result for the session.
+- `ElevatedDiagnostics.ApplyTo` runs at the end of `RealStorageProbe.Read` and `RealHealthProbe.Read`: it fills `StorageState.BootTimes / SlowStartupItems` only when they are null (Unknown),
+  and `HealthState.BlueScreenModules` when empty (also sets `CrashReportsRead`). The next check after the rung therefore re-evaluates the findings.
+- Rungs (`Triage/ReadRungs.cs`, tier 1, optional, never automatic): "Read the start-up times" in the slow computer ladder when `BootTimes` is null; "Read the crash reports" in the check-up ladder when blue
+  screens exist, no module is known and the reports were not read yet. `LadderRunner` does not ask "is it fixed?" after these read-only steps.
