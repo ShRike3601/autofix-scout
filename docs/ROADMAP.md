@@ -15,7 +15,7 @@ Many new checks only explain what to do. The next step is safe, undoable fixes f
 
 ## Trust and support
 5. AutoFix Scout's own problem log: unexpected errors in the app itself are written to a local log and included in the
-   helper report, so testers' problems can be fixed. [started: agent g22-selflog]
+   helper report, so testers' problems can be fixed. [DONE, merged into next]
 6. A "beta" update channel in Settings for friends who test early builds (pre-releases).
 7. Code signing (SignPath Foundation, applied for) so Smart App Control stops blocking the installer.
 
