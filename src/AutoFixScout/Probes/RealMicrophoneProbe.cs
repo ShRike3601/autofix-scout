@@ -31,10 +31,10 @@ public sealed class RealMicrophoneProbe : IMicrophoneProbe
         }).ToList();
 
         try { state.Devices = RealAudioProbe.ReadMediaDevices(); }
-        catch (Exception ex) { errors.Add($"WMI: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Microphone probe", ex); errors.Add($"WMI: {ex.Message}"); }
 
         try { ReadEndpoints(state); }
-        catch (Exception ex) { errors.Add($"Core Audio: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Microphone probe", ex); errors.Add($"Core Audio: {ex.Message}"); }
 
         try
         {
@@ -47,7 +47,7 @@ public sealed class RealMicrophoneProbe : IMicrophoneProbe
             state.DesktopAppAccess = Allowed(desktop);
             state.DeniedApps = AppConsent.ReadDenied(hkcu);
         }
-        catch (Exception ex) { errors.Add($"Consent store: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Microphone probe", ex); errors.Add($"Consent store: {ex.Message}"); }
         return state;
     }
 

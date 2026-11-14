@@ -24,7 +24,7 @@ public sealed class RealPerfProbe : IPerfProbe
         void Part(string name, Action read)
         {
             try { read(); }
-            catch (Exception ex) { errors.Add($"{name}: {ex.Message}"); }
+            catch (Exception ex) { AppLog.Warn("Perf probe", ex); errors.Add($"{name}: {ex.Message}"); }
         }
 
         Activity.Report(ActivityKind.Analyze, "Reading processor speed, power settings, memory and stability signals");

@@ -80,8 +80,8 @@ public sealed class RealHealthProbe : IHealthProbe
     {
         var s = new HealthState();
         var errors = new List<string>();
-        try { ReadAppEvents(s); } catch (Exception ex) { errors.Add($"event log (programs): {ex.Message}"); }
-        try { ReadSystemEvents(s); } catch (Exception ex) { errors.Add($"event log (system): {ex.Message}"); }
+        try { ReadAppEvents(s); } catch (Exception ex) { AppLog.Warn("Health probe", ex); errors.Add($"event log (programs): {ex.Message}"); }
+        try { ReadSystemEvents(s); } catch (Exception ex) { AppLog.Warn("Health probe", ex); errors.Add($"event log (system): {ex.Message}"); }
         s.ProbeErrors = errors;
         return s;
     }
@@ -94,7 +94,7 @@ public sealed class RealHealthProbe : IHealthProbe
         void Part(string name, Action read)
         {
             try { read(); }
-            catch (Exception ex) { errors.Add($"{name}: {ex.Message}"); }
+            catch (Exception ex) { AppLog.Warn("Health probe", ex); errors.Add($"{name}: {ex.Message}"); }
         }
         Part("proxy", () => ReadUserProxy(s));
         Part("system proxy", () => ReadWinHttpProxy(s));

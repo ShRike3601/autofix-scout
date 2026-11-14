@@ -14,14 +14,14 @@ public sealed class RealInputProbe : IInputProbe
         var errors = new List<string>();
         var s = new InputState { ProbeErrors = errors };
         try { s.Devices = ReadDevices(); }
-        catch (Exception ex) { errors.Add($"WMI: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Input probe", ex); errors.Add($"WMI: {ex.Message}"); }
         try
         {
             Activity.ReadingRegistry("HKCU", TouchpadKey, "(touchpad settings)");
             s.TouchpadEnabled = ReadTri(TouchpadKey + @"\Status", "Enabled");
             s.LeaveOnWithMouse = ReadTri(TouchpadKey, "LeaveOnWithMouse");
         }
-        catch (Exception ex) { errors.Add($"Touchpad: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Input probe", ex); errors.Add($"Touchpad: {ex.Message}"); }
         try
         {
             Activity.Report(ActivityKind.Command, "Reading the accessibility key settings through SystemParametersInfo (Sticky, Filter, Toggle and Mouse Keys)");
@@ -30,11 +30,11 @@ public sealed class RealInputProbe : IInputProbe
             s.ToggleKeysFlags = Accessibility.Get(Accessibility.Kind.Toggle);
             s.MouseKeysFlags = Accessibility.Get(Accessibility.Kind.Mouse);
         }
-        catch (Exception ex) { errors.Add($"Accessibility: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Input probe", ex); errors.Add($"Accessibility: {ex.Message}"); }
         Activity.ReadingRegistry("HKCU", "Keyboard Layout", "(installed layouts and the switch shortcut)");
         try { ReadLayouts(s); }
 
-        catch (Exception ex) { errors.Add($"Layouts: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Input probe", ex); errors.Add($"Layouts: {ex.Message}"); }
         return s;
     }
 

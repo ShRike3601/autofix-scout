@@ -37,7 +37,7 @@ public sealed class RealCameraProbe : ICameraProbe
         var errors = new List<string>();
         var state = new CameraState { ProbeErrors = errors };
         try { state.Devices = ReadDevices(); }
-        catch (Exception ex) { errors.Add($"WMI: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Camera probe", ex); errors.Add($"WMI: {ex.Message}"); }
         try
         {
             Activity.ReadingRegistry("HKLM and HKCU", ConsentKey, "(app access to the camera)");
@@ -51,7 +51,7 @@ public sealed class RealCameraProbe : ICameraProbe
             state.DeniedApps = AppConsent.ReadDenied(hkcu);
             state.AppsUsingCamera = InUse(hkcu, packaged: true).Concat(InUse(desktop, packaged: false)).Distinct().ToList();
         }
-        catch (Exception ex) { errors.Add($"Consent store: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Camera probe", ex); errors.Add($"Consent store: {ex.Message}"); }
         return state;
     }
 

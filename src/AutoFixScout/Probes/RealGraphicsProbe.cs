@@ -18,7 +18,7 @@ public sealed class RealGraphicsProbe : IGraphicsProbe
         void Part(string name, Action read)
         {
             try { read(); }
-            catch (Exception ex) { errors.Add($"{name}: {ex.Message}"); }
+            catch (Exception ex) { AppLog.Warn("Graphics probe", ex); errors.Add($"{name}: {ex.Message}"); }
         }
         Activity.Report(ActivityKind.Analyze, "Reading the graphics card, driver, overclocking tools and driver resets");
         Part("video controllers", () => s.Gpus = ReadGpus());
