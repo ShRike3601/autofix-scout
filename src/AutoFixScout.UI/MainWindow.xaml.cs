@@ -34,6 +34,7 @@ public partial class MainWindow : Window, IFixHost
             switch (Environment.GetEnvironmentVariable("AUTOFIXSCOUT_OPEN"))
             {
                 case "settings": SetSettingsOpen(true); break;
+                case "settings-end": SetSettingsOpen(true); _ = Dispatcher.InvokeAsync(() => (SettingsBody.Parent as System.Windows.Controls.ScrollViewer)?.ScrollToEnd(), System.Windows.Threading.DispatcherPriority.Loaded); break;
                 case "graphics": OnGraphicsClicked(this, new RoutedEventArgs()); break;
                 case "netquality": OnConnectionQualityClicked(this, new RoutedEventArgs()); break;
                 case "graphics-log": OnGraphicsClicked(this, new RoutedEventArgs()); EnsureActivityPanel(); SetActivityOpen(true); break;
