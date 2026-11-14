@@ -160,6 +160,13 @@ public static class FixActions
                     return await Task.Run(Watching.WifiWatcherSetup.TurnOn);
                 case "network.wifi_watch_off":
                     return await Task.Run(Watching.WifiWatcherSetup.TurnOff);
+                case Repair.GameFixes.GameModeAction:
+                    // The person's own HKCU game settings only; the previous value is kept for Undo in History. No admin.
+                    return await Task.Run(Repair.GameFixes.GameModeOn);
+                case Repair.GameFixes.GraphicsCardAction:
+                    return await Task.Run(() => Repair.GameFixes.UseGraphicsCard(rung.Arg));
+                case Repair.GameFixes.RecordingAction:
+                    return await Task.Run(Repair.GameFixes.BackgroundRecordingOff);
                 case "storage.empty_recycle_bin":
                     return await Task.Run(Areas.StorageCleanup.EmptyRecycleBin);
                 default:

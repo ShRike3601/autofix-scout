@@ -19,7 +19,7 @@ public sealed record UndoResult(bool Ok, string Message);
 /// </summary>
 public sealed class ChangeHistory
 {
-    public const string DriverKind = "driver", StartupKind = "startup";
+    public const string DriverKind = "driver", StartupKind = "startup", GameFixKind = "gamefix";
 
     private readonly string _dbPath;
     private readonly string _savePointRoot;
@@ -50,8 +50,13 @@ public sealed class ChangeHistory
             return (DriverKind, sp.Groups[1].Value);
         if (actionId == "startup.disable" && StartupEntry.Match(detail) is { Success: true } st && StartupApps.IsValidName(st.Groups[1].Value))
             return (StartupKind, st.Groups[2].Value + "|" + st.Groups[1].Value);
+        if (GameFixes.IsGameFix(actionId) && GameFixes.PayloadFromDetail(detail) is { } game)
+            return (GameFixKind, game);
         return null;
     }
+
+    /// <summary>A game settings fix that found nothing to change: it is not listed as a change.</summary>
+    private static bool IsNoOp(string actionId, string? detail) => GameFixes.IsGameFix(actionId) && GameFixes.PayloadFromDetail(detail) is null;
 
     /// <summary>Steps that are not changes to the computer: questions to the person, tests and scans.</summary>
     public static bool IsChange(string actionId) =>
@@ -115,6 +120,9 @@ public sealed class ChangeHistory
         "security.remove_browser_policies" or "security.remove_browser_policies_user" => "Browser policies that changed the home page or search were removed.",
         "input.touchpad_on" => "The touchpad was turned on.",
         "input.accessibility_keys_off" => "The shortcut for Sticky Keys and Filter Keys was turned off.",
+        GameFixes.GameModeAction => "Game Mode was turned on.",
+        GameFixes.GraphicsCardAction => "A game was set to use the graphics card instead of the power-saving graphics chip.",
+        GameFixes.RecordingAction => "Background recording of the Xbox Game Bar was turned off.",
         _ => "AutoFix Scout made a change to Windows.",
     };
 
@@ -128,6 +136,9 @@ public sealed class ChangeHistory
         "display.set_brightness" or "display.extend" => "The screen settings can be changed again in the Windows display settings.",
         "power.balanced_plan" => "The power plan can be changed in the Windows power settings.",
         "startup.disable" => "The app can be switched on again under \"Startup apps\" in the Windows settings.",
+        GameFixes.GameModeAction => "Game Mode can be changed again in the Windows \"Game Mode\" settings.",
+        GameFixes.GraphicsCardAction => "The graphics card of a game can be changed again in the Windows \"Graphics\" settings.",
+        GameFixes.RecordingAction => "Recording can be changed again in the Windows \"Captures\" settings.",
         "service.restart" or "device.disable_enable" or "device.enable" or "device.rescan" or "network.flush_dns"
             or "network.renew_address" or "shell.restart_start_menu" or "shell.restart_explorer" or "shell.rebuild_icon_cache"
             or "apps.start_onedrive" or "security.update_signatures" =>
@@ -148,7 +159,7 @@ public sealed class ChangeHistory
             var list = new List<ChangeEntry>();
             foreach (var row in log.ChangeRows())
             {
-                if (!IsChange(row.ActionId)) continue;
+                if (!IsChange(row.ActionId) || IsNoOp(row.ActionId, row.Detail)) continue;
                 var undone = row.Result == "undone" || row.UndoApplied;
                 var description = Describe(row.ActionId, row.Detail);
                 if (undone) { list.Add(new ChangeEntry(row.StepId, row.WhenUtc, description, false, true, null)); }
@@ -168,6 +179,7 @@ public sealed class ChangeHistory
         // The executor keeps the save point until it is used or 30 days old.
         DriverKind => payload is { Length: 32 } && Directory.Exists(Path.Combine(_savePointRoot, payload)),
         StartupKind => payload is not null && payload.Contains('|'),
+        GameFixKind => GameFixes.IsValidPayload(payload),
         _ => false,
     };
 
@@ -203,6 +215,8 @@ public sealed class ChangeHistory
             case StartupKind:
                 var parts = payload.Split('|', 2);
                 return await Task.Run(() => StartupApps.Enable(parts[1], parts[0]));
+            case GameFixKind:
+                return await Task.Run(() => GameFixes.Undo(payload));
             default:
                 return (false, "no undo for " + kind);
         }

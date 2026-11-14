@@ -7,7 +7,7 @@ report, first-run tour, keyboard shortcuts.
 ## Next: from advice to one-click fixes
 Many new checks only explain what to do. The next step is safe, undoable fixes for the simple cases.
 1. One-click game settings fixes (per user, undoable from History): turn Game Mode on, set a game back to the graphics
-   card, turn off background recording. [started: agent g21-gamefix]
+   card, turn off background recording. [done on branch g21-gamefix: games.game_mode_on, games.use_graphics_card, games.background_recording_off, undo from History]
 2. Driver updates from Windows Update for old Wi-Fi and graphics drivers (the executor already talks to Windows
    Update for drivers), with the existing driver save point and automatic undo.
 3. Start-up clean-up driven by the measured boot data: offer to switch off the apps Windows named as slow.

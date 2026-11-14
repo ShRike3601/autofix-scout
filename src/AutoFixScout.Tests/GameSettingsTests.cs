@@ -308,7 +308,7 @@ public class GameSettingsTriageTests
         Assert.Equal(6, f.Count(x => x.Code.ToString().StartsWith("GameSet")));
         var l = GraphicsTriage.Ladder(s, f);
         Assert.Equal(l.Count, l.Select(r => r.Id).Distinct().Count());
-        Assert.All(l, r => Assert.True(r.Tier == 0 && r.ActionId is "ui.human_step" or "ui.open_settings_page"));
+        Assert.All(l, r => Assert.True(r.Tier == 0 ? r.ActionId is "ui.human_step" or "ui.open_settings_page" : r.Tier == 1 && Repair.GameFixes.IsGameFix(r.ActionId)));
         Assert.Contains(l, r => r.Arg == "gaming");
         Assert.Contains(l, r => r.Arg == "capture");
         Assert.Contains(l, r => r.Arg == "powersleep");
