@@ -100,7 +100,7 @@ public static class DiagResults
             .OrderByDescending(b => b.TimeUtc).Take(MaxBoots).ToList();
         r.SlowItems = (slow ?? Enumerable.Empty<SlowStartupItem>())
             .Where(s => s is not null && s.TotalMs is >= 0 and <= MaxDurationMs)
-            .Select(s => CleanName(s.Name) is { } n ? new SlowStartupItem(n, s.TotalMs) : null).OfType<SlowStartupItem>()
+            .Select(s => CleanName(s.Name) is { } n ? new SlowStartupItem(n, s.TotalMs, CleanName(s.FileName), s.EventId is >= 0 and <= 110 ? s.EventId : 0) : null).OfType<SlowStartupItem>()
             .GroupBy(s => s.Name, StringComparer.OrdinalIgnoreCase).Select(g => g.MaxBy(x => x.TotalMs)!)
             .OrderByDescending(s => s.TotalMs).Take(MaxSlowItems).ToList();
         return r;

@@ -12,7 +12,8 @@ namespace AutoFixScout.Probes;
 public sealed record BootRecord(DateTime TimeUtc, long BootMs, long MainPathMs, long PostBootMs);
 
 /// <summary>An app, driver or service that Windows reported as slowing start-up (events 101 to 110): friendly name only.</summary>
-public sealed record SlowStartupItem(string Name, long TotalMs);
+/// <remarks>FileName is the program file named in the event (for example "Spotify.exe"); EventId is 101 for an app, 0 when unknown.</remarks>
+public sealed record SlowStartupItem(string Name, long TotalMs, string? FileName = null, int EventId = 0);
 
 /// <summary>Parses start-up timing events (pure; shared with the elevated helper).</summary>
 public static partial class StartupTimings
@@ -62,7 +63,9 @@ public static partial class StartupTimings
             var d = Data(xml);
             var name = d.TryGetValue("FriendlyName", out var f) && !string.IsNullOrWhiteSpace(f) ? f.Trim() : null;
             if (name is null) return null;
-            return new SlowStartupItem(name, Num(d, "TotalTime") ?? 0);
+            var file = d.TryGetValue("FileName", out var fn) && !string.IsNullOrWhiteSpace(fn) ? fn.Trim()
+                     : d.TryGetValue("Name", out var nm) && !string.IsNullOrWhiteSpace(nm) ? nm.Trim() : null;
+            return new SlowStartupItem(name, Num(d, "TotalTime") ?? 0, file, n);
         }
         catch (Exception) { return null; }
     }
