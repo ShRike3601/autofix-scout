@@ -384,4 +384,10 @@ public enum FindingCode
     PowerBatteryAgeing,
     PowerBatteryManyCycles,
     PowerBatteryReportUnreadable,
+    // Connection quality (NetQuality area). A steady connection has its own code so LooksNormal stays the internet check's.
+    NetQualityLocalNetwork,
+    NetQualityInternet,
+    NetQualityInternetUnclear,
+    NetQualitySteady,
+    NetQualityNotMeasurable,
 }
