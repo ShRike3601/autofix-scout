@@ -181,9 +181,10 @@ public sealed class RealHealthProbe : IHealthProbe
 
 
 
-    private static void ReadStopCodes(HealthState s)
+    internal static void ReadStopCodes(HealthState s)
     {
         var codes = new List<uint>();
+        var times = new List<DateTime>();
         foreach (var e in Query("System", "(Provider[@Name='Microsoft-Windows-WER-SystemErrorReporting'] or Provider[@Name='BugCheck']) and EventID=1001"))
         {
             var code = StopCodes.Parse(Prop(e, 0));
@@ -194,8 +195,75 @@ public sealed class RealHealthProbe : IHealthProbe
                 code = StopCodes.Parse(text);
             }
             if (code is { } c) codes.Add(c);
+            if (e.TimeCreated is { } t) times.Add(t);
         }
+        // Kernel-Power 41 carries the stop code of a crash in its first value (0 = power was cut without a blue screen).
+        var kpCodes = new List<uint>();
+        var kpTimes = new List<DateTime>();
+        foreach (var e in Query("System", "Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=41"))
+            if (e.Properties.Count > 0 && e.Properties[0].Value is { } v && Convert.ToInt64(v) is > 0 and var n && n <= uint.MaxValue)
+            {
+                kpCodes.Add((uint)n);
+                if (e.TimeCreated is { } t) kpTimes.Add(t);
+            }
+        s.KernelPowerBugchecks = kpCodes.Count;
+        if (codes.Count == 0 && kpCodes.Count > 0) { codes = kpCodes; times = kpTimes; }
         s.StopCodes = StopCodes.Count(codes);
+        s.BlueScreenTimes = times;
+        ReadWerReports(s);
+        ReadMinidumps(s);
+    }
+
+    private static readonly string WerRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Microsoft", "Windows", "WER");
+
+    /// <summary>
+    /// Windows Error Reporting reports of blue screens: only EventType, the code and a module name are read from
+    /// Report.wer. Folders that Windows keeps for administrators only are skipped; nothing is copied.
+    /// </summary>
+    private static void ReadWerReports(HealthState s)
+    {
+        var modules = new List<string?>();
+        int read = 0, denied = 0, total = 0;
+        Activity.Report(ActivityKind.Files, "Reading the blue screen reports of Windows Error Reporting (only the stop code and the driver file name are used)");
+        foreach (var sub in new[] { "ReportArchive", "ReportQueue" })
+        {
+            string[] dirs;
+            try { dirs = Directory.GetDirectories(Path.Combine(WerRoot, sub)); }
+            catch (Exception) { continue; }
+            foreach (var dir in dirs)
+            {
+                var name = Path.GetFileName(dir);
+                if (!(name.StartsWith("Kernel", StringComparison.OrdinalIgnoreCase) || name.StartsWith("LiveKernel", StringComparison.OrdinalIgnoreCase)
+                      || name.StartsWith("BlueScreen", StringComparison.OrdinalIgnoreCase) || name.StartsWith("Critical", StringComparison.OrdinalIgnoreCase))) continue;
+                if (total++ >= 60) break;
+                try
+                {
+                    var file = Path.Combine(dir, "Report.wer");
+                    if (File.GetLastWriteTimeUtc(file) < DateTime.UtcNow - Window && Directory.GetLastWriteTimeUtc(dir) < DateTime.UtcNow - Window) continue;
+                    var r = BlueScreenReports.ParseReport(File.ReadAllText(file));
+                    read++;
+                    if (r is { EventType: var type } && type.Equals("BlueScreen", StringComparison.OrdinalIgnoreCase) && r.Module is { } m) modules.Add(m);
+                }
+                catch (UnauthorizedAccessException) { denied++; }
+                catch (IOException) { denied++; }
+            }
+        }
+        s.BlueScreenModules = BlueScreenReports.CountModules(modules);
+        Activity.Report(ActivityKind.Files, denied > 0
+            ? $"Read {Activity.Count(read, "report")}; {Activity.Count(denied, "report")} could not be read without administrator rights"
+            : $"Read {Activity.Count(read, "report")}");
+    }
+
+    /// <summary>Only the number of files in the Minidump folder is counted. The dump files are never opened.</summary>
+    private static void ReadMinidumps(HealthState s)
+    {
+        Activity.Report(ActivityKind.Files, "Counting the files in the Windows Minidump folder (the files are not opened)");
+        try
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Minidump");
+            s.MinidumpCount = Directory.Exists(dir) ? new DirectoryInfo(dir).EnumerateFiles("*.dmp").Count(f => f.LastWriteTimeUtc >= DateTime.UtcNow - Window) : 0;
+        }
+        catch (Exception) { s.MinidumpCount = null; }
     }
 
     private static long ToLong(object? v) => v is null ? 0 : Convert.ToInt64(v);

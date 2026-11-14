@@ -567,3 +567,13 @@ Quality of life:
 - Optional weekly check-up from the tray, with a notification only when something is wrong.
 - Save a report as a file (HTML) to send to a helper.
 - First-run tour (three short cards) for new users.
+
+## Blue screen explainer (g15-bsod, 2026-11-14)
+- `Probes/BlueScreenReports.cs` (pure): stop code to cause group (driver, memory, graphics, disk, damaged files, hardware),
+  module name to friendly driver name, Report.wer parser (EventType, code, module, time only), recurrence logic.
+  `RealHealthProbe.ReadStopCodes` reads System 1001, Kernel-Power 41 stop code, WER reports and the Minidump file count.
+- Without admin on the bench laptop: System log 1001 and Kernel-Power 41 work; the Minidump folder lists (dates and count only);
+  the WER folders list, but the BlueScreen and Critical Report.wer files are denied, so the named driver is often unknown.
+  The finding then states the stop code and recurrence only. Never claim a driver when no report named one.
+- Findings and steps: `HealthTriage.BlueScreenCause` and the ladder (rungs `bluescreen_named_driver`, `bluescreen_hardware_settings`;
+  reuses `gpu_clean_driver`, `perf_cooling`, `memory_diagnostic`, `scan_disk`, DISM/SFC).

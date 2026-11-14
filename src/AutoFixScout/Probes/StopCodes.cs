@@ -52,6 +52,10 @@ public static class StopCodes
         [0x154] = new("UNEXPECTED_STORE_EXCEPTION", StopCategory.Storage, "A problem occurred in the part of Windows that handles compressed memory, which depends on the drive. A failing drive or a faulty storage driver is the usual cause."),
         [0xF4] = new("CRITICAL_OBJECT_TERMINATION", StopCategory.Storage, "A process that Windows cannot run without was ended. A failing drive or damaged system files is the usual cause."),
         [0x124] = new("WHEA_UNCORRECTABLE_ERROR", StopCategory.Other, "The computer's hardware reported an error that could not be corrected. The processor, memory, drive or power supply is the usual cause, so software repairs rarely help.", Hardware: true),
+        [0x77] = new("KERNEL_STACK_INPAGE_ERROR", StopCategory.Storage, "Windows could not read needed data from the drive. A failing drive, a loose cable or a faulty drive controller is the usual cause."),
+        [0x8E] = new("KERNEL_MODE_EXCEPTION_NOT_HANDLED", StopCategory.Driver, "A part of Windows or a driver caused an error that it could not recover from. An out-of-date or faulty driver is the usual cause, and faulty memory (RAM) is possible."),
+        [0x1E] = new("KMODE_EXCEPTION_NOT_HANDLED", StopCategory.Driver, "A part of Windows or a driver caused an error that it could not recover from. An out-of-date or faulty driver is the usual cause, and faulty memory (RAM) is possible."),
+        [0x3D] = new("INTERRUPT_EXCEPTION_NOT_HANDLED", StopCategory.Driver, "A driver did not handle a request from the hardware correctly. An out-of-date or faulty driver is the usual cause."),
         [0xEF] = new("CRITICAL_PROCESS_DIED", StopCategory.Other, "A process that Windows cannot run without was ended. Damaged system files, a faulty driver or a failing drive is the usual cause."),
     };
 
