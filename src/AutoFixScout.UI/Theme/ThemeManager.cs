@@ -67,6 +67,7 @@ public static class ThemeManager
         };
     }
 
+    private static readonly Uri LightGlassUri = new("pack://application:,,,/AutoFixScout.UI;component/Theme/LightGlass.xaml");
     private static readonly Uri DarkGlassUri = new("pack://application:,,,/AutoFixScout.UI;component/Theme/DarkGlass.xaml");
 
     /// <summary>True while the window shows the Windows 11 acrylic backdrop (frosted glass).</summary>
@@ -78,6 +79,7 @@ public static class ThemeManager
         Current = Detect();
         var palette = Current switch
         {
+            Mode.Light when glass => new ResourceDictionary { MergedDictionaries = { new ResourceDictionary { Source = LightUri }, new ResourceDictionary { Source = LightGlassUri } } },
             Mode.Light => new ResourceDictionary { Source = LightUri },
             Mode.HighContrast => HighContrastPalette(),
             // Later merged dictionaries win, so the glass surfaces override the solid ones.
@@ -110,16 +112,21 @@ public static class ThemeManager
         Motion.Reduced = Settings.ReduceMotion;
         if (window.FindName("Root") is FrameworkElement root)
             root.LayoutTransform = Settings.TextScale > 1.01 ? new ScaleTransform(Settings.TextScale, Settings.TextScale) : Transform.Identity;
-        Glass = Detect() == Mode.Dark && Settings.Glass && SetBackdrop(window, hwnd, on: true);
+        Glass = Detect() != Mode.HighContrast && Settings.Glass && SetBackdrop(window, hwnd, on: true);
         if (!Glass) SetBackdrop(window, hwnd, on: false);
         // With the frame extended over the window, DWM draws the native Windows 11 caption buttons; use those and hide ours.
         if (System.Windows.Shell.WindowChrome.GetWindowChrome(window) is { } chrome) chrome.UseAeroCaptionButtons = Glass;
         if (window.FindName("CaptionButtons") is UIElement own) own.Visibility = Glass ? Visibility.Collapsed : Visibility.Visible;
-        if (window.FindName("AmbientField") is System.Windows.Controls.Canvas field && (field.Visibility == Visibility.Visible) != Glass)
-            Ambient.Attach(field, Glass);
+        var lightField = Detect() == Mode.Light;
+        if (window.FindName("AmbientField") is System.Windows.Controls.Canvas field
+            && ((field.Visibility == Visibility.Visible) != Glass || (Glass && field.Tag is bool was && was != lightField)))
+        {
+            Ambient.Attach(field, Glass, lightField);
+            field.Tag = lightField;
+        }
         ApplyPalette(Glass);
         // The app draws its own title bar; these only affect the system frame around it.
-        var dark = Current == Mode.Dark ? 1 : 0;
+        var dark = Current == Mode.Dark ? 1 : 0; // 0 for light: frame and caption buttons render light
         // Attribute 20 on Windows 10 20H1+ / 11, 19 on older Windows 10.
         if (DwmSetWindowAttribute(hwnd, 20, ref dark, sizeof(int)) != 0)
             DwmSetWindowAttribute(hwnd, 19, ref dark, sizeof(int));
