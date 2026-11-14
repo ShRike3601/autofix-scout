@@ -335,8 +335,9 @@ public class StressAnalysisTests
     public void FindingCodes_AreAppendedAtTheEnd()
     {
         var names = Enum.GetNames<FindingCode>();
-        Assert.Equal("StressNotRun", names[^1]);
-        Assert.Equal("GpuResizableBarOff", names[^7]);
+        Assert.Equal("NetQualityNotMeasurable", names[^1]);
+        Assert.Equal("StressNotRun", names[^6]);
+        Assert.Equal("GpuResizableBarOff", names[^12]);
     }
 }
 
