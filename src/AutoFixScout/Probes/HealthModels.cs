@@ -25,6 +25,14 @@ public sealed class HealthState
     public int BlueScreens { get; set; }
     /// <summary>Stop codes of the blue screens in the last 14 days, most frequent first (empty when none could be read).</summary>
     public IReadOnlyList<StopCodeCount> StopCodes { get; set; } = new List<StopCodeCount>();
+    /// <summary>Modules (driver files) that Windows named in blue screen reports in the last 14 days, most frequent first. Often empty: the reports can need administrator rights.</summary>
+    public IReadOnlyList<ModuleCount> BlueScreenModules { get; set; } = new List<ModuleCount>();
+    /// <summary>When the blue screens happened (local time), from the System log.</summary>
+    public IReadOnlyList<DateTime> BlueScreenTimes { get; set; } = new List<DateTime>();
+    /// <summary>Kernel-Power 41 events that carry a stop code (the code is not 0), in the last 14 days.</summary>
+    public int KernelPowerBugchecks { get; set; }
+    /// <summary>Files in the Windows Minidump folder; null when the folder could not be listed.</summary>
+    public int? MinidumpCount { get; set; }
     /// <summary>The page file (virtual memory) settings and size; null = could not be read.</summary>
     public PageFileState? PageFile { get; set; }
     /// <summary>Resource-Exhaustion-Detector event 2004 ("low virtual memory") in the last 14 days.</summary>

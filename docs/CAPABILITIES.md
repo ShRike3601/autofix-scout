@@ -51,7 +51,7 @@ Status: **Done** = built, unit-tested and checked on the test laptop (every admi
 | One app has no sound | app muted or at zero in the Volume mixer, audio enhancements | unmute that app, guided | Done |
 | What fills the drive | Windows.old, hibernation file, Downloads, update caches | Storage Sense, component cleanup, guided (personal files never deleted) | Done |
 | One app cannot use the microphone or camera | per-app privacy switch off for Teams, Zoom, a browser... | guided Settings step naming the app | Done |
-| Blue-screen causes | stop codes explained (memory, driver, storage, graphics) | memory test (guided), driver steps, disk scan | Done |
+| Blue-screen causes | stop code explained in plain words and grouped (driver, memory, graphics, disk, damaged files, hardware); the driver Windows named, in friendly words, when a report records one (reports can need administrator rights); whether it keeps happening (days, same code); sources: System log 1001, Kernel-Power 41 stop code, Windows Error Reporting reports, Minidump file count (never opened) | memory test (guided), update or reinstall the named driver, clean graphics driver install, heat and overclock advice for 0x124, disk scan, system file repair | Done |
 | Virtual memory | page file missing or too small | let Windows manage the page file (admin, restart) | Done |
 | Threats found by Microsoft Defender | recent detections, active or removed | Protection history, full scan, Defender Offline (guided) | Done |
 | Scanner | image acquisition service off, scanner errors | restore service, re-detect, guided | Done |

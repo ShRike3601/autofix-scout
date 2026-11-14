@@ -103,9 +103,9 @@ public static class HealthTriage
         if (shell.Count > 0)
             f.Add(F(FindingCode.HealthShellCrashing, "Parts of Windows itself, such as the taskbar, the Start menu or search, have closed unexpectedly.",
                 string.Join("; ", shell.Select(c => $"{c.App} x{c.Count} ({c.Module}, {c.ExceptionCode})"))));
-        if (s.BlueScreens > 0)
-            f.Add(F(FindingCode.HealthBlueScreens, $"Windows has stopped with an error screen (a \"blue screen\") {Times(s.BlueScreens)} in the last two weeks.{BlueScreenCause(s)}",
-                $"bugchecks: {s.BlueScreens}, unexpected shutdowns: {s.UnexpectedShutdowns}" +
+        if (BlueScreenCount(s) > 0)
+            f.Add(F(FindingCode.HealthBlueScreens, $"Windows has stopped with an error screen (a \"blue screen\") {Times(BlueScreenCount(s))} in the last two weeks.{BlueScreenCause(s)}",
+                $"bugchecks: {BlueScreenCount(s)}, unexpected shutdowns: {s.UnexpectedShutdowns}" +
                 (s.StopCodes.Count > 0 ? "; stop codes: " + string.Join(", ", s.StopCodes.Select(c => $"{StopCodes.Hex(c.Code)}{(StopCodes.Meaning(c.Code) is { } m ? " " + m.Name : "")} x{c.Count}")) : "")));
         if (PageFileTooSmall(s))
             f.Add(F(FindingCode.HealthPageFileTooSmall, PageFileSentence(s), PageFileDetail(s)));
@@ -187,11 +187,60 @@ public static class HealthTriage
     /// <summary>The most frequent stop code, explained; empty when no code could be read or it is not a common one.</summary>
     private static string BlueScreenCause(HealthState s)
     {
-        if (s.StopCodes.Count == 0) return "";
-        var top = s.StopCodes[0];
-        return StopCodes.Meaning(top.Code) is { } m
-            ? $" The most frequent stop code was {StopCodes.Hex(top.Code)} ({m.Name}). {m.Explanation}"
-            : $" The most frequent stop code was {StopCodes.Hex(top.Code)}.";
+        var total = BlueScreenCount(s);
+        var text = "";
+        if (s.StopCodes.Count > 0)
+        {
+            var top = s.StopCodes[0];
+            text = StopCodes.Meaning(top.Code) is { } m
+                ? $" The most frequent stop code was {StopCodes.Hex(top.Code)} ({m.Name}). {m.Explanation}"
+                : $" The most frequent stop code was {StopCodes.Hex(top.Code)}.";
+        }
+        return text + BlueScreenDriverSentence(s, total) + BlueScreenRecurrenceSentence(s, total);
+    }
+
+    /// <summary>The module Windows blamed most often, as a sentence; empty when no report named one.</summary>
+    public static string BlueScreenDriverSentence(HealthState s, int total)
+    {
+        if (s.BlueScreenModules.Count == 0) return "";
+        var top = s.BlueScreenModules[0];
+        if (BlueScreenReports.NameModule(top.Module) is not { } d) return "";
+        if (d.IsWindowsItself)
+            return $" Windows named its own core file \"{d.Module}\", which does not point to one specific driver.";
+        var what = d.Display.Equals(d.Module, StringComparison.OrdinalIgnoreCase) ? $"the file \"{d.Module}\"" : $"the {d.Display} (\"{d.Module}\")";
+        var when = total <= 1 ? "" : top.Count >= total ? "Each time, " : $"In {top.Count} of these, ";
+        return when.Length == 0 ? $" Windows named {what} as the cause." : $" {when}Windows named {what} as the cause.";
+    }
+
+    /// <summary>Whether the blue screens keep happening: how many days, and whether the stop code is always the same.</summary>
+    public static string BlueScreenRecurrenceSentence(HealthState s, int total)
+    {
+        var r = BlueScreenReports.Recur(total, s.BlueScreenTimes, s.StopCodes);
+        if (total <= 1) return " It has happened only once so far.";
+        if (r.KeepsHappening)
+            return (r.Days >= 2 ? $" The problem keeps happening, on {r.Days} different days." : " The problem keeps happening.")
+                + (r.SameCodeEachTime ? " The stop code was the same every time, which points to one cause." : "");
+        return " It happened more than once, but on one day only.";
+    }
+
+    /// <summary>Blue screens from the System log; when it has none, crashes recorded with a stop code by Kernel-Power 41.</summary>
+    public static int BlueScreenCount(HealthState s) => s.BlueScreens > 0 ? s.BlueScreens : s.KernelPowerBugchecks;
+
+    /// <summary>The cause groups of the most frequent stop codes (usual cause and second possibility), plus the group of the named driver.</summary>
+    private static List<CauseGroup> BlueScreenCauseGroups(HealthState s)
+    {
+        var g = new List<CauseGroup>();
+        foreach (var c in s.StopCodes.Take(3))
+            if (BlueScreenReports.CausesOf(c.Code) is { } x)
+            {
+                g.Add(x.Primary);
+                if (x.Secondary is { } sec) g.Add(sec);
+            }
+            else if (StopCodes.Meaning(c.Code)?.Category is { } cat)
+                g.Add(cat switch { StopCategory.Storage => CauseGroup.Disk, StopCategory.Memory => CauseGroup.Memory, StopCategory.Graphics => CauseGroup.Graphics, StopCategory.Driver => CauseGroup.Driver, _ => CauseGroup.Unknown });
+        if (s.BlueScreenModules.Count > 0 && BlueScreenReports.NameModule(s.BlueScreenModules[0].Module) is { IsWindowsItself: false } d)
+            g.Add(d.Group == CauseGroup.Unknown ? CauseGroup.Driver : d.Group);
+        return g.Distinct().ToList();
     }
 
     public const long PageFileMinimumMb = 1024;
@@ -337,24 +386,37 @@ public static class HealthTriage
         }
         if (codes.Contains(FindingCode.HealthStoreAppsDamaged) || codes.Contains(FindingCode.HealthServicesFailing) || codes.Contains(FindingCode.HealthBlueScreens))
             systemRepair = true;
-        var causes = codes.Contains(FindingCode.HealthBlueScreens)
-            ? s.StopCodes.Take(3).Select(c => StopCodes.Meaning(c.Code)?.Category).Where(c => c is not null).Select(c => c!.Value).Distinct().ToList()
-            : new List<StopCategory>();
-        if (codes.Contains(FindingCode.HealthDiskErrors) || causes.Contains(StopCategory.Storage))
+        var causes = codes.Contains(FindingCode.HealthBlueScreens) ? BlueScreenCauseGroups(s) : new List<CauseGroup>();
+        var named = codes.Contains(FindingCode.HealthBlueScreens) && s.BlueScreenModules.Count > 0 ? BlueScreenReports.NameModule(s.BlueScreenModules[0].Module) : null;
+        if (codes.Contains(FindingCode.HealthDiskErrors) || causes.Contains(CauseGroup.Disk))
             r.Add(Admin("scan_disk", "disk.scan", "AutoFix Scout can ask Windows to scan the drive for file system errors while you keep working.", "C"));
-        if (causes.Contains(StopCategory.Memory))
+        if (causes.Contains(CauseGroup.Memory))
             r.Add(new("memory_diagnostic", "ui.human_step", 0,
                 "Faulty memory (RAM) can cause these blue screens. Please save your work, then press the Windows key and R together, type \"mdsched.exe\", and select \"OK\". " +
                 "Choose \"Restart now and check for problems\". The computer restarts, and the Windows Memory Diagnostic test takes several minutes. " +
                 "Windows shows the result after it starts again. AutoFix Scout does not start the Windows Memory Diagnostic."));
-        if (causes.Contains(StopCategory.Graphics) || causes.Contains(StopCategory.Driver))
+        if (named is { IsWindowsItself: false })
+            r.Add(new("bluescreen_named_driver", "ui.human_step", 0,
+                named.Display.Equals(named.Module, StringComparison.OrdinalIgnoreCase)
+                    ? $"Windows named the file \"{named.Module}\" as the cause. Please find out which program or device it belongs to, then update or reinstall that program or driver. If it belongs to a program that is no longer needed, please uninstall the program."
+                    : $"Windows named the {named.Display} (\"{named.Module}\") as the cause. Please update that driver, or reinstall it if it is already up to date. The newest version is available through Windows Update or from the web site of its maker."));
+        if (causes.Contains(CauseGroup.Graphics) || causes.Contains(CauseGroup.Driver))
             r.Add(new("bluescreen_driver_updates", "ui.open_settings_page", 0,
                 "AutoFix Scout will open \"Windows Update\". Please select \"Check for updates\", then \"Advanced options\", then \"Optional updates\", then \"Driver updates\", and install any driver offered" +
-                (causes.Contains(StopCategory.Graphics) ? ", in particular a display driver." : "."), "windowsupdate"));
-        if (causes.Contains(StopCategory.Driver))
+                (causes.Contains(CauseGroup.Graphics) ? ", in particular a display driver." : "."), "windowsupdate"));
+        if (causes.Contains(CauseGroup.Driver))
             r.Add(new("bluescreen_driver_maker", "ui.human_step", 0,
                 "If Windows Update offers no driver, please open the support web site of the computer's maker, search for the model, and download the newest drivers for Windows, starting with the chipset, storage and network drivers. " +
                 "Run the installers, then restart the computer. AutoFix Scout does not install drivers from other sources."));
+        if (causes.Contains(CauseGroup.Graphics))
+            r.Add(GraphicsTriage.CleanDriverRung());
+        if (causes.Contains(CauseGroup.Hardware))
+        {
+            r.Add(PerfTriage.CoolingRung());
+            r.Add(new("bluescreen_hardware_settings", "ui.human_step", 0,
+                "The computer's hardware reported an error that could not be corrected. If the processor, memory or graphics card has been overclocked, please return it to the standard settings. " +
+                "Please also use the charger that came with the computer, and restart it after the change. If the blue screens continue, a repair shop should check the computer, because a part may be failing."));
+        }
         if (codes.Contains(FindingCode.HealthPageFileTooSmall))
         {
             r.Add(Admin("pagefile_automatic", "system.pagefile_auto",
