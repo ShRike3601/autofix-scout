@@ -23,7 +23,7 @@ Many new checks only explain what to do. The next step is safe, undoable fixes f
 8. Browser problems: unwanted search engine or start page, extensions installed by programs, policy hijacks (read-only
    first, then reset per browser).
 9. Sound crackles and drop-outs: check for high DPC latency and the drivers that cause it.
-10. DNS check: compare the current DNS server with two public ones and offer a faster one (the person chooses).
+10. DNS check: compare the current DNS server with two public ones and offer a faster one (the person chooses). [DONE, read-only, inside the connection quality check]
 11. Hindi and other languages (all wording is already in one style, which makes translation simpler).
 
 ## Look and feel
