@@ -67,6 +67,26 @@ public sealed class OverclockToolState
     public bool ToolInstalled => AfterburnerInstalled == Tri.Yes || OtherTools.Count > 0;
 }
 
+/// <summary>Windows game settings that commonly cause stutter. Unknown (or null) means "could not be read" and never raises a finding.</summary>
+public sealed class GameSettingsState
+{
+    public Tri GameMode { get; set; } = Tri.Unknown;
+    /// <summary>Hardware-accelerated GPU scheduling: Yes = on (HwSchMode 2), No = off (1).</summary>
+    public Tri HardwareScheduling { get; set; } = Tri.Unknown;
+    /// <summary>File names only (never folders) of games set to the power saving graphics chip.</summary>
+    public IReadOnlyList<string> PowerSavingGames { get; set; } = new List<string>();
+    /// <summary>Windows 11 power mode (overlay) GUID from the performance check's reader; null when not available.</summary>
+    public string? PowerOverlayGuid { get; set; }
+    /// <summary>Running on battery now; null = unknown.</summary>
+    public bool? OnBattery { get; set; }
+    /// <summary>"Optimizations for windowed games": Yes = on, No = turned off, Unknown = no saved value.</summary>
+    public Tri WindowedOptimisations { get; set; } = Tri.Unknown;
+    public Tri VariableRefresh { get; set; } = Tri.Unknown;
+    /// <summary>Xbox Game Bar background recording is switched on.</summary>
+    public Tri BackgroundRecording { get; set; } = Tri.Unknown;
+    public long? TotalRamBytes { get; set; }
+}
+
 /// <summary>probe.graphics. Null or Unknown means "could not be read", never "fine".</summary>
 public sealed class GraphicsState
 {
@@ -82,6 +102,7 @@ public sealed class GraphicsState
     public Tri IsDesktop { get; set; } = Tri.Unknown;
     /// <summary>Graphics driver resets in the last 14 days (shared reader with the health check).</summary>
     public int GraphicsResets { get; set; }
+    public GameSettingsState Games { get; set; } = new();
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
 
     public GpuInfo? Dedicated => Gpus.FirstOrDefault(g => g.Kind == GpuKind.Dedicated);

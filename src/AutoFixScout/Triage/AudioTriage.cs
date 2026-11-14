@@ -390,4 +390,11 @@ public enum FindingCode
     NetQualityInternetUnclear,
     NetQualitySteady,
     NetQualityNotMeasurable,
+    // Windows game settings (Graphics area)
+    GameSetGameModeOff,
+    GameSetHardwareSchedulingOff,
+    GameSetGameOnPowerSaving,
+    GameSetPowerEfficiencyPluggedIn,
+    GameSetWindowedOptimisationsOff,
+    GameSetBackgroundRecording,
 }

@@ -77,6 +77,8 @@ public static class GraphicsTriage
                 "Resizable BAR is switched off. Some newer games run a little faster with it. This is a setting in the BIOS, and not every computer supports it.",
                 $"BAR1 total={s.Bar1TotalMiB} MiB"));
 
+        AddGameSettings(f, s);
+
         if (!tools.OverclockActive && tools.ToolInstalled && f.All(x => x.Code is FindingCode.GpuResizableBarOff or FindingCode.GpuDriverOld))
             f.Add(F(FindingCode.GpuOverclockToolInstalled,
                 "A graphics tuning tool is installed (" + string.Join(", ", ToolNames(tools)) + "). Such tools can change the speed and voltage of the graphics card.",
@@ -91,6 +93,77 @@ public static class GraphicsTriage
                     $"gpus={s.Gpus.Count} nvidia={s.Nvidia.Count} resets={s.GraphicsResets}"));
         }
         return f;
+    }
+
+    /// <summary>A computer with at most this much memory counts as weaker for game recording (8 GiB plus room for reserved memory).</summary>
+    public const long WeakRamBytes = 9L * 1024 * 1024 * 1024;
+
+    private static string Quoted(IEnumerable<string> names) => string.Join(", ", names.Select(n => $"\"{n}\""));
+
+    /// <summary>Windows game settings. Only settings that were read and are clearly set the wrong way raise a finding; Unknown never does.</summary>
+    private static void AddGameSettings(List<Finding> f, GraphicsState s)
+    {
+        var g = s.Games;
+        var dedicated = s.Dedicated;
+        if (g.GameMode == Tri.No)
+            f.Add(F(FindingCode.GameSetGameModeOff,
+                "Game Mode is turned off in Windows. Some games run more smoothly with it turned on.", "AutoGameModeEnabled=0"));
+
+        bool schedulingCard = dedicated != null && (dedicated.IsNvidia || dedicated.Name.Contains("Radeon", StringComparison.OrdinalIgnoreCase) || dedicated.Name.Contains("AMD", StringComparison.OrdinalIgnoreCase));
+        if (g.HardwareScheduling == Tri.No && schedulingCard)
+            f.Add(F(FindingCode.GameSetHardwareSchedulingOff,
+                "The Windows setting \"Hardware-accelerated GPU scheduling\" is turned off. Some games run more smoothly with it turned on.", "HwSchMode=1"));
+
+        if (g.PowerSavingGames.Count > 0 && s.IsDesktop == Tri.No && dedicated != null)
+        {
+            var one = g.PowerSavingGames.Count == 1;
+            f.Add(F(FindingCode.GameSetGameOnPowerSaving,
+                one ? $"The game \"{g.PowerSavingGames[0]}\" is set to use the power-saving graphics chip instead of the graphics card."
+                    : $"The games {Quoted(g.PowerSavingGames)} are set to use the power-saving graphics chip instead of the graphics card.",
+                $"GpuPreference=1 for {g.PowerSavingGames.Count} game(s): {string.Join(", ", g.PowerSavingGames)}; dedicated '{dedicated.Name}'"));
+        }
+
+        if (g.OnBattery == false && string.Equals(g.PowerOverlayGuid, PerfTriage.OverlayBestEfficiencyGuid, StringComparison.OrdinalIgnoreCase))
+            f.Add(F(FindingCode.GameSetPowerEfficiencyPluggedIn,
+                "The Windows power mode is set to \"Best power efficiency\" while the computer is plugged in. Games can run more slowly in this mode.",
+                $"overlay={g.PowerOverlayGuid} onBattery=false"));
+
+        var off = new List<string>();
+        if (g.WindowedOptimisations == Tri.No) off.Add("Optimizations for windowed games");
+        if (g.VariableRefresh == Tri.No) off.Add("Variable refresh rate");
+        if (off.Count > 0)
+            f.Add(F(FindingCode.GameSetWindowedOptimisationsOff,
+                off.Count == 1
+                    ? $"The Windows setting \"{off[0]}\" is turned off. Some games run more smoothly with it turned on."
+                    : $"The Windows settings \"{off[0]}\" and \"{off[1]}\" are turned off. Some games run more smoothly with them turned on.",
+                $"windowed={g.WindowedOptimisations} vrr={g.VariableRefresh}"));
+
+        if (g.BackgroundRecording == Tri.Yes && g.TotalRamBytes is > 0 and <= WeakRamBytes)
+            f.Add(F(FindingCode.GameSetBackgroundRecording,
+                "The Xbox Game Bar is recording gameplay in the background. On a computer with little memory, this can make games run more slowly.",
+                $"GameDVR_Enabled=1 AppCaptureEnabled=1 HistoricalCaptureEnabled=1 ram={g.TotalRamBytes / 1048576} MB"));
+    }
+
+    private static void AddGameRungs(List<Rung> rungs, HashSet<FindingCode> codes)
+    {
+        if (codes.Contains(FindingCode.GameSetGameModeOff))
+            rungs.Add(new("gpu_game_mode", "ui.open_settings_page", 0,
+                "AutoFix Scout will open the \"Game Mode\" settings. Please turn on \"Game Mode\". You can turn it off again at any time.", "gaming"));
+        if (codes.Contains(FindingCode.GameSetGameOnPowerSaving))
+            rungs.Add(new("gpu_game_preference", "ui.human_step", 0,
+                "Please open the \"Graphics\" settings, select the game in the list, and select \"Options\". Choose \"High performance\" and select \"Save\". You can change this again at any time."));
+        var defaults = new List<string>();
+        if (codes.Contains(FindingCode.GameSetHardwareSchedulingOff)) defaults.Add("\"Hardware-accelerated GPU scheduling\"");
+        if (codes.Contains(FindingCode.GameSetWindowedOptimisationsOff)) defaults.Add("\"Optimizations for windowed games\" and \"Variable refresh rate\"");
+        if (defaults.Count > 0)
+            rungs.Add(new("gpu_default_graphics", "ui.human_step", 0,
+                "Please open the \"Graphics\" settings and select \"Change default graphics settings\". There you can turn on " + string.Join(" and ", defaults) +
+                ". Windows may ask you to restart the computer."));
+        if (codes.Contains(FindingCode.GameSetPowerEfficiencyPluggedIn))
+            rungs.Add(PerfTriage.PowerModeRung());
+        if (codes.Contains(FindingCode.GameSetBackgroundRecording))
+            rungs.Add(new("gpu_game_capture", "ui.open_settings_page", 0,
+                "AutoFix Scout will open the \"Captures\" settings. Please turn off \"Record what happened\". You can turn it on again at any time.", "capture"));
     }
 
     private static IEnumerable<string> ToolNames(OverclockToolState t)
@@ -143,6 +216,7 @@ public static class GraphicsTriage
             rungs.Add(new("gpu_enable_rebar", "ui.human_step", 0,
                 "Resizable BAR is switched on in the BIOS. Please restart the computer and open the BIOS setup. Turn on \"Above 4G Decoding\" and \"Re-Size BAR Support\", and turn off \"CSM\". " +
                 "The names differ by maker, and an update of the motherboard BIOS may be needed first. A helper can do this with you."));
+        AddGameRungs(rungs, codes);
         rungs.Add(new("gpu_settings", "ui.open_settings_page", 0,
             "AutoFix Scout will open the \"Graphics\" settings. There you can choose which graphics card each game uses.", "graphics"));
         return rungs;
