@@ -29,4 +29,4 @@ Many new checks only explain what to do. The next step is safe, undoable fixes f
 ## Look and feel
 12. Light theme with glass, and a high-contrast pass with a screen reader.
 13. A small tray icon that shows the Wi-Fi watcher and weekly check-up state.
-14. A search box that also finds settings and history entries (Ctrl+K).
+14. A search box that also finds settings and history entries (Ctrl+K). [Settings DONE; history entries still open]
