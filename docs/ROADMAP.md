@@ -10,13 +10,13 @@ Many new checks only explain what to do. The next step is safe, undoable fixes f
    card, turn off background recording. [done on branch g21-gamefix: games.game_mode_on, games.use_graphics_card, games.background_recording_off, undo from History]
 2. Driver updates from Windows Update for old Wi-Fi and graphics drivers (the executor already talks to Windows
    Update for drivers), with the existing driver save point and automatic undo.
-3. Start-up clean-up driven by the measured boot data: offer to switch off the apps Windows named as slow.
+3. Start-up clean-up driven by the measured boot data: offer to switch off the apps Windows named as slow. [DONE]
 4. Component store clean-up (DISM /StartComponentCleanup) for a full drive, through the elevated helper.
 
 ## Trust and support
 5. AutoFix Scout's own problem log: unexpected errors in the app itself are written to a local log and included in the
    helper report, so testers' problems can be fixed. [DONE, merged into next]
-6. A "beta" update channel in Settings for friends who test early builds (pre-releases).
+6. A "beta" update channel in Settings for friends who test early builds (pre-releases). [DONE: "Get test versions early"; publish with a tag like v0.4.0-beta.1]
 7. Code signing (SignPath Foundation, applied for) so Smart App Control stops blocking the installer.
 
 ## Wider coverage
