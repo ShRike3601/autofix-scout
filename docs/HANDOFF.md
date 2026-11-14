@@ -550,3 +550,20 @@ Next (owner's requests, in order):
    motion, activity list unfolded by default, clear history, open data folder.
 4. Build, test, screenshots; then ask the owner 0.3.1 vs 0.4.0 (UI + activity feed + Afterburner fix => 0.4.0
    recommended); check the UI session has nothing to push; release; then propose next-release ideas.
+- 2026-11-14 07:03 IST: v0.3.1 released (owner chose 0.3.1 over 0.4.0). PR 14 merged.
+
+## Ideas for the next release (proposed 2026-11-14; owner said keep working, stop before the 11:30 reset)
+Capabilities:
+- Battery health (laptops): design vs full-charge capacity and cycle count (powercfg /batteryreport /xml, read-only),
+  plain wear level and advice. [started: agent g13-battery]
+- Connection quality: latency, jitter and packet loss to the gateway and to the internet, separately for Wi-Fi, so
+  "internet is slow / games lag online" gets an answer (Wi-Fi vs provider). [started: agent g14-netquality]
+- Blue screen explainer: stop code + the driver named in the crash report, in plain words, with what to do.
+- Drive wear: SSD wear %, temperature and read errors from the storage reliability counters.
+- Slow start-up through the elevated helper (the boot-time log needs admin).
+- Game settings check: Game Mode, hardware-accelerated GPU scheduling, variable refresh rate, per-game GPU choice.
+Quality of life:
+- Keyboard shortcuts: Ctrl+K search, Ctrl+, settings, Esc back. Remember window size and position. [started here]
+- Optional weekly check-up from the tray, with a notification only when something is wrong.
+- Save a report as a file (HTML) to send to a helper.
+- First-run tour (three short cards) for new users.
