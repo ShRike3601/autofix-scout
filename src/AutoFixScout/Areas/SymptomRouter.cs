@@ -57,7 +57,7 @@ public static partial class SymptomRouter
                    new[] { "office", "word", "excel", "outlook", "powerpoint", "onenote" }),
         ("store", new[] { "microsoft store", "windows store", "app store", "store won", "store not", "cannot install apps", "can't install apps", "apps not downloading", "download pending" },
                   new[] { "store", "install", "installing", "download", "downloading" }),
-        ("power", new[] { "battery drains", "battery dies", "battery life", "battery not charging", "won't sleep", "wont sleep", "will not sleep", "wakes up by itself", "turns on by itself", "won't shut down", "fast startup" },
+        ("power", new[] { "battery drains", "battery drains fast", "battery health", "battery worn", "battery dies", "battery life", "battery not charging", "won't sleep", "wont sleep", "will not sleep", "wakes up by itself", "turns on by itself", "won't shut down", "fast startup" },
                   new[] { "battery", "charging", "sleep", "hibernate", "power", "shut down", "shutdown" }),
         ("input", new[] { "touchpad not", "trackpad not", "keyboard not", "mouse not", "keys not working", "sticky keys", "filter keys", "typing wrong", "wrong characters", "wrong letters", "keyboard layout", "wrong language", "symbols wrong", "cursor not moving", "mouse pointer" },
                   new[] { "keyboard", "touchpad", "trackpad", "mouse", "cursor", "typing", "keys" }),

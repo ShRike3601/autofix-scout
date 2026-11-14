@@ -379,4 +379,9 @@ public enum FindingCode
     StressGpuClocksLow,
     StressStoppedForSafety,
     StressNotRun,
+    // Battery health from the capacity report (Power area)
+    PowerBatteryWornOut,
+    PowerBatteryAgeing,
+    PowerBatteryManyCycles,
+    PowerBatteryReportUnreadable,
 }

@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using AutoFixScout.Probes;
 
 namespace AutoFixScout.Triage;
 
@@ -21,6 +22,10 @@ public sealed class PowerState
     /// <summary>True when the person reports problems after shutting down or starting up.</summary>
     public bool ReportsShutdownProblems { get; set; }
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
+    /// <summary>The parsed battery capacity report (powercfg /batteryreport /xml). Null when it was not read or not readable.</summary>
+    public BatteryReportData? BatteryReport { get; set; }
+    /// <summary>True when this computer has a battery but its capacity report could not be read.</summary>
+    public bool BatteryReportFailed { get; set; }
 
     public double? WearPercentOfDesign =>
         DesignCapacity is > 0 && FullChargeCapacity is > 0 ? Math.Round(100.0 * FullChargeCapacity.Value / DesignCapacity.Value, 1) : null;
@@ -34,6 +39,19 @@ public static class PowerTriage
     public const string UltimateGuid = "e9a42b02-d5df-448d-aa00-03f14749eb61";
     /// <summary>Wakes in 7 days at or above which the computer counts as waking up by itself often.</summary>
     public const int OftenWakes = 7;
+
+    /// <summary>Wear (1 - full charge / design capacity, in percent) at or above which the battery should be replaced.</summary>
+    public const double WornOutWearPercent = 40;
+    /// <summary>Wear at or above which the battery counts as ageing (information only).</summary>
+    public const double AgeingWearPercent = 20;
+    /// <summary>Charge cycles above which the battery counts as heavily used.</summary>
+    public const int ManyCycles = 800;
+
+    /// <summary>"; full charge 52000 mWh on 2025-01-05, 47000 mWh now" from the oldest and newest history entries (numbers and dates only).</summary>
+    private static string TrendDetail(BatteryReportData r) =>
+        r.History.Count >= 2
+            ? $"; history {r.History[0].FullChargeCapacity} mWh on {r.History[0].Start:yyyy-MM-dd}, {r.History[^1].FullChargeCapacity} mWh on {r.History[^1].Start:yyyy-MM-dd}"
+            : "";
 
     private static Finding F(FindingCode code, string plain, string detail) => new(code, plain, detail);
 
@@ -67,7 +85,21 @@ public static class PowerTriage
         if (s.ProbeErrors.Count > 0 && s.ActiveSchemeGuid is null && s.WakeSources.Count == 0 && !s.HasBattery)
             return new[] { F(FindingCode.ProbeIncomplete, "AutoFix Scout could not complete the check.", string.Join("; ", s.ProbeErrors)) };
         var f = new List<Finding>();
-        if (s.HasBattery && s.WearPercentOfDesign is { } wear)
+        var report = s.HasBattery ? s.BatteryReport : null;
+        if (report?.WearPercent is { } rw)
+        {
+            var held = Math.Round(100 - rw, MidpointRounding.AwayFromZero);
+            var detail = $"full charge {report.FullTotal} of design {report.DesignTotal} mWh (wear {rw:0.#}%){(report.MaxCycles is { } cc ? $"; cycles {cc}" : "")}{TrendDetail(report)}";
+            if (rw >= WornOutWearPercent)
+                f.Add(F(FindingCode.PowerBatteryWornOut, $"The battery can now hold {held:0} percent of the charge it held when it was new. It is worn out and should be replaced.", detail));
+            else if (rw >= AgeingWearPercent)
+                f.Add(F(FindingCode.PowerBatteryAgeing, $"The battery can now hold {held:0} percent of the charge it held when it was new. This is normal ageing, and the battery runs out somewhat sooner than before.", detail));
+            if (report.MaxCycles is > ManyCycles and { } cycles)
+                f.Add(F(FindingCode.PowerBatteryManyCycles, $"The battery has been through about {cycles} charge cycles, which is more than most batteries are designed for.", $"cycle count {cycles}"));
+        }
+        else if (s.HasBattery && s.BatteryReportFailed)
+            f.Add(F(FindingCode.PowerBatteryReportUnreadable, "AutoFix Scout could not read the battery report from Windows, so the battery wear could not be measured.", "powercfg /batteryreport failed or returned no usable capacity"));
+        if (report?.WearPercent is null && s.HasBattery && s.WearPercentOfDesign is { } wear)
         {
             if (wear < 60)
                 f.Add(F(FindingCode.PowerBatteryReplace, $"The battery has worn out. It now holds only about {wear:0} percent of the charge it held when new, so it needs replacing.",
@@ -91,7 +123,7 @@ public static class PowerTriage
         if (f.Count > 0) return f;
         return new[] { F(FindingCode.LooksNormal,
             s.HasBattery ? "The battery and the power settings look normal." : "This computer has no battery, and its power settings look normal.",
-            $"scheme {s.ActiveSchemeGuid}; wear {(s.WearPercentOfDesign?.ToString("0.#") ?? "unknown")}") };
+            $"scheme {s.ActiveSchemeGuid}; wear {(s.BatteryReport?.WearPercent ?? (s.WearPercentOfDesign is { } w ? 100 - w : (double?)null))?.ToString("0.#") ?? "unknown"}") };
     }
 
     public static IReadOnlyList<Rung> Ladder(PowerState s, IReadOnlyList<Finding> findings)
@@ -110,6 +142,17 @@ public static class PowerTriage
         if (codes.Contains(FindingCode.PowerWakesOften))
             r.Add(new("check_wake_causes", "ui.human_step", 0,
                 "Open the Windows search, type \"Device Manager\", open it, and for the network adapter and the mouse open \"Properties\", \"Power Management\" and clear \"Allow this device to wake the computer\" where it is not needed."));
+        var batteryCodes = new[] { FindingCode.PowerBatteryWornOut, FindingCode.PowerBatteryAgeing, FindingCode.PowerBatteryManyCycles };
+        if (s.HasBattery && batteryCodes.Any(codes.Contains))
+            r.Add(new("reduce_battery_drain", "ui.human_step", 0,
+                "To make the battery last longer, lower the screen brightness, turn on Battery Saver when the charge is low, and close programs that are not needed. " +
+                "The Windows page for battery use shows which programs use the most."));
+        if (codes.Contains(FindingCode.PowerBatteryWornOut) || codes.Contains(FindingCode.PowerBatteryManyCycles))
+            r.Add(new("replace_battery", "ui.human_step", 0,
+                "A battery that has lost this much of its capacity cannot be restored. The computer maker or a repair shop can replace it. Please ask for a battery made for this exact computer model."));
+        if (codes.Contains(FindingCode.PowerBatteryAgeing) && !codes.Contains(FindingCode.PowerBatteryWornOut))
+            r.Add(new("battery_replace_later", "ui.human_step", 0,
+                "No action is needed yet. If the battery later becomes too short-lived for daily use, the computer maker or a repair shop can replace it."));
         if (s.FastStartup == true)
             r.Add(new("fast_startup_off", "ui.human_step", 0,
                 "To switch Fast Startup off, open the Windows search, type \"Control Panel\", open \"Hardware and Sound\", \"Power Options\", \"Choose what the power buttons do\", " +
@@ -118,7 +161,7 @@ public static class PowerTriage
     }
 
     public static string? NotFixedHint(IReadOnlyList<Finding> after) =>
-        after.Any(x => x.Code is FindingCode.PowerBatteryReplace or FindingCode.PowerBatteryWorn)
+        after.Any(x => x.Code is FindingCode.PowerBatteryReplace or FindingCode.PowerBatteryWorn or FindingCode.PowerBatteryWornOut or FindingCode.PowerBatteryManyCycles)
             ? "A worn battery cannot be repaired by settings. A replacement battery from the maker or a repair shop is the lasting solution."
             : "If the battery still drains quickly or the computer still wakes by itself, the person helping you can check the wake timers and the programs that keep the computer awake. This needs administrator rights.";
 }

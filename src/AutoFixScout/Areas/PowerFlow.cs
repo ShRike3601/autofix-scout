@@ -26,8 +26,9 @@ public static class PowerFlow
         var s = new PowerState();
         var errors = new List<string>();
         void Part(string name, Action a) { try { a(); } catch (Exception ex) { errors.Add($"{name}: {ex.Message}"); } }
-        Activity.Report(ActivityKind.Analyze, "Reading battery, power plan, sleep settings and wake events");
+        Activity.Report(ActivityKind.Analyze, "Reading battery, battery report, power plan, sleep settings and wake events");
         Part("battery", () => ReadBattery(s));
+        Part("battery report", () => ReadBatteryReport(s));
         Part("power plan", () => s.ActiveSchemeGuid = PowerTriage.ParseActiveScheme(Powercfg("/getactivescheme")));
         Part("sleep timeouts", () =>
         {
@@ -47,17 +48,37 @@ public static class PowerFlow
         return k?.GetValue(name) is int i ? i : null;
     }
 
-    internal static string Powercfg(string args)
+    internal static string Powercfg(string args, string? shown = null)
     {
         var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "powercfg.exe"), args)
         { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-        Commands.Running("powercfg.exe", args.StartsWith("/query") ? "/query (power settings of the active plan)" : args);
+        Commands.Running("powercfg.exe", shown ?? (args.StartsWith("/query") ? "/query (power settings of the active plan)" : args));
         using var p = Process.Start(psi)!;
         var o = p.StandardOutput.ReadToEndAsync();
         _ = p.StandardError.ReadToEndAsync();
         if (!p.WaitForExit(30_000)) { try { p.Kill(true); } catch { } throw new TimeoutException("powercfg timed out"); }
         if (p.ExitCode != 0) throw new InvalidOperationException($"powercfg {args} exit {p.ExitCode}");
         return o.Result;
+    }
+
+    /// <summary>
+    /// Reads the capacity report of the battery: "powercfg /batteryreport /xml" (no administrator rights needed) into a temporary file,
+    /// parsed by <see cref="BatteryReportParser"/>, then deleted. Only computers with a battery run it. Never throws.
+    /// </summary>
+    internal static void ReadBatteryReport(PowerState s, Func<string, string>? runReport = null)
+    {
+        if (!s.HasBattery) return;
+        var path = Path.Combine(Path.GetTempPath(), "afs-battery-" + Guid.NewGuid().ToString("N") + ".xml");
+        try
+        {
+            if (runReport is null) Powercfg($"/batteryreport /xml /output \"{path}\"", "/batteryreport /xml (battery capacity report, saved to a temporary file)");
+            else runReport(path);
+            Activity.Report(ActivityKind.Files, "Reading the temporary battery report, then deleting it");
+            s.BatteryReport = BatteryReportParser.Parse(File.Exists(path) ? File.ReadAllText(path) : null);
+        }
+        catch (Exception) { s.BatteryReport = null; }
+        finally { try { if (File.Exists(path)) File.Delete(path); } catch (Exception) { } }
+        s.BatteryReportFailed = s.BatteryReport?.WearPercent is null;
     }
 
     private static void ReadBattery(PowerState s)
