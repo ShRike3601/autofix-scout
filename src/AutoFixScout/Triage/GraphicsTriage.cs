@@ -144,8 +144,26 @@ public static class GraphicsTriage
                 $"GameDVR_Enabled=1 AppCaptureEnabled=1 HistoricalCaptureEnabled=1 ram={g.TotalRamBytes / 1048576} MB"));
     }
 
-    private static void AddGameRungs(List<Rung> rungs, HashSet<FindingCode> codes)
+    /// <summary>At most this many games get their own one-click rung (each one is a separate approval).</summary>
+    public const int MaxGameFixes = 3;
+
+    private static void AddGameRungs(List<Rung> rungs, HashSet<FindingCode> codes, IReadOnlyList<string> games)
     {
+        // One-click fixes first (the person's own settings, undoable from History); the advice rungs stay as the fallback.
+        if (codes.Contains(FindingCode.GameSetGameModeOff))
+            rungs.Add(new("gpu_game_mode_fix", Repair.GameFixes.GameModeAction, 1,
+                "AutoFix Scout will switch Game Mode on. This can be undone from History."));
+        if (codes.Contains(FindingCode.GameSetGameOnPowerSaving))
+        {
+            var fixable = games.Where(Repair.GameFixes.IsValidExeName).Take(MaxGameFixes).ToList();
+            for (var i = 0; i < fixable.Count; i++)
+                rungs.Add(new($"gpu_game_preference_fix_{i + 1}", Repair.GameFixes.GraphicsCardAction, 1,
+                    $"AutoFix Scout will set the game \"{fixable[i]}\" to use the graphics card. This can be undone from History.", fixable[i]));
+        }
+        if (codes.Contains(FindingCode.GameSetBackgroundRecording))
+            rungs.Add(new("gpu_game_capture_fix", Repair.GameFixes.RecordingAction, 1,
+                "AutoFix Scout will turn off background recording in the Xbox Game Bar. This can be undone from History."));
+
         if (codes.Contains(FindingCode.GameSetGameModeOff))
             rungs.Add(new("gpu_game_mode", "ui.open_settings_page", 0,
                 "AutoFix Scout will open the \"Game Mode\" settings. Please turn on \"Game Mode\". You can turn it off again at any time.", "gaming"));
@@ -216,7 +234,7 @@ public static class GraphicsTriage
             rungs.Add(new("gpu_enable_rebar", "ui.human_step", 0,
                 "Resizable BAR is switched on in the BIOS. Please restart the computer and open the BIOS setup. Turn on \"Above 4G Decoding\" and \"Re-Size BAR Support\", and turn off \"CSM\". " +
                 "The names differ by maker, and an update of the motherboard BIOS may be needed first. A helper can do this with you."));
-        AddGameRungs(rungs, codes);
+        AddGameRungs(rungs, codes, s.Games.PowerSavingGames);
         rungs.Add(new("gpu_settings", "ui.open_settings_page", 0,
             "AutoFix Scout will open the \"Graphics\" settings. There you can choose which graphics card each game uses.", "graphics"));
         return rungs;
