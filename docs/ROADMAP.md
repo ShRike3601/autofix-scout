@@ -20,7 +20,7 @@ Many new checks only explain what to do. The next step is safe, undoable fixes f
 7. Code signing (SignPath Foundation, applied for) so Smart App Control stops blocking the installer.
 
 ## Wider coverage
-8. Browser problems: unwanted search engine or start page, extensions installed by programs, policy hijacks (read-only
+8. [DONE for Chrome and Edge, read-only; Firefox and automatic resets still open] Browser problems: unwanted search engine or start page, extensions installed by programs, policy hijacks (read-only
    first, then reset per browser).
 9. Sound crackles and drop-outs: check for high DPC latency and the drivers that cause it.
 10. DNS check: compare the current DNS server with two public ones and offer a faster one (the person chooses). [DONE, read-only, inside the connection quality check]

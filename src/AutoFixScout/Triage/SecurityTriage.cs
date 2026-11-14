@@ -64,6 +64,8 @@ public sealed class SecurityState
     internal IReadOnlyList<BrowserPolicies.Flag> BrowserPolicyFlags { get; set; } = new List<BrowserPolicies.Flag>();
     /// <summary>The computer belongs to a domain or Azure AD: browser policies are then expected, and are not removed.</summary>
     public bool ManagedPc { get; set; }
+    /// <summary>Search engine, start pages and extensions of Chrome and Edge (hosts and ids only), read by <see cref="BrowserHijackScan"/>. Null when not read.</summary>
+    internal BrowserHijackState? BrowserHijack { get; set; }
 
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
 }
@@ -82,6 +84,51 @@ public static class SecurityTriage
 
     /// <summary>Security Center productState, bits 4-7: 0 = definitions up to date.</summary>
     public static bool IsUpToDate(int state) => ((state >> 4) & 0xF) == 0;
+
+    public static readonly FindingCode[] BrowserHijackCodes =
+    {
+        FindingCode.BrowserSearchHijacked, FindingCode.BrowserStartPageHijacked, FindingCode.BrowserForcedExtensions, FindingCode.BrowserExternalExtensions,
+    };
+
+    private const string NotInBrowser = " This was not done in the browser itself.";
+
+    private static string Cap(string p) => char.ToUpperInvariant(p[0]) + p[1..];
+
+    /// <summary>
+    /// Findings of the browser hijack scan. Only on a computer that is not managed by an organization. Plain texts name hosts
+    /// and extension ids only, never a path, a query or a user name.
+    /// </summary>
+    internal static IReadOnlyList<Finding> BrowserHijackFindings(BrowserHijackState? b)
+    {
+        var f = new List<Finding>();
+        if (b is null || b.Managed) return f;
+        static string Sentence(HijackHost h) =>
+            $"A program has set the {h.Setting} of {BrowserHijackScan.BrowserName(h.Browser)} to \"{BrowserHijackScan.Shown(h.Host)}\".";
+        static string Tech(IEnumerable<HijackHost> hs) => string.Join("; ", hs.Select(h => $"{h.Browser} {h.Setting}: {h.Host}"));
+        if (b.SearchHosts.Count > 0)
+            f.Add(F(FindingCode.BrowserSearchHijacked, string.Join(" ", b.SearchHosts.Take(3).Select(Sentence)) + NotInBrowser, Tech(b.SearchHosts)));
+        if (b.StartHosts.Count > 0)
+            f.Add(F(FindingCode.BrowserStartPageHijacked, string.Join(" ", b.StartHosts.Take(3).Select(Sentence)) + NotInBrowser, Tech(b.StartHosts)));
+        if (b.Forced.Count > 0 || b.InstallSources.Count > 0)
+        {
+            var parts = new List<string>();
+            foreach (var g in b.Forced.GroupBy(x => x.Browser))
+                parts.Add($"{BrowserHijackScan.BrowserName(g.Key)} has {g.Count()} {(g.Count() == 1 ? "extension" : "extensions")} installed by a program, not by you: {string.Join(", ", g.Take(5).Select(x => x.Id))}");
+            foreach (var g in b.InstallSources.GroupBy(x => x.Browser))
+                parts.Add($"{BrowserHijackScan.BrowserName(g.Key)} may install extensions from {string.Join(", ", g.Take(3).Select(x => $"\"{BrowserHijackScan.Shown(x.Host)}\""))}, as set by a program");
+            f.Add(F(FindingCode.BrowserForcedExtensions, string.Join(". ", parts.Select(Cap)) + ".",
+                string.Join("; ", b.Forced.Select(x => $"{x.Browser} forced {x.Id}").Concat(b.InstallSources.Select(x => $"{x.Browser} install source {x.Host}")))));
+        }
+        if (b.External.Count > 0)
+        {
+            var parts = b.External.GroupBy(x => x.Browser).Select(g =>
+                $"{BrowserHijackScan.BrowserName(g.Key)} has {g.Count()} {(g.Count() == 1 ? "extension" : "extensions")} added by a program through Windows: {string.Join(", ", g.Take(5).Select(x => x.UpdateHost is null ? x.Id : $"{x.Id} from \"{BrowserHijackScan.Shown(x.UpdateHost)}\""))}");
+            f.Add(F(FindingCode.BrowserExternalExtensions,
+                string.Join(". ", parts.Select(Cap)) + ". Some of these extensions are wanted, so please check that you recognize them.",
+                string.Join("; ", b.External.Select(x => $"{x.Browser} {x.Id} update host {x.UpdateHost ?? "(none)"}"))));
+        }
+        return f;
+    }
 
     private static Finding F(FindingCode code, string plain, string detail) => new(code, plain, detail);
 
@@ -185,6 +232,8 @@ public static class SecurityTriage
                     $"A program has taken control of browser settings in {browsers}, such as the home page, the search engine, the proxy server or added extensions. The browser may show \"Managed by your organization\".",
                     BrowserPolicies.Summary(s.BrowserPolicyFlags)));
         }
+
+        f.AddRange(BrowserHijackFindings(s.BrowserHijack));
 
         var removed = ThreatHistory.RemovedCount(s.Threats);
         var removedFinding = removed > 0
@@ -293,6 +342,17 @@ public static class SecurityTriage
                 "If a rule is still listed, select \"Reload policies\" on that page."));
         }
 
+        if (codes.Overlaps(BrowserHijackCodes))
+        {
+            // Policy-based findings come with SecurityBrowserPolicy, whose removal step above backs up first and is the only writer.
+            r.Add(new("browser_reset_settings", "ui.human_step", 0,
+                "Please open the settings of the browser: type edge://settings (Microsoft Edge) or chrome://settings (Google Chrome) in the address bar. " +
+                "Then select \"Reset settings\" and \"Restore settings to their default values\". Bookmarks and saved passwords are kept."));
+            r.Add(new("browser_uninstall_unknown", "ui.open_settings_page", 0,
+                "AutoFix Scout will open \"Installed apps\". If a program that you do not recognize was installed shortly before the problem began, please select it and choose \"Uninstall\".",
+                "apps"));
+        }
+
         if (defender && !threatActive)
             r.Add(new("quick_scan", "security.quick_scan", 0,
                 "AutoFix Scout can ask Microsoft Defender to run a quick scan for unwanted software. This takes a few minutes, and you can keep working."));
@@ -335,7 +395,7 @@ public static class SecurityTriage
     {
         FindingCode.SecurityNoAntivirus, FindingCode.SecurityRealTimeOff, FindingCode.SecuritySignaturesOld, FindingCode.SecurityFirewallOff,
         FindingCode.SecuritySmartScreenOff, FindingCode.HealthHostsHijacked, FindingCode.HealthDeadProxy, FindingCode.HealthDeadSystemProxy,
-        FindingCode.SecurityBrowserPolicy,
+        FindingCode.SecurityBrowserPolicy, FindingCode.BrowserSearchHijacked, FindingCode.BrowserStartPageHijacked, FindingCode.BrowserForcedExtensions,
     };
 
     public static bool Resolved(IReadOnlyList<Finding> before, IReadOnlyList<Finding> after) =>

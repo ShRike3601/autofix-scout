@@ -96,6 +96,15 @@ public static class SecurityFlow
             s.BrowserPolicyFlags = flags;
             s.ManagedPc = flags.Count > 0 && BrowserPolicies.IsManagedPc();
         });
+        Part("browser search, start pages and extensions", () =>
+        {
+            Activity.ReadingRegistry("HKCU and HKLM", @"Software\Policies", "(search engine, start pages and forced extensions of Chrome and Edge)");
+            Activity.ReadingRegistry("HKCU and HKLM", @"Software\Google\Chrome\Extensions", "(extensions added through the registry for Chrome and Edge)");
+            var b = BrowserHijackScan.ScanRegistry();
+            s.BrowserHijack = b;
+            Activity.Report(ActivityKind.Analyze,
+                $"Found {b.SearchHosts.Count + b.StartHosts.Count} unusual browser address settings and {b.Forced.Count + b.External.Count} extensions added by programs");
+        });
         s.ProbeErrors = errors;
         return s;
     }
