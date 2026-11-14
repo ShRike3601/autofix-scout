@@ -40,7 +40,7 @@ public partial class MainWindow
         var glass = Check("Frosted glass", s.Glass);
         glass.Click += (_, _) => Change(x => x.Glass = glass.IsChecked == true);
         card.Children.Add(glass);
-        card.Children.Add(Helper("Windows 11 with the dark theme. Turn it off for a solid look or on slower computers."));
+        card.Children.Add(Helper("On Windows 11, in the dark and the light theme. Turn it off for a solid look or on slower computers."));
         var motion = Check("Reduce motion", s.ReduceMotion);
         motion.Margin = new Thickness(0, 12, 0, 0);
         motion.Click += (_, _) => Change(x => x.ReduceMotion = motion.IsChecked == true);
@@ -84,6 +84,20 @@ public partial class MainWindow
         note.Margin = new Thickness(0, 10, 0, 0);
         card.Children.Add(note);
         SettingsBody.Children.Add(Card(card));
+
+        SettingsBody.Children.Add(Section("Keyboard shortcuts"));
+        var keys = new StackPanel();
+        foreach (var (combo, what) in new[] { ("Ctrl + K", "Describe a problem"), ("Ctrl + ,", "Open or close the settings"), ("Ctrl + H", "History"), ("Esc", "Close this panel") })
+        {
+            var line = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
+            var key = Text(combo, "CaptionText");
+            key.Width = 90;
+            DockPanel.SetDock(key, Dock.Left);
+            line.Children.Add(key);
+            line.Children.Add(new TextBlock { Text = what });
+            keys.Children.Add(line);
+        }
+        SettingsBody.Children.Add(Card(keys));
     }
 
     /// <summary>Saves one change, re-applies the look at once, and redraws the panel so the choice shows as selected.</summary>

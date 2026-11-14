@@ -26,6 +26,8 @@ public sealed class UpdateInfo
 public sealed class UpdateService
 {
     public const string LatestReleaseUrl = "https://api.github.com/repos/ShRike3601/autofix-scout/releases/latest";
+    /// <summary>Used instead when the person opted in to test versions: the newest ten releases, pre-releases included.</summary>
+    public const string ReleaseListUrl = "https://api.github.com/repos/ShRike3601/autofix-scout/releases?per_page=10";
     public static readonly TimeSpan MinInterval = TimeSpan.FromHours(6);
     public static readonly TimeSpan ApiTimeout = TimeSpan.FromSeconds(5);
 
@@ -72,15 +74,16 @@ public sealed class UpdateService
             var settings = AppSettings.Load(_dir);
             if (!settings.CheckForUpdates) return null;
             var state = UpdateState.Load(_dir);
-            var due = !_checkedThisRun && (state.LastCheckUtc is null || _now() - state.LastCheckUtc.Value >= MinInterval
+            var due = !_checkedThisRun && (state.LastCheckUtc is null || state.LatestWasBeta != settings.BetaUpdates || _now() - state.LastCheckUtc.Value >= MinInterval
                                            || state.LastCheckUtc.Value > _now());   // a clock set back counts as due
             if (due)
             {
                 _checkedThisRun = true;
-                var fetched = await FetchLatestAsync(ct);
+                var fetched = await FetchLatestAsync(settings.BetaUpdates, ct);
                 if (fetched is not null)
                 {
                     state.Latest = fetched.Value.Info;   // null: no usable release
+                    state.LatestWasBeta = settings.BetaUpdates;
                     state.LastCheckUtc = _now();
                     state.Save(_dir);
                 }
@@ -93,24 +96,28 @@ public sealed class UpdateService
     /// <summary>Whether a found release should be offered to a running build.</summary>
     public static UpdateInfo? Offer(UpdateInfo? latest, AppVersion current, AppSettings settings)
     {
-        if (latest is null || !AppVersion.TryParse(latest.Version, out var v) || v.IsPrerelease) return null;
+        if (latest is null || !AppVersion.TryParse(latest.Version, out var v)) return null;
+        if (v.IsPrerelease && !settings.BetaUpdates) return null;
         if (current.IsDev && !settings.OfferUpdatesToDevBuilds) return null;
         return AppVersion.IsNewer(v, current) ? latest : null;
     }
 
     private readonly record struct Fetched(UpdateInfo? Info);
 
-    private async Task<Fetched?> FetchLatestAsync(CancellationToken ct)
+    private async Task<Fetched?> FetchLatestAsync(bool beta, CancellationToken ct)
     {
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(ApiTimeout);
-            Activity.Report(ActivityKind.Network, "HTTP GET https://api.github.com/repos/.../releases/latest (checking for a newer AutoFix Scout; nothing about this computer is sent)");
-            using var resp = await _http.GetAsync(LatestReleaseUrl, cts.Token);
+            Activity.Report(ActivityKind.Network, beta
+                ? "HTTP GET https://api.github.com/repos/.../releases (checking for a newer AutoFix Scout, test versions included; nothing about this computer is sent)"
+                : "HTTP GET https://api.github.com/repos/.../releases/latest (checking for a newer AutoFix Scout; nothing about this computer is sent)");
+            using var resp = await _http.GetAsync(beta ? ReleaseListUrl : LatestReleaseUrl, cts.Token);
             if (resp.StatusCode == HttpStatusCode.NotFound) return new Fetched(null);   // no release yet
             if (!resp.IsSuccessStatusCode) return null;                                  // rate limit (403/429), outage
-            return new Fetched(ParseRelease(await resp.Content.ReadAsStringAsync(cts.Token)));
+            var body = await resp.Content.ReadAsStringAsync(cts.Token);
+            return new Fetched(beta ? ParseReleaseList(body) : ParseRelease(body));
         }
         catch (Exception) { return null; }
     }
@@ -121,11 +128,41 @@ public sealed class UpdateService
         try
         {
             using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
+            return ParseOne(doc.RootElement, allowPrerelease: false);
+        }
+        catch (Exception) { return null; }
+    }
+
+    /// <summary>
+    /// Reads a GitHub release list (test version channel). Skips drafts, bad tags and releases without the setup file,
+    /// and returns the highest version, pre-releases included (0.4.0-beta.2 is before 0.4.0). Null when none is usable.
+    /// </summary>
+    public static UpdateInfo? ParseReleaseList(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) return null;
+            UpdateInfo? best = null; AppVersion bestV = default;
+            foreach (var item in doc.RootElement.EnumerateArray())
+            {
+                var info = ParseOne(item, allowPrerelease: true);
+                if (info is null || !AppVersion.TryParse(info.Version, out var iv)) continue;
+                if (best is null || iv.CompareTo(bestV) > 0) { best = info; bestV = iv; }
+            }
+            return best;
+        }
+        catch (Exception) { return null; }
+    }
+
+    private static UpdateInfo? ParseOne(JsonElement root, bool allowPrerelease)
+    {
+        try
+        {
             if (root.ValueKind != JsonValueKind.Object) return null;
-            if (Flag(root, "draft") || Flag(root, "prerelease")) return null;
+            if (Flag(root, "draft") || (!allowPrerelease && Flag(root, "prerelease"))) return null;
             var tag = Str(root, "tag_name");
-            if (!AppVersion.TryParse(tag, out var v) || v.IsPrerelease) return null;
+            if (!AppVersion.TryParse(tag, out var v) || (!allowPrerelease && v.IsPrerelease)) return null;
             var version = v.ToString();
             var setupName = $"AutoFixScout-Setup-{version}.exe";
             string setupUrl = "", shaUrl = ""; long size = 0;

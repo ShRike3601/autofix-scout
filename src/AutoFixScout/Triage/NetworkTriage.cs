@@ -157,12 +157,8 @@ public static class NetworkTriage
                     rungs.Add(RestartRouter);
                     break;
                 case FindingCode.NetWeakWifi:
-                    rungs.Add(new("move_closer", "ui.human_step", 0,
-                        "Please move closer to your router and away from thick walls or large metal objects. Then run the check again."));
-                    if (s.Supports5GHz == Tri.Yes)
-                        rungs.Add(new("use_5ghz", "ui.open_settings_page", 0,
-                            "Your Wi-Fi adapter supports the 5 GHz band, which is often faster at short range. " +
-                            "AutoFix Scout will open the \"Wi-Fi\" settings. If your router offers a 5 GHz network, please select it and connect.", "wifi"));
+                    rungs.Add(MoveCloser);
+                    if (s.Supports5GHz == Tri.Yes) rungs.Add(Use5GHz);
                     rungs.Add(RestartRouter);
                     break;
                 case FindingCode.NetWifiDrops:
@@ -224,7 +220,14 @@ public static class NetworkTriage
         return rungs.DistinctBy(r => r.Id).ToList();
     }
 
-    private static readonly Rung RestartRouter = new("restart_router", "ui.human_step", 0,
+    internal static readonly Rung MoveCloser = new("move_closer", "ui.human_step", 0,
+        "Please move closer to your router and away from thick walls or large metal objects. Then run the check again.");
+
+    internal static readonly Rung Use5GHz = new("use_5ghz", "ui.open_settings_page", 0,
+        "Your Wi-Fi adapter supports the 5 GHz band, which is often faster at short range. " +
+        "AutoFix Scout will open the \"Wi-Fi\" settings. If your router offers a 5 GHz network, please select it and connect.", "wifi");
+
+    internal static readonly Rung RestartRouter = new("restart_router", "ui.human_step", 0,
         "Please unplug your router for 30 seconds, then plug it back in. Then wait about two minutes until its lights are steady.");
 
     private static void AddIfNotNull(List<Rung> rungs, Rung? rung) { if (rung != null) rungs.Add(rung); }

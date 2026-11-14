@@ -59,6 +59,10 @@ public sealed class StorageState
     public int? MemoryLoadPercent { get; set; }
     /// <summary>Disks and storage controllers with a problem code; null = the device list could not be read.</summary>
     public IReadOnlyList<StorageDeviceInfo>? ProblemDevices { get; set; }
+    /// <summary>Physical drives Windows Storage lists (0 = none or unreadable); the drive health read is offered only when drives exist.</summary>
+    public int PhysicalDriveCount { get; set; }
+    /// <summary>diag.read_drive_health already ran in this session.</summary>
+    public bool DriveHealthRead { get; set; }
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
 }
 

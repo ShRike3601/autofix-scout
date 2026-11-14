@@ -335,8 +335,9 @@ public class StressAnalysisTests
     public void FindingCodes_AreAppendedAtTheEnd()
     {
         var names = Enum.GetNames<FindingCode>();
-        Assert.Equal("StressNotRun", names[^1]);
-        Assert.Equal("GpuResizableBarOff", names[^7]);
+        var end = Array.IndexOf(names, "StressNotRun"); // later areas append after it
+        Assert.True(end >= 0);
+        Assert.Equal("GpuResizableBarOff", names[end - 6]);
     }
 }
 

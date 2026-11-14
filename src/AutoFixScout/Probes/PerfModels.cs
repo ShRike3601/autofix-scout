@@ -41,6 +41,10 @@ public sealed class PerfState
     public int UnexpectedShutdowns { get; set; }
     public int HardwareErrors { get; set; }
     public bool InstabilityRead { get; set; }
+    /// <summary>Physical drives Windows Storage lists (0 = none or unreadable); the drive health read is offered only when drives exist.</summary>
+    public int PhysicalDriveCount { get; set; }
+    /// <summary>diag.read_drive_health already ran in this session.</summary>
+    public bool DriveHealthRead { get; set; }
 
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
 

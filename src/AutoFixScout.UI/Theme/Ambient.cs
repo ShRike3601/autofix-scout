@@ -19,7 +19,12 @@ public static class Ambient
         (Color.FromRgb(0x14, 0xB8, 0xA6), 0.55, 0.70, 0.75, -0.07, -0.06, 31), // teal, bottom
     };
 
-    public static void Attach(Canvas canvas, bool on)
+    private static readonly Color[] LightColors =
+    {
+        Color.FromRgb(0x8F, 0xB8, 0xFF), Color.FromRgb(0xC4, 0xAE, 0xFF), Color.FromRgb(0x8A, 0xE0, 0xD2), // pastel, low alpha: dark text keeps contrast
+    };
+
+    public static void Attach(Canvas canvas, bool on, bool light = false)
     {
         canvas.Children.Clear();
         canvas.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
@@ -28,13 +33,15 @@ public static class Ambient
         for (var i = 0; i < Pools.Length; i++)
         {
             var p = Pools[i];
+            var c = light ? LightColors[i] : p.Color;
+            var (a0, a1) = light ? ((byte)0x38, (byte)0x14) : ((byte)0x5A, (byte)0x22);
             var brush = new RadialGradientBrush
             {
                 GradientStops =
                 {
-                    new GradientStop(Color.FromArgb(0x5A, p.Color.R, p.Color.G, p.Color.B), 0),
-                    new GradientStop(Color.FromArgb(0x22, p.Color.R, p.Color.G, p.Color.B), 0.45),
-                    new GradientStop(Color.FromArgb(0x00, p.Color.R, p.Color.G, p.Color.B), 1),
+                    new GradientStop(Color.FromArgb(a0, c.R, c.G, c.B), 0),
+                    new GradientStop(Color.FromArgb(a1, c.R, c.G, c.B), 0.45),
+                    new GradientStop(Color.FromArgb(0x00, c.R, c.G, c.B), 1),
                 },
             };
             brush.Freeze();

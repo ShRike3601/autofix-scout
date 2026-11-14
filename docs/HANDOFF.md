@@ -550,3 +550,85 @@ Next (owner's requests, in order):
    motion, activity list unfolded by default, clear history, open data folder.
 4. Build, test, screenshots; then ask the owner 0.3.1 vs 0.4.0 (UI + activity feed + Afterburner fix => 0.4.0
    recommended); check the UI session has nothing to push; release; then propose next-release ideas.
+- 2026-11-14 07:03 IST: v0.3.1 released (owner chose 0.3.1 over 0.4.0). PR 14 merged.
+
+## Ideas for the next release (proposed 2026-11-14; owner said keep working, stop before the 11:30 reset)
+Capabilities:
+- Battery health (laptops): design vs full-charge capacity and cycle count (powercfg /batteryreport /xml, read-only),
+  plain wear level and advice. [DONE, merged into next]
+- Connection quality: latency, jitter and packet loss to the gateway and to the internet, separately for Wi-Fi, so
+  "internet is slow / games lag online" gets an answer (Wi-Fi vs provider). [DONE, in the app under Internet and Bluetooth]
+- Blue screen explainer: stop code + the driver named in the crash report, in plain words, with what to do. [DONE; the driver name needs admin-only reports, next step: read them through the elevated helper]
+- Drive wear: SSD wear %, temperature and read errors from the storage reliability counters. [started: agent g20-drives, via a diag.read_drive_health elevated read]
+- Slow start-up through the elevated helper (the boot-time log needs admin). [DONE: diag.read_boot_times, also diag.read_crash_reports for blue screens]
+- Game settings check: Game Mode, hardware-accelerated GPU scheduling, variable refresh rate, per-game GPU choice. [DONE, in the graphics check]
+Quality of life:
+- Keyboard shortcuts: Ctrl+K search, Ctrl+, settings, Esc back. Remember window size and position. [started here]
+- Optional weekly check-up, with a notification only when something is wrong. [DONE: scheduled task, Settings checkbox]
+- Save a report as a file (HTML) to send to a helper. [DONE]
+- First-run tour (three short cards) for new users. [DONE]
+
+## Blue screen explainer (g15-bsod, 2026-11-14)
+- `Probes/BlueScreenReports.cs` (pure): stop code to cause group (driver, memory, graphics, disk, damaged files, hardware),
+  module name to friendly driver name, Report.wer parser (EventType, code, module, time only), recurrence logic.
+  `RealHealthProbe.ReadStopCodes` reads System 1001, Kernel-Power 41 stop code, WER reports and the Minidump file count.
+- Without admin on the bench laptop: System log 1001 and Kernel-Power 41 work; the Minidump folder lists (dates and count only);
+  the WER folders list, but the BlueScreen and Critical Report.wer files are denied, so the named driver is often unknown.
+  The finding then states the stop code and recurrence only. Never claim a driver when no report named one.
+- Findings and steps: `HealthTriage.BlueScreenCause` and the ladder (rungs `bluescreen_named_driver`, `bluescreen_hardware_settings`;
+  reuses `gpu_clean_driver`, `perf_cooling`, `memory_diagnostic`, `scan_disk`, DISM/SFC).
+
+## Weekly check-up (g19-weekly, 2026-11-14)
+- Optional, per user, no administrator rights. Settings, "Weekly check-up" checkbox (under "Updates and Wi-Fi") calls `WeeklyCheckupSetup.On/Off` (`src/AutoFixScout/Weekly/`). One Task Scheduler task "AutoFix Scout weekly check-up", weekly, first run about 5 minutes after switching on, then every 7 days at that time. Command lines are pure functions (unit tested); processes use ArgumentList.
+- Catch-up of a missed run: `schtasks /create` cannot set it, so `On` follows with `Set-ScheduledTask` (PowerShell, `-StartWhenAvailable`, battery allowed, 5 minute limit). This works for the current user without admin (verified on the bench). If it fails, the task still runs weekly but a missed run is not caught up.
+- `AutoFixScout.UI.exe --weekly-checkup` (App.xaml.cs): no window, no theme, `base.OnStartup` is skipped; runs `HealthFlow.DiagnoseAsync` (read-only), writes `%LOCALAPPDATA%\AutoFixScout\weekly.json` (date, problem count, finding codes), shows a toast ("AutoFix Scout found something to check") only if `LadderRunner.IsAllClear/IsInformation` leave at least one problem. Hard limit: 100 s for the check, process exit by 110 s at the latest. The app has no single-instance logic, so a normal start is never blocked. A toast click does not open the app (no COM activator for an unpackaged app).
+- The UI project now targets `net8.0-windows10.0.19041.0` (needed for the toast API, same as the Wi-Fi watcher).
+- Installer: `[UninstallRun]` deletes the task. `PrepareToInstall` notes whether the task exists (`ExecAsOriginalUser schtasks /query`); a `[Run]` entry calls `AutoFixScout.UI.exe --weekly-restore` afterwards, which calls `WeeklyCheckupSetup.On()` (the schedule restarts at about 5 minutes after the update, so the weekday and time may change). NOT compiled with Inno Setup here: please build the installer once and test a silent upgrade.
+- Gaps: the uninstall deletes the task of the account that runs the uninstaller only (same person in a normal installation); a task of another Windows account is left behind and only fails to start a missing file.
+## Read-only elevated reads (g18-admin-read, 2026-11-14)
+- Executor actions `diag.read_boot_times` and `diag.read_crash_reports`: no argument (any argument = exit 2), change nothing. They write one JSON file
+  (`C:\ProgramData\AutoFixScout\logs\diag-boot-times.json` / `diag-crash-reports.json`; new file, protected ACL: SYSTEM and Administrators full, Users read and delete).
+  Exit 0 = written, 3 = nothing to report (no file), 1 = failed. Boot times: Diagnostics-Performance events 100 and 101 to 110, last 30 days, through the shared
+  `StartupTimings` parsers. Crash reports: `Report.wer` of type BlueScreen and LiveKernelEvent in `WER\ReportArchive` and `ReportQueue` through `BlueScreenReports.ParseReport`
+  (stop code, module file name, time; minidumps are never opened).
+- `Probes/DiagResults.cs` (linked into the executor, namespace `AutoFixScout.Executor.Shared` there): JSON shape, limits, validation and the privacy filter (anything with `\Users\` is dropped, paths are cut to the file name).
+  The app validates again (the file is untrusted input), deletes it after reading, and `ElevatedDiagnostics` keeps the result for the session.
+- `ElevatedDiagnostics.ApplyTo` runs at the end of `RealStorageProbe.Read` and `RealHealthProbe.Read`: it fills `StorageState.BootTimes / SlowStartupItems` only when they are null (Unknown),
+  and `HealthState.BlueScreenModules` when empty (also sets `CrashReportsRead`). The next check after the rung therefore re-evaluates the findings.
+- Rungs (`Triage/ReadRungs.cs`, tier 1, optional, never automatic): "Read the start-up times" in the slow computer ladder when `BootTimes` is null; "Read the crash reports" in the check-up ladder when blue
+  screens exist, no module is known and the reports were not read yet. `LadderRunner` does not ask "is it fixed?" after these read-only steps.
+
+## Drive health read (g20-drives, 2026-11-14)
+- Executor action `diag.read_drive_health` (third read-only action, same rules as the other two: no argument, exit 2 on any; 0 written, 3 nothing found, 1 failed; fixed file `diag-drive-health.json`, same ACL and CreateNew logic). It queries `root\Microsoft\Windows\Storage` `MSFT_PhysicalDisk` (`SELECT *`, because `GetRelated` fails on a partial object; only DeviceId, FriendlyName, MediaType, BusType, HealthStatus, Size are read) and follows the association to `MSFT_StorageReliabilityCounter` (Wear, Temperature, TemperatureMax, ReadErrors/WriteErrors Total and Uncorrected, PowerOnHours, StartStopCycleCount). Serial numbers are never read or written.
+- Without admin (bench, measured): MSFT_PhysicalDisk lists fine; the association returns nothing and a direct query of the counter class is "access denied". So the counters need the helper.
+- `DiagResults.CleanDrives/ParseDrives` validate: wear 0 to 100, temperature 0 to 120 C, counts and hours capped; an out-of-range value becomes null (Unknown), names go through the same privacy filter, at most 32 drives.
+- `ElevatedDiagnostics.Merge(HealthState, DiagDriveResult)` fills only unknown fields of `PhysicalDriveInfo` (WearPercent, TemperatureC, TemperatureMaxC, ReadErrorsUncorrected, WriteErrorsUncorrected, PowerOnHours; match by DeviceId, or by name when unique) and sets `DriveHealthRead`.
+- Findings (end of enum): `HealthDriveWornOut` (SSD wear 90 or more), `HealthDriveWearing` (70 to 89), `HealthDriveErrors` (uncorrected read or write errors above 0), `HealthDriveHot` (TemperatureMax 70 C or more). Wear counts for SSDs only. Rungs: `back_up_files` (existing) for the first three, `drive_cooling` (human step) for the last.
+- Rung `read_drive_health` (tier 1, optional): in the health ladder while all drives have unknown counters, and in the storage and performance ladders when `PhysicalDriveCount > 0`; never after `DriveHealthRead`.
+
+## One-click game settings fixes (g21-gamefix, 2026-11-14)
+`Repair/GameFixes.cs`: `games.game_mode_on`, `games.use_graphics_card` (arg = exe file name, exactly one match in a known game folder, GpuPreference 1 to 2), `games.background_recording_off`. HKCU only, no admin, every method takes the key root (tests use `HKCU\Software\AutoFixScoutTests\<guid>`). The result detail carries an `undo=<kind>|<escaped previous values>` token; `ChangeHistory.UndoFor` turns it into an undo_record of kind `gamefix`, and `GameFixes.Undo` restores the values (a missing value is deleted). "Nothing to do" results carry no token and are not listed in History. Fix rungs (tier 1, ids `gpu_game_*_fix*`) come before the old advice rungs in `GraphicsTriage.Ladder`; at most 3 game rungs.
+
+## DNS speed check (g25-dns, 2026-11-14)
+- `Probes/DnsQuery.cs` (pure A-record query builder and reply parser), `Probes/DnsSpeedProbe.cs` (raw UDP port 53, 2 s timeout, 6 names x 2 rounds, the adapter's IPv4 DNS servers pooled as "current" plus 1.1.1.1 and 8.8.8.8, all at once; a server with no answer in its first 4 queries is given up and the rest count as failed), `Triage/DnsQualityTriage.cs` (pure analysis).
+- Runs in parallel with the 15 s ping test in `RealConnectionQualityProbe` (`QualityState.Dns`). A DNS finding appears only when the pings are steady (it replaces the all-clear); when the pings are bad, the DNS numbers go into the technical detail only.
+- Slow = current median above 150 ms or more than 30 % failed. Public servers named as faster only at 50 ms and 2x. Public servers also slow = `NetQualityDnsSlowEverywhere` (no DNS blame); public servers that answer nothing (blocked UDP 53) are ignored. Codes `NetQualityDnsSlow`, `NetQualityDnsSlowEverywhere` at the end of the enum. Step `dns_change_server` opens `ms-settings:network-status` (new key `network_status`); nothing is changed by the app.
+
+## State at the end of the 2026-11-14 day session (owner: stop at the usage reset, leave pending work as is)
+- `next` (draft PR 15, not released, version not chosen) has everything since 0.3.1: battery health, connection
+  quality + DNS speed, blue-screen explainer, game settings + one-click game fixes (undo), drive health and the
+  optional administrator reads (boot times, crash reports, drive health), start-up clean-up from boot data, weekly
+  check-up, HTML helper report, the app's own problem log, beta update channel, first-run tour, shortcuts, window
+  position. 1,629 tests pass; CI builds the installer.
+- Possibly unfinished at the reset (each on its own branch/worktree, NOT merged unless noted in git log of `next`):
+  g26-browser and g27-lightglass were both merged before the reset.
+- Not verified on screen: drive health result screen, the one-click game fix flow, the weekly check-up toast,
+  the beta checkbox. Nothing of this was run against real settings while the owner was away.
+- Roadmap: docs/ROADMAP.md (done items marked). Remaining: driver updates via Windows Update (changes drivers: needs
+  bench time with the owner), component store clean-up, sound crackles (DPC latency), Hindi, tray icon, wider search.
+## Browser hijack checks (g26-browser, 2026-11-14)
+- `Repair/BrowserHijackScan.cs`: read-only scan of Chrome and Edge through an `IBrowserRegistry` (real reader `RegistryBrowserReader`, fake in tests). Reads policy values (DefaultSearchProviderSearchURL, HomepageLocation, NewTabPageLocation), RestoreOnStartupURLs, ExtensionInstallForcelist, ExtensionInstallSources (HKLM incl. WOW6432Node, HKCU) and `Software\{Google\Chrome|Microsoft\Edge}\Extensions\<id>` (only the update_url value, never the path value). Only hosts (punycode, no path, query, port; IP addresses shown as "an IP address") and extension ids leave the scan.
+- Flagged: a host that is not google., bing.com, duckduckgo.com, yahoo., ecosia.org, startpage.com, brave.com, yandex. (plus msn.com, microsoft.com, live.com, office.com for start pages); extension ids matching `^[a-p]{32}$` that are not on `FirstPartyIds` (six Google app ids; no Edge ids because none is known for certain). Nothing is flagged on a managed device (`IsManagedDevice`: BrowserPolicies.IsManagedPc, or a GUID subkey under HKLM\SOFTWARE\Microsoft\Enrollments).
+- Findings (end of enum): `BrowserSearchHijacked`, `BrowserStartPageHijacked`, `BrowserForcedExtensions` (also ExtensionInstallSources), `BrowserExternalExtensions`. Produced by `SecurityTriage.BrowserHijackFindings`, scanned in `SecurityFlow` ("browser search, start pages and extensions"). The first three are in `Rechecked`.
+- Steps: human only (`browser_reset_settings`, `browser_uninstall_unknown` opens Installed apps). The existing guarded `security.remove_browser_policies` (admin, backs up first, skipped on managed PCs) still comes from `SecurityBrowserPolicy`, which fires for the same policy values. No new writer.
+- Not done: Firefox, UI wording check on a real hijacked machine, HKCU external extensions removal.

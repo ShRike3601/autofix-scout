@@ -30,6 +30,11 @@ public static class Program
         {
             return (args.Length, args.ElementAtOrDefault(0)) switch
             {
+                // Read-only reads: no argument at all. Any argument is rejected (exit 2). The result goes to a fixed file, never to a caller-chosen path.
+                (1, Shared.DiagResults.BootAction) => DiagReads.BootTimes(),
+                (1, Shared.DiagResults.CrashAction) => DiagReads.CrashReports(),
+                (1, Shared.DiagResults.DriveAction) => DiagReads.DriveHealth(),
+                (_, Shared.DiagResults.BootAction or Shared.DiagResults.CrashAction or Shared.DiagResults.DriveAction) => 2,
                 (3, "driver.rollback") when IsValidInstanceId(args[1]) && IsValidSavePointId(args[2]) && IsToggleableDevice(args[1])
                     => SavePoints.Rollback(args[1], args[2]),
                 (3, "driver.install_from_windows_update") when IsValidInstanceId(args[1]) && IsValidSavePointId(args[2]) && IsToggleableDevice(args[1])

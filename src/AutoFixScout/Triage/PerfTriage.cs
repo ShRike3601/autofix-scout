@@ -167,6 +167,8 @@ public static partial class PerfTriage
             rungs.Add(new("perf_undo_overclock", "ui.human_step", 0,
                 "If an overclock or an undervolt was ever set, in the BIOS or in a tool such as MSI Afterburner or Intel XTU, please set it back to the default values. " +
                 "Also check that the power supply is strong enough and that the power cables are firmly plugged in."));
+        // Optional and never automatic: a worn or failing drive makes a computer slow, and its counters need administrator rights.
+        if (ReadRungs.OfferDriveRead(s.PhysicalDriveCount, s.DriveHealthRead)) rungs.Add(ReadRungs.DriveHealth());
         return rungs;
     }
 

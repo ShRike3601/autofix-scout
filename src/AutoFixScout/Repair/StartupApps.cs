@@ -108,11 +108,19 @@ public static class StartupApps
         return i < 0 ? KnownOptional.Length : i;
     }
 
-    /// <summary>Enabled, not protected, the person's own; known launchers and updaters first; at most <see cref="MaxOffered"/>.</summary>
-    public static IReadOnlyList<StartupEntry> Offerable(IEnumerable<StartupEntry> entries, string windowsDir) =>
-        entries.Where(e => e.Enabled && IsUserEntry(e) && !IsProtected(e, windowsDir))
-            .OrderBy(Rank).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+    /// <summary>
+    /// Enabled, not protected, the person's own. Entries that Windows measured as slowing start-up come first, the largest
+    /// delay first (see <see cref="StartupSlowMatch"/>); then known launchers and updaters; at most <see cref="MaxOffered"/>.
+    /// </summary>
+    public static IReadOnlyList<StartupEntry> Offerable(IEnumerable<StartupEntry> entries, string windowsDir, IEnumerable<SlowStartupItem>? slow = null)
+    {
+        var pool = entries.Where(e => e.Enabled && IsUserEntry(e) && !IsProtected(e, windowsDir)).ToList();
+        var delays = new Dictionary<StartupEntry, long>();
+        foreach (var m in StartupSlowMatch.Match(slow, pool)) delays.TryAdd(m.Entry, m.Ms);
+        return pool.OrderBy(e => delays.ContainsKey(e) ? 0 : 1).ThenByDescending(e => delays.TryGetValue(e, out var ms) ? ms : 0)
+            .ThenBy(Rank).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
             .Take(MaxOffered).ToList();
+    }
 
     /// <summary>Enabled machine-wide entries that are not protected: switching them off needs admin, so they are only named.</summary>
     public static IReadOnlyList<StartupEntry> MachineWide(IEnumerable<StartupEntry> entries, string windowsDir) =>

@@ -25,6 +25,18 @@ public sealed class HealthState
     public int BlueScreens { get; set; }
     /// <summary>Stop codes of the blue screens in the last 14 days, most frequent first (empty when none could be read).</summary>
     public IReadOnlyList<StopCodeCount> StopCodes { get; set; } = new List<StopCodeCount>();
+    /// <summary>Modules (driver files) that Windows named in blue screen reports in the last 14 days, most frequent first. Often empty: the reports can need administrator rights.</summary>
+    public IReadOnlyList<ModuleCount> BlueScreenModules { get; set; } = new List<ModuleCount>();
+    /// <summary>The blue screen reports were read through the elevated helper (even when they named no module). Stops the same offer from coming back.</summary>
+    public bool CrashReportsRead { get; set; }
+    /// <summary>True after diag.read_drive_health ran in this session (even when it found nothing).</summary>
+    public bool DriveHealthRead { get; set; }
+    /// <summary>When the blue screens happened (local time), from the System log.</summary>
+    public IReadOnlyList<DateTime> BlueScreenTimes { get; set; } = new List<DateTime>();
+    /// <summary>Kernel-Power 41 events that carry a stop code (the code is not 0), in the last 14 days.</summary>
+    public int KernelPowerBugchecks { get; set; }
+    /// <summary>Files in the Windows Minidump folder; null when the folder could not be listed.</summary>
+    public int? MinidumpCount { get; set; }
     /// <summary>The page file (virtual memory) settings and size; null = could not be read.</summary>
     public PageFileState? PageFile { get; set; }
     /// <summary>Resource-Exhaustion-Detector event 2004 ("low virtual memory") in the last 14 days.</summary>
@@ -96,6 +108,18 @@ public sealed record HostsHijack(string Host, string Ip);
 /// <summary>A physical drive as Windows Storage reports it. Health: Healthy, Warning, Unhealthy, Unknown.</summary>
 public sealed record PhysicalDriveInfo(string Name, string MediaType, string Health, IReadOnlyList<int> OperationalStatus, bool PredictFailure)
 {
+    /// <summary>Windows' small drive number (MSFT_PhysicalDisk.DeviceId); never a serial number. Null = unknown.</summary>
+    public int? DeviceId { get; init; }
+    // The reliability counters need administrator rights (diag.read_drive_health). Null = Unknown, never "zero".
+    /// <summary>Percentage of the drive's expected life used (0 to 100).</summary>
+    public int? WearPercent { get; init; }
+    public int? TemperatureC { get; init; }
+    public int? TemperatureMaxC { get; init; }
+    public long? ReadErrorsUncorrected { get; init; }
+    public long? WriteErrorsUncorrected { get; init; }
+    public long? PowerOnHours { get; init; }
+    /// <summary>True when none of the reliability counters is known yet.</summary>
+    public bool CountersUnknown => WearPercent is null && TemperatureC is null && TemperatureMaxC is null && ReadErrorsUncorrected is null && WriteErrorsUncorrected is null && PowerOnHours is null;
     /// <summary>Unhealthy, "predictive failure" (5), "error" (6), "non-recoverable error" (7) or Windows' own failure prediction.</summary>
     public bool Failing => Health == "Unhealthy" || PredictFailure || OperationalStatus.Any(s => s is 5 or 6 or 7);
     /// <summary>"Warning" health or "degraded" (3) or "stressed" (4).</summary>

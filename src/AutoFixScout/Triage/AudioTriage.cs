@@ -379,4 +379,33 @@ public enum FindingCode
     StressGpuClocksLow,
     StressStoppedForSafety,
     StressNotRun,
+    // Battery health from the capacity report (Power area)
+    PowerBatteryWornOut,
+    PowerBatteryAgeing,
+    PowerBatteryManyCycles,
+    PowerBatteryReportUnreadable,
+    // Connection quality (NetQuality area). A steady connection has its own code so LooksNormal stays the internet check's.
+    NetQualityLocalNetwork,
+    NetQualityInternet,
+    NetQualityInternetUnclear,
+    NetQualitySteady,
+    NetQualityNotMeasurable,
+    // Windows game settings (Graphics area)
+    GameSetGameModeOff,
+    GameSetHardwareSchedulingOff,
+    GameSetGameOnPowerSaving,
+    GameSetPowerEfficiencyPluggedIn,
+    GameSetWindowedOptimisationsOff,
+    GameSetBackgroundRecording,
+    // Drive wear, temperature and uncorrected errors (read through diag.read_drive_health)
+    HealthDriveWornOut,
+    HealthDriveWearing,
+    HealthDriveErrors,
+    HealthDriveHot,
+    NetQualityDnsSlow,
+    NetQualityDnsSlowEverywhere,
+    BrowserSearchHijacked,
+    BrowserStartPageHijacked,
+    BrowserForcedExtensions,
+    BrowserExternalExtensions,
 }

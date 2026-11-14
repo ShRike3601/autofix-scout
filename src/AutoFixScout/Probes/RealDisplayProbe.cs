@@ -16,21 +16,21 @@ public sealed class RealDisplayProbe : IDisplayProbe
         var state = new DisplayState { ProbeErrors = errors };
 
         try { state.Adapters = ReadAdapters(); }
-        catch (Exception ex) { errors.Add($"Display adapters: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Display probe", ex); errors.Add($"Display adapters: {ex.Message}"); }
 
         try
         {
             using var q = Wmi.Searcher(@"root\wmi", "SELECT Active FROM WmiMonitorBasicDisplayParams");
             state.ConnectedScreens = q.Get().Cast<ManagementBaseObject>().Count(m => m["Active"] is true);
         }
-        catch (Exception ex) { errors.Add($"WmiMonitorBasicDisplayParams: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Display probe", ex); errors.Add($"WmiMonitorBasicDisplayParams: {ex.Message}"); }
 
         Activity.Report(ActivityKind.Command, "Counting the screens that show the desktop (EnumDisplayDevices, EnumDisplaySettings)");
         try { state.ShowingScreens = CountShowingScreens(); }
-        catch (Exception ex) { errors.Add($"EnumDisplayDevices: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Display probe", ex); errors.Add($"EnumDisplayDevices: {ex.Message}"); }
 
         try { state.Screens = ReadScreens(); }
-        catch (Exception ex) { errors.Add($"EnumDisplaySettings: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Display probe", ex); errors.Add($"EnumDisplaySettings: {ex.Message}"); }
 
         // Desktops have no software brightness ("Not supported"): that is normal, not a probe error.
         try

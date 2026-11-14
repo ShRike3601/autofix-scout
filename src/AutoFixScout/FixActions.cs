@@ -17,6 +17,8 @@ public static class FixActions
         "repair.dism", "repair.sfc", "time.resync", "network.reset_winhttp_proxy", "network.clean_hosts", "service.restore_default",
         "system.repair_path", "network.reset_winsock", "update.reset_components", "search.rebuild_index", "runtime.install_vcredist", "disk.scan",
         "storage.cleanup_components", "office.quick_repair", "network.wifi_stability", "security.firewall_on", "security.uac_on", "security.remove_browser_policies", "system.pagefile_auto",
+        // Read-only: no argument; the result comes back as a file the app validates and deletes (see ElevatedDiagnostics).
+        Probes.DiagResults.BootAction, Probes.DiagResults.CrashAction, Probes.DiagResults.DriveAction,
     };
 
     public static async Task<(bool Ok, string Detail)> RunAsync(Rung rung)
@@ -52,6 +54,7 @@ public static class FixActions
                         "camera" => "ms-settings:privacy-webcam",
                         "airplane" => "ms-settings:network-airplanemode",
                         "wifi" => "ms-settings:network-wifi",
+                        "network_status" => "ms-settings:network-status",
                         "camera_app" => "microsoft.windows.camera:",
                         "storagesense" => "ms-settings:storagesense",
                         "startupapps" => "ms-settings:startupapps",
@@ -63,6 +66,8 @@ public static class FixActions
                         "scanners" => "ms-settings:printers",
                         "display" => "ms-settings:display",
                         "graphics" => "ms-settings:display-advancedgraphics",
+                        "gaming" => "ms-settings:gaming-gamemode",
+                        "capture" => "ms-settings:gaming-gamedvr",
                         "apps" => "ms-settings:appsfeatures",
                         "updatehistory" => "ms-settings:windowsupdate-history",
                         "backup" => "ms-settings:backup",
@@ -101,6 +106,8 @@ public static class FixActions
                     return await Task.Run(() => { var r = RunFixed("DisplaySwitch.exe", "/extend"); Thread.Sleep(3000); return r; });
                 case "display.set_brightness":
                     return await Task.Run(SetBrightness);
+                case Probes.DiagResults.BootAction or Probes.DiagResults.CrashAction or Probes.DiagResults.DriveAction:
+                    return await RunDiagAsync(rung.ActionId);
                 case var elevated when ElevatedActions.Contains(elevated):
                     var code = await Task.Run(() => RunElevated(rung.ActionId, rung.Arg!));
                     return (code == 0, code is null ? Declined : $"executor exit code {code}");
@@ -154,6 +161,13 @@ public static class FixActions
                     return await Task.Run(Watching.WifiWatcherSetup.TurnOn);
                 case "network.wifi_watch_off":
                     return await Task.Run(Watching.WifiWatcherSetup.TurnOff);
+                case Repair.GameFixes.GameModeAction:
+                    // The person's own HKCU game settings only; the previous value is kept for Undo in History. No admin.
+                    return await Task.Run(Repair.GameFixes.GameModeOn);
+                case Repair.GameFixes.GraphicsCardAction:
+                    return await Task.Run(() => Repair.GameFixes.UseGraphicsCard(rung.Arg));
+                case Repair.GameFixes.RecordingAction:
+                    return await Task.Run(Repair.GameFixes.BackgroundRecordingOff);
                 case "storage.empty_recycle_bin":
                     return await Task.Run(Areas.StorageCleanup.EmptyRecycleBin);
                 default:
@@ -244,6 +258,15 @@ public static class FixActions
             Activity.Report(ActivityKind.Change, "The Windows permission prompt was declined, so nothing was changed");
             return null;
         }
+    }
+
+    /// <summary>The read-only helper actions take no argument. Exit 0 = data written, 3 = nothing to report (both are a success).</summary>
+    private static async Task<(bool Ok, string Detail)> RunDiagAsync(string actionId)
+    {
+        var code = await Task.Run(() => RunElevated(actionId));
+        if (code is null) return (false, Declined);
+        var (ok, detail) = ElevatedDiagnostics.Finish(actionId, code.Value);
+        return (ok, code is 0 or 3 ? detail : $"executor exit code {code}; {detail}");
     }
 
     private const string Declined = "The Windows permission prompt was declined, so nothing was changed.";

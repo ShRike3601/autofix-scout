@@ -49,7 +49,7 @@ public partial class MainWindow
         });
     }
 
-    private static bool Normal(Diagnosis d) => d.Findings.Count > 0 && d.Findings.All(f => f.Code == FindingCode.LooksNormal);
+    private static bool Normal(Diagnosis d) => d.Findings.Count > 0 && d.Findings.All(f => LadderRunner.IsAllClear(f.Code));
 
     /// <summary>Runs the load test once (about 2 minutes) behind a progress screen with a "Stop" button. Sets _stressLast.</summary>
     private async Task RunStressTestAsync()
@@ -271,6 +271,16 @@ public partial class MainWindow
         settings.Children.Add(updates);
         settings.Children.Add(Helper("AutoFix Scout asks github.com once at start whether a newer version exists. No personal data is sent."));
 
+        var beta = Check("Get test versions early", appSettings.BetaUpdates);
+        beta.Click += (_, _) =>
+        {
+            var s = AppSettings.Load();
+            s.BetaUpdates = beta.IsChecked == true;
+            s.Save();
+        };
+        settings.Children.Add(beta);
+        settings.Children.Add(Helper("Test versions arrive sooner but may have problems. Recommended only for people who help test AutoFix Scout."));
+
         Tri watcher;
         try { watcher = WifiWatcherSetup.ReadState(); } catch (Exception) { watcher = Tri.Unknown; }
         settings.Children.Add(Divider());
@@ -300,6 +310,7 @@ public partial class MainWindow
         else
             settings.Children.Add(Row("The Wi-Fi watcher is off.",
                 "It can be switched on from the internet check when Wi-Fi keeps dropping.", new Border(), divider: false));
+        AddWeeklyCheckupRow(settings);
         SettingsBody.Children.Add(Card(settings));
         AddDataSettings();
 
@@ -313,7 +324,20 @@ public partial class MainWindow
     /// <summary>Esc closes the settings panel first (otherwise it would press the step screen's cancel button underneath).</summary>
     private void OnWindowPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (_settingsOpen && e.Key == System.Windows.Input.Key.Escape) { SetSettingsOpen(false); e.Handled = true; }
+        if (_settingsOpen && e.Key == System.Windows.Input.Key.Escape) { SetSettingsOpen(false); e.Handled = true; return; }
+        // Shortcuts: Ctrl+, settings, Ctrl+K the "describe the problem" box (home page), Ctrl+H history (not during a check).
+        if (System.Windows.Input.Keyboard.Modifiers != System.Windows.Input.ModifierKeys.Control) return;
+        switch (e.Key)
+        {
+            case System.Windows.Input.Key.OemComma:
+                SetSettingsOpen(!_settingsOpen); e.Handled = true; break;
+            case System.Windows.Input.Key.K when HomePanel.Visibility == Visibility.Visible:
+                if (_settingsOpen) SetSettingsOpen(false);
+                SymptomBox.Focus(); SymptomBox.SelectAll(); e.Handled = true; break;
+            case System.Windows.Input.Key.H when NavHistory.IsEnabled:
+                if (_settingsOpen) SetSettingsOpen(false);
+                NavHistory.IsChecked = true; e.Handled = true; break;
+        }
     }
 
     private void OnSettingsButtonClicked(object sender, RoutedEventArgs e) => SetSettingsOpen(!_settingsOpen);

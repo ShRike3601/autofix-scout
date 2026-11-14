@@ -18,13 +18,14 @@ public sealed class RealGraphicsProbe : IGraphicsProbe
         void Part(string name, Action read)
         {
             try { read(); }
-            catch (Exception ex) { errors.Add($"{name}: {ex.Message}"); }
+            catch (Exception ex) { AppLog.Warn("Graphics probe", ex); errors.Add($"{name}: {ex.Message}"); }
         }
         Activity.Report(ActivityKind.Analyze, "Reading the graphics card, driver, overclocking tools and driver resets");
         Part("video controllers", () => s.Gpus = ReadGpus());
         Part("chassis", () => s.IsDesktop = ReadIsDesktop());
         Part("nvidia-smi", () => ReadNvidia(s));
         Part("overclocking tools", () => s.Tools = ReadTools());
+        Part("game settings", () => s.Games = ReadGameSettings());
         Part("graphics resets", () => s.GraphicsResets = RealHealthProbe.CountGraphicsResets());
         s.ProbeErrors = errors;
         Activity.Report(ActivityKind.Analyze, $"Read {Activity.Count(s.Gpus.Count, "graphics adapter")} and {s.GraphicsResets} graphics driver {(s.GraphicsResets == 1 ? "reset" : "resets")}"
@@ -49,6 +50,52 @@ public sealed class RealGraphicsProbe : IGraphicsProbe
                     o["CurrentHorizontalResolution"] is uint w && w > 0, o["PNPDeviceID"] as string));
             }
         return list;
+    }
+
+    // ---- Windows game settings (read-only registry values and the performance check's power readers) ----
+
+    private static object? Value(RegistryKey hive, string path, string name)
+    {
+        using var k = hive.OpenSubKey(path);
+        return k?.GetValue(name);
+    }
+
+    internal static GameSettingsState ReadGameSettings()
+    {
+        var g = new GameSettingsState();
+        Activity.Report(ActivityKind.Registry, "Reading the Windows game settings (Game Mode, graphics scheduling, per-game graphics choice, game recording, power mode)");
+        void Part(Action read) { try { read(); } catch (Exception) { /* that setting stays Unknown */ } }
+        bool win11 = Environment.OSVersion.Version.Build >= 22000;
+        Part(() => g.GameMode = GameSettingsParsers.GameMode(Value(Registry.CurrentUser, @"Software\Microsoft\GameBar", "AutoGameModeEnabled"), win11));
+        Part(() => g.HardwareScheduling = GameSettingsParsers.HardwareScheduling(Value(Registry.LocalMachine, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode")));
+        Part(() =>
+        {
+            using var k = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\DirectX\UserGpuPreferences");
+            if (k == null) return;
+            g.PowerSavingGames = GameSettingsParsers.PowerSavingGames(k.GetValueNames().Select(n => new KeyValuePair<string, object?>(n, k.GetValue(n))));
+            var (windowed, vrr) = GameSettingsParsers.GlobalSettings(k.GetValue("DirectXUserGlobalSettings"));
+            g.WindowedOptimisations = windowed;
+            g.VariableRefresh = vrr;
+        });
+        Part(() =>
+        {
+            const string dvr = @"Software\Microsoft\Windows\CurrentVersion\GameDVR";
+            var store = GameSettingsParsers.OneZero(Value(Registry.CurrentUser, @"System\GameConfigStore", "GameDVR_Enabled"));
+            var capture = GameSettingsParsers.OneZero(Value(Registry.CurrentUser, dvr, "AppCaptureEnabled"));
+            var history = GameSettingsParsers.OneZero(Value(Registry.CurrentUser, dvr, "HistoricalCaptureEnabled"));
+            g.BackgroundRecording = GameSettingsParsers.BackgroundRecording(store, capture, history);
+        });
+        Part(() => g.PowerOverlayGuid = RealPerfProbe.ReadOverlay());
+        Part(() => g.OnBattery = RealPerfProbe.ReadPower().OnBattery);
+        Part(() =>
+        {
+            using var q = Wmi.Searcher("SELECT TotalPhysicalMemory FROM Win32_ComputerSystem");
+            foreach (ManagementBaseObject o in q.Get())
+                using (o)
+                    if (o["TotalPhysicalMemory"] is ulong ram) g.TotalRamBytes = (long)ram;
+        });
+        Activity.Report(ActivityKind.Analyze, $"Read the game settings; {Activity.Count(g.PowerSavingGames.Count, "game")} set to the power saving graphics chip");
+        return g;
     }
 
     private static Tri ReadIsDesktop()

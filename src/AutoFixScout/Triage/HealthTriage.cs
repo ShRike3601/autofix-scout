@@ -44,6 +44,45 @@ public static class HealthTriage
 
     private static string ServiceName(string name) => ServiceDefaults.Find(name)?.DisplayName ?? name;
 
+    // ---- drive wear, errors and temperature (reliability counters, read through diag.read_drive_health) ----
+
+    /// <summary>Hot: 65 C or more right now, or a recorded maximum of 85 C or more. A lifetime peak in the 70s is normal for an NVMe SSD under load (bench, 2026-11-14: 76 C), so it alone is not a problem.</summary>
+    public const int WearWornOutPercent = 90, WearWearingPercent = 70, HotNowC = 65, HotMaxC = 85;
+
+    public static bool HasUncorrectedErrors(PhysicalDriveInfo d) => d.ReadErrorsUncorrected > 0 || d.WriteErrorsUncorrected > 0;
+
+    /// <summary>Wear of an SSD only (a hard drive reports no wear). Null = Unknown, which gives no finding.</summary>
+    private static int? SsdWear(PhysicalDriveInfo d) => d.MediaType == "SSD" ? d.WearPercent : null;
+
+    public static IEnumerable<Finding> DriveHealthFindings(HealthState s)
+    {
+        var worn = s.Drives.Where(d => SsdWear(d) >= WearWornOutPercent).OrderByDescending(d => d.WearPercent).FirstOrDefault();
+        var wearing = s.Drives.Where(d => SsdWear(d) is >= WearWearingPercent and < WearWornOutPercent).OrderByDescending(d => d.WearPercent).FirstOrDefault();
+        if (worn is not null)
+            yield return F(FindingCode.HealthDriveWornOut,
+                $"The SSD \"{worn.Name}\" has used about {worn.WearPercent} percent of its expected life. Please copy important files to another drive or to cloud storage now, and plan to replace the SSD.",
+                $"{worn.Name} wear={worn.WearPercent}% hours={worn.PowerOnHours?.ToString() ?? "unknown"}");
+        else if (wearing is not null)
+            yield return F(FindingCode.HealthDriveWearing,
+                $"The SSD \"{wearing.Name}\" has used about {wearing.WearPercent} percent of its expected life. It still works, but please keep a recent backup of your important files and plan to replace the SSD in the future.",
+                $"{wearing.Name} wear={wearing.WearPercent}% hours={wearing.PowerOnHours?.ToString() ?? "unknown"}");
+        if (s.Drives.FirstOrDefault(HasUncorrectedErrors) is { } bad)
+            yield return F(FindingCode.HealthDriveErrors,
+                $"The drive \"{bad.Name}\" has reported errors that it could not correct while reading or writing. Please copy important files to another drive or to cloud storage now.",
+                $"{bad.Name} uncorrected read errors={bad.ReadErrorsUncorrected?.ToString() ?? "unknown"} write errors={bad.WriteErrorsUncorrected?.ToString() ?? "unknown"}");
+        if (s.Drives.Where(d => d.TemperatureC >= HotNowC || d.TemperatureMaxC >= HotMaxC)
+                .OrderByDescending(d => Math.Max(d.TemperatureC ?? 0, d.TemperatureMaxC ?? 0)).FirstOrDefault() is { } hot)
+            yield return F(FindingCode.HealthDriveHot,
+                (hot.TemperatureC >= HotNowC
+                    ? $"The drive \"{hot.Name}\" is now at {hot.TemperatureC} degrees Celsius, which is too warm. "
+                    : $"The drive \"{hot.Name}\" has reached {hot.TemperatureMaxC} degrees Celsius, which is too warm. ") +
+                $"Please make sure the air vents are free of dust, that nothing blocks the air flow, and that the computer is in a cool place.",
+                $"{hot.Name} temperature={hot.TemperatureC?.ToString() ?? "unknown"} C max={hot.TemperatureMaxC} C");
+    }
+
+    /// <summary>True when drives exist, none has reliability counters yet and the helper has not read them: the optional read is worth offering.</summary>
+    public static bool OfferDriveRead(HealthState s) => !s.DriveHealthRead && s.Drives.Count > 0 && s.Drives.All(d => d.CountersUnknown);
+
     /// <summary>Findings, most important first; always at least one.</summary>
     public static IReadOnlyList<Finding> Evaluate(HealthState s)
     {
@@ -56,6 +95,7 @@ public static class HealthTriage
         else if (s.Drives.FirstOrDefault(d => d.Warning) is { } warn)
             f.Add(F(FindingCode.HealthDriveWarning, $"Windows reports a warning for the drive \"{warn.Name}\". It is a good idea to back up your important files.",
                 $"{warn.Name} ({warn.MediaType}) health={warn.Health} status={string.Join(",", warn.OperationalStatus)}"));
+        foreach (var d in DriveHealthFindings(s)) f.Add(d);
         if (s.TempProfile)
             f.Add(F(FindingCode.HealthTempProfile, "Windows signed you in with a temporary profile, so your desktop and files may look missing. Your files are most likely still safe in your normal profile; nothing is deleted.",
                 s.TempProfileDetail ?? "temporary profile"));
@@ -103,9 +143,9 @@ public static class HealthTriage
         if (shell.Count > 0)
             f.Add(F(FindingCode.HealthShellCrashing, "Parts of Windows itself, such as the taskbar, the Start menu or search, have closed unexpectedly.",
                 string.Join("; ", shell.Select(c => $"{c.App} x{c.Count} ({c.Module}, {c.ExceptionCode})"))));
-        if (s.BlueScreens > 0)
-            f.Add(F(FindingCode.HealthBlueScreens, $"Windows has stopped with an error screen (a \"blue screen\") {Times(s.BlueScreens)} in the last two weeks.{BlueScreenCause(s)}",
-                $"bugchecks: {s.BlueScreens}, unexpected shutdowns: {s.UnexpectedShutdowns}" +
+        if (BlueScreenCount(s) > 0)
+            f.Add(F(FindingCode.HealthBlueScreens, $"Windows has stopped with an error screen (a \"blue screen\") {Times(BlueScreenCount(s))} in the last two weeks.{BlueScreenCause(s)}",
+                $"bugchecks: {BlueScreenCount(s)}, unexpected shutdowns: {s.UnexpectedShutdowns}" +
                 (s.StopCodes.Count > 0 ? "; stop codes: " + string.Join(", ", s.StopCodes.Select(c => $"{StopCodes.Hex(c.Code)}{(StopCodes.Meaning(c.Code) is { } m ? " " + m.Name : "")} x{c.Count}")) : "")));
         if (PageFileTooSmall(s))
             f.Add(F(FindingCode.HealthPageFileTooSmall, PageFileSentence(s), PageFileDetail(s)));
@@ -187,11 +227,60 @@ public static class HealthTriage
     /// <summary>The most frequent stop code, explained; empty when no code could be read or it is not a common one.</summary>
     private static string BlueScreenCause(HealthState s)
     {
-        if (s.StopCodes.Count == 0) return "";
-        var top = s.StopCodes[0];
-        return StopCodes.Meaning(top.Code) is { } m
-            ? $" The most frequent stop code was {StopCodes.Hex(top.Code)} ({m.Name}). {m.Explanation}"
-            : $" The most frequent stop code was {StopCodes.Hex(top.Code)}.";
+        var total = BlueScreenCount(s);
+        var text = "";
+        if (s.StopCodes.Count > 0)
+        {
+            var top = s.StopCodes[0];
+            text = StopCodes.Meaning(top.Code) is { } m
+                ? $" The most frequent stop code was {StopCodes.Hex(top.Code)} ({m.Name}). {m.Explanation}"
+                : $" The most frequent stop code was {StopCodes.Hex(top.Code)}.";
+        }
+        return text + BlueScreenDriverSentence(s, total) + BlueScreenRecurrenceSentence(s, total);
+    }
+
+    /// <summary>The module Windows blamed most often, as a sentence; empty when no report named one.</summary>
+    public static string BlueScreenDriverSentence(HealthState s, int total)
+    {
+        if (s.BlueScreenModules.Count == 0) return "";
+        var top = s.BlueScreenModules[0];
+        if (BlueScreenReports.NameModule(top.Module) is not { } d) return "";
+        if (d.IsWindowsItself)
+            return $" Windows named its own core file \"{d.Module}\", which does not point to one specific driver.";
+        var what = d.Display.Equals(d.Module, StringComparison.OrdinalIgnoreCase) ? $"the file \"{d.Module}\"" : $"the {d.Display} (\"{d.Module}\")";
+        var when = total <= 1 ? "" : top.Count >= total ? "Each time, " : $"In {top.Count} of these, ";
+        return when.Length == 0 ? $" Windows named {what} as the cause." : $" {when}Windows named {what} as the cause.";
+    }
+
+    /// <summary>Whether the blue screens keep happening: how many days, and whether the stop code is always the same.</summary>
+    public static string BlueScreenRecurrenceSentence(HealthState s, int total)
+    {
+        var r = BlueScreenReports.Recur(total, s.BlueScreenTimes, s.StopCodes);
+        if (total <= 1) return " It has happened only once so far.";
+        if (r.KeepsHappening)
+            return (r.Days >= 2 ? $" The problem keeps happening, on {r.Days} different days." : " The problem keeps happening.")
+                + (r.SameCodeEachTime ? " The stop code was the same every time, which points to one cause." : "");
+        return " It happened more than once, but on one day only.";
+    }
+
+    /// <summary>Blue screens from the System log; when it has none, crashes recorded with a stop code by Kernel-Power 41.</summary>
+    public static int BlueScreenCount(HealthState s) => s.BlueScreens > 0 ? s.BlueScreens : s.KernelPowerBugchecks;
+
+    /// <summary>The cause groups of the most frequent stop codes (usual cause and second possibility), plus the group of the named driver.</summary>
+    private static List<CauseGroup> BlueScreenCauseGroups(HealthState s)
+    {
+        var g = new List<CauseGroup>();
+        foreach (var c in s.StopCodes.Take(3))
+            if (BlueScreenReports.CausesOf(c.Code) is { } x)
+            {
+                g.Add(x.Primary);
+                if (x.Secondary is { } sec) g.Add(sec);
+            }
+            else if (StopCodes.Meaning(c.Code)?.Category is { } cat)
+                g.Add(cat switch { StopCategory.Storage => CauseGroup.Disk, StopCategory.Memory => CauseGroup.Memory, StopCategory.Graphics => CauseGroup.Graphics, StopCategory.Driver => CauseGroup.Driver, _ => CauseGroup.Unknown });
+        if (s.BlueScreenModules.Count > 0 && BlueScreenReports.NameModule(s.BlueScreenModules[0].Module) is { IsWindowsItself: false } d)
+            g.Add(d.Group == CauseGroup.Unknown ? CauseGroup.Driver : d.Group);
+        return g.Distinct().ToList();
     }
 
     public const long PageFileMinimumMb = 1024;
@@ -256,10 +345,16 @@ public static class HealthTriage
         }
         if (codes.Contains(FindingCode.HealthDeviceProblem))
             AddDeviceRungs(s, r);
-        if (codes.Contains(FindingCode.HealthDriveFailing) || codes.Contains(FindingCode.HealthDriveWarning))
+        if (codes.Contains(FindingCode.HealthDriveFailing) || codes.Contains(FindingCode.HealthDriveWarning) || codes.Contains(FindingCode.HealthDriveWornOut) || codes.Contains(FindingCode.HealthDriveWearing) || codes.Contains(FindingCode.HealthDriveErrors))
             r.Add(new("back_up_files", "ui.open_settings_page", 0,
                 "Please copy your important files (documents, photos) to a USB drive or to OneDrive before anything else. " +
                 "AutoFix Scout will open the \"Windows Backup\" settings, which can do this for you.", "backup"));
+        if (codes.Contains(FindingCode.HealthDriveHot))
+            r.Add(new("drive_cooling", "ui.human_step", 0,
+                "Please make sure the air vents and fans are free of dust and that nothing blocks them. A laptop should stand on a hard, flat surface, not on a bed or a blanket. " +
+                "If the drive is in a desktop computer, a helper can check that the case fans work."));
+        // Optional and never automatic: the wear and error counters of a drive can be read by administrators only.
+        if (OfferDriveRead(s)) r.Add(ReadRungs.DriveHealth());
         if (codes.Contains(FindingCode.HealthClockWrong) && s.AutoTimeOff)
             r.Add(new("auto_time_on", "ui.open_settings_page", 0,
                 "AutoFix Scout will open the \"Date and time\" settings. Please switch on \"Set time automatically\", and check that the time zone is correct.", "dateandtime"));
@@ -337,24 +432,39 @@ public static class HealthTriage
         }
         if (codes.Contains(FindingCode.HealthStoreAppsDamaged) || codes.Contains(FindingCode.HealthServicesFailing) || codes.Contains(FindingCode.HealthBlueScreens))
             systemRepair = true;
-        var causes = codes.Contains(FindingCode.HealthBlueScreens)
-            ? s.StopCodes.Take(3).Select(c => StopCodes.Meaning(c.Code)?.Category).Where(c => c is not null).Select(c => c!.Value).Distinct().ToList()
-            : new List<StopCategory>();
-        if (codes.Contains(FindingCode.HealthDiskErrors) || causes.Contains(StopCategory.Storage))
+        var causes = codes.Contains(FindingCode.HealthBlueScreens) ? BlueScreenCauseGroups(s) : new List<CauseGroup>();
+        var named = codes.Contains(FindingCode.HealthBlueScreens) && s.BlueScreenModules.Count > 0 ? BlueScreenReports.NameModule(s.BlueScreenModules[0].Module) : null;
+        // Optional and never automatic: the reports that name the driver are readable by administrators only.
+        if (codes.Contains(FindingCode.HealthBlueScreens) && s.BlueScreenModules.Count == 0 && !s.CrashReportsRead) r.Add(ReadRungs.CrashReports());
+        if (codes.Contains(FindingCode.HealthDiskErrors) || causes.Contains(CauseGroup.Disk))
             r.Add(Admin("scan_disk", "disk.scan", "AutoFix Scout can ask Windows to scan the drive for file system errors while you keep working.", "C"));
-        if (causes.Contains(StopCategory.Memory))
+        if (causes.Contains(CauseGroup.Memory))
             r.Add(new("memory_diagnostic", "ui.human_step", 0,
                 "Faulty memory (RAM) can cause these blue screens. Please save your work, then press the Windows key and R together, type \"mdsched.exe\", and select \"OK\". " +
                 "Choose \"Restart now and check for problems\". The computer restarts, and the Windows Memory Diagnostic test takes several minutes. " +
                 "Windows shows the result after it starts again. AutoFix Scout does not start the Windows Memory Diagnostic."));
-        if (causes.Contains(StopCategory.Graphics) || causes.Contains(StopCategory.Driver))
+        if (named is { IsWindowsItself: false })
+            r.Add(new("bluescreen_named_driver", "ui.human_step", 0,
+                named.Display.Equals(named.Module, StringComparison.OrdinalIgnoreCase)
+                    ? $"Windows named the file \"{named.Module}\" as the cause. Please find out which program or device it belongs to, then update or reinstall that program or driver. If it belongs to a program that is no longer needed, please uninstall the program."
+                    : $"Windows named the {named.Display} (\"{named.Module}\") as the cause. Please update that driver, or reinstall it if it is already up to date. The newest version is available through Windows Update or from the web site of its maker."));
+        if (causes.Contains(CauseGroup.Graphics) || causes.Contains(CauseGroup.Driver))
             r.Add(new("bluescreen_driver_updates", "ui.open_settings_page", 0,
                 "AutoFix Scout will open \"Windows Update\". Please select \"Check for updates\", then \"Advanced options\", then \"Optional updates\", then \"Driver updates\", and install any driver offered" +
-                (causes.Contains(StopCategory.Graphics) ? ", in particular a display driver." : "."), "windowsupdate"));
-        if (causes.Contains(StopCategory.Driver))
+                (causes.Contains(CauseGroup.Graphics) ? ", in particular a display driver." : "."), "windowsupdate"));
+        if (causes.Contains(CauseGroup.Driver))
             r.Add(new("bluescreen_driver_maker", "ui.human_step", 0,
                 "If Windows Update offers no driver, please open the support web site of the computer's maker, search for the model, and download the newest drivers for Windows, starting with the chipset, storage and network drivers. " +
                 "Run the installers, then restart the computer. AutoFix Scout does not install drivers from other sources."));
+        if (causes.Contains(CauseGroup.Graphics))
+            r.Add(GraphicsTriage.CleanDriverRung());
+        if (causes.Contains(CauseGroup.Hardware))
+        {
+            r.Add(PerfTriage.CoolingRung());
+            r.Add(new("bluescreen_hardware_settings", "ui.human_step", 0,
+                "The computer's hardware reported an error that could not be corrected. If the processor, memory or graphics card has been overclocked, please return it to the standard settings. " +
+                "Please also use the charger that came with the computer, and restart it after the change. If the blue screens continue, a repair shop should check the computer, because a part may be failing."));
+        }
         if (codes.Contains(FindingCode.HealthPageFileTooSmall))
         {
             r.Add(Admin("pagefile_automatic", "system.pagefile_auto",

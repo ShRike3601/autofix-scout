@@ -20,6 +20,9 @@ public sealed class AppSettings
     /// <summary>Default off. Only for people who test builds: lets a development build be offered a release.</summary>
     public bool OfferUpdatesToDevBuilds { get; set; }
 
+    /// <summary>Default off. Opt in to test versions (GitHub pre-releases, for example 0.4.0-beta.1).</summary>
+    public bool BetaUpdates { get; set; }
+
     // ---- Appearance and behaviour (Settings panel) ----
 
     /// <summary>"dark" (default), "light" or "system" (follows the Windows app mode).</summary>
@@ -39,6 +42,9 @@ public sealed class AppSettings
 
     /// <summary>Shows the list of steps unfolded during a check (for people who want to follow every step).</summary>
     public bool ActivityOpen { get; set; }
+
+    /// <summary>The first-run tour was shown (or skipped).</summary>
+    public bool TourDone { get; set; }
 
     public static readonly string[] Themes = { "dark", "light", "system" };
     public static readonly string[] Accents = { "blue", "teal", "violet", "orange" };

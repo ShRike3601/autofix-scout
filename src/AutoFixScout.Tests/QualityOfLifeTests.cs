@@ -473,3 +473,29 @@ public class AppearanceSettingsTests
         finally { try { Directory.Delete(dir, true); } catch (IOException) { } }
     }
 }
+
+public class WindowPlacementTests
+{
+    [Fact]
+    public void FitTo_KeepsVisibleWindows_DropsLostOnes()
+    {
+        var p = new AutoFixScout.Updates.WindowPlacement(100, 80, 1100, 760, false);
+        Assert.Equal(p, p.FitTo(0, 0, 1920, 1080, 880, 560));
+        Assert.Null((p with { Left = 3000 }).FitTo(0, 0, 1920, 1080, 880, 560));          // monitor unplugged
+        Assert.Null((p with { Width = 300 }).FitTo(0, 0, 1920, 1080, 880, 560));          // too small
+        Assert.Equal(1366, (p with { Width = 2500 }).FitTo(0, 0, 1366, 768, 880, 560)!.Width); // shrunk to the screen
+    }
+
+    [Fact]
+    public void SaveAndLoad_RoundTrip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "afs-window-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            new AutoFixScout.Updates.WindowPlacement(10, 20, 1000, 700, true).Save(dir);
+            Assert.Equal(new AutoFixScout.Updates.WindowPlacement(10, 20, 1000, 700, true), AutoFixScout.Updates.WindowPlacement.Load(dir));
+            Assert.Null(AutoFixScout.Updates.WindowPlacement.Load(dir + "-none"));
+        }
+        finally { try { Directory.Delete(dir, true); } catch (IOException) { } }
+    }
+}

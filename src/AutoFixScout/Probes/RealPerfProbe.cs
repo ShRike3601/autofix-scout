@@ -24,7 +24,7 @@ public sealed class RealPerfProbe : IPerfProbe
         void Part(string name, Action read)
         {
             try { read(); }
-            catch (Exception ex) { errors.Add($"{name}: {ex.Message}"); }
+            catch (Exception ex) { AppLog.Warn("Perf probe", ex); errors.Add($"{name}: {ex.Message}"); }
         }
 
         Activity.Report(ActivityKind.Analyze, "Reading processor speed, power settings, memory and stability signals");
@@ -42,6 +42,8 @@ public sealed class RealPerfProbe : IPerfProbe
             var (blue, shut, whea) = RealHealthProbe.ReadInstabilitySignals();
             s.BlueScreens = blue; s.UnexpectedShutdowns = shut; s.HardwareErrors = whea; s.InstabilityRead = true;
         });
+        s.PhysicalDriveCount = RealHealthProbe.CountPhysicalDrives();
+        s.DriveHealthRead = ElevatedDiagnostics.DriveHealthWasRead;
         s.ProbeErrors = errors;
         Activity.Report(ActivityKind.Analyze, errors.Count == 0 ? "Read all parts of the performance check" : $"{Activity.Count(errors.Count, "part")} of the performance check could not be read");
         return s;
@@ -116,7 +118,7 @@ public sealed class RealPerfProbe : IPerfProbe
 
     [DllImport("powrprof.dll")] private static extern uint PowerGetEffectiveOverlayScheme(out Guid scheme);
 
-    private static string? ReadOverlay()
+    internal static string? ReadOverlay()
     {
         Activity.Report(ActivityKind.Command, "Calling PowerGetEffectiveOverlayScheme (power mode)");
         return PowerGetEffectiveOverlayScheme(out var g) == 0 ? g.ToString() : null;

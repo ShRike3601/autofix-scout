@@ -22,16 +22,21 @@ public partial class MainWindow : Window, IFixHost
     {
         InitializeComponent();
         PreviewKeyDown += OnWindowPreviewKeyDown;
+        RestorePlacement();
+        DecideTour();
         Loaded += async (_, _) =>
         {
             CloseUnfinishedSessions();
             _ = BuildSidebarAsync();
+            ShowTourIfNeeded();
             // For screenshots and testing: AUTOFIXSCOUT_OPEN=settings opens the settings panel at start.
             // "graphics" starts the read-only graphics check; "graphics-log" also unfolds the activity list.
             switch (Environment.GetEnvironmentVariable("AUTOFIXSCOUT_OPEN"))
             {
                 case "settings": SetSettingsOpen(true); break;
+                case "settings-end": SetSettingsOpen(true); _ = Dispatcher.InvokeAsync(() => (SettingsBody.Parent as System.Windows.Controls.ScrollViewer)?.ScrollToEnd(), System.Windows.Threading.DispatcherPriority.Loaded); break;
                 case "graphics": OnGraphicsClicked(this, new RoutedEventArgs()); break;
+                case "netquality": OnConnectionQualityClicked(this, new RoutedEventArgs()); break;
                 case "graphics-log": OnGraphicsClicked(this, new RoutedEventArgs()); EnsureActivityPanel(); SetActivityOpen(true); break;
             }
             await RecoverOpenSavePointsAsync();
@@ -135,13 +140,16 @@ public partial class MainWindow : Window, IFixHost
             var report = HelperReport.Build(topic, before.State, before.Findings, log.Select(l => l.ToString()), outcome);
             var logError = FinishSession(sessionId, log, outcome);
             if (logError != null) report += $"\nSession log unavailable: {logError}\n";
-            _lastReportPath = HelperReport.Save(topic, report);
+            HelperReport.Save(topic, report); // the plain text copy stays for anyone who prefers it
+            try { _lastReportPath = HelperReport.SaveHtml(HelperReport.BuildHtmlNow(topic, before.Findings, log.Select(l => l.ToString()), outcome, AppVersion, _checkStarted)); }
+            catch (Exception) { _lastReportPath = HelperReport.Save(topic, report); }
             var end = outcome == Outcome.NotFixed && after.NotFixedHint is { } hint ? hint : EndMessage(outcome, what);
             Journey(Stage.Done, warn: outcome is not (Outcome.Fixed or Outcome.NoFaultFound));
             await ShowStepAsync(end, "Finish", look: EndLook(outcome));
         }
         catch (Exception ex)
         {
+            AppLog.Error("check", ex);
             FinishSession(sessionId, new List<StepLog>(), Outcome.Abandoned);
             Journey(Stage.Done, warn: true);
             await ShowStepAsync($"AutoFix Scout could not complete the check.\n\nTechnical detail: {ex.Message}", "Finish", look: Look.Problem);
@@ -338,6 +346,12 @@ public partial class MainWindow : Window, IFixHost
         var matched = rank.Candidates.Any(c => c.Score > 0);
         var areas = rank.Candidates.Select(c => c.Route.Area).ToList();
         var options = rank.Candidates.Select(c => new Choice(AreaGlyph(c.Route.Area), c.Route.Title, c.Covers)).ToList();
+        var settingTitle = Areas.SettingsSearch.Match(text);
+        if (settingTitle is not null)
+        {
+            areas.Add("setting");
+            options.Add(new Choice(0xE713, "Open the setting: " + settingTitle, "Settings"));
+        }
         if (!areas.Contains("health"))
         {
             areas.Add("health");
@@ -354,6 +368,7 @@ public partial class MainWindow : Window, IFixHost
         if (pick < 0) { ShowHome(); return; }
         Action<object, RoutedEventArgs> run = areas[pick] switch
         {
+            "setting" => (_, _) => SetSettingsOpen(true),
             "sound" => OnSoundClicked,
             "camera" => OnCameraClicked,
             "network" => OnNetworkClicked,
@@ -374,6 +389,9 @@ public partial class MainWindow : Window, IFixHost
             "printer" => OnPrinterClicked,
             "scanner" => OnScannerClicked,
             "display" => OnDisplayClicked,
+            "performance" => OnPerfClicked,
+            "graphics" => OnGraphicsClicked,
+            "netquality" => OnConnectionQualityClicked,
             _ => OnHealthClicked,
         };
         run(sender, e);
@@ -463,6 +481,10 @@ private async void OnInstallClicked(object sender, RoutedEventArgs e) => await R
         await RunFlowAsync(Areas.PerfFlow.Topic, Areas.PerfFlow.What, Areas.PerfFlow.DiagnoseAsync,
             () => AskAsync(Areas.PerfFlow.TestQuestion));
 
+    private async void OnConnectionQualityClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.ConnectionQualityFlow.Topic, Areas.ConnectionQualityFlow.What, () => Areas.ConnectionQualityFlow.DiagnoseAsync(),
+            () => AskAsync(Areas.ConnectionQualityFlow.TestQuestion));
+
     private async void OnGraphicsClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.GraphicsFlow.Topic, Areas.GraphicsFlow.What, Areas.GraphicsFlow.DiagnoseAsync,
             () => AskAsync(Areas.GraphicsFlow.TestQuestion));
@@ -506,7 +528,7 @@ private async void OnScannerClicked(object sender, RoutedEventArgs e) =>        
         if (_lastReportPath is null)
             MessageBox.Show(this, "A report will be available here after a check has been completed.", AppName);
         else
-            Process.Start(new ProcessStartInfo("notepad.exe", $"\"{_lastReportPath}\""));
+            Process.Start(new ProcessStartInfo(_lastReportPath) { UseShellExecute = true }); // .html opens in the default browser
     }
 
     /// <summary>"History" in the sidebar: changes with Undo and recent checks (MainWindow.Extras.cs).</summary>

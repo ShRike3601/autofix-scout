@@ -603,6 +603,6 @@ public class HealthTests
         foreach (var t in f.Select(x => x.PlainMessage).Concat(l.Select(r => r.Say)))
             Assert.DoesNotMatch(@"n't|'d |'ll |\bI\b|\bwe\b|!|\bit's\b|\bthat's\b", t);
         Assert.Equal(l.Count, l.Select(r => r.Id).Distinct().Count());
-        Assert.All(l.Where(r => r.Tier == 1), r => Assert.EndsWith("Windows will ask for your permission.", r.Say));
+        Assert.All(l.Where(r => r.Tier == 1 && !Probes.DiagResults.IsDiagAction(r.ActionId)), r => Assert.EndsWith("Windows will ask for your permission.", r.Say));
     }
 }

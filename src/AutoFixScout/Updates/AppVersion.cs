@@ -42,7 +42,34 @@ public readonly record struct AppVersion(int Major, int Minor, int Patch, int Bu
         if (Pre is null && o.Pre is null) return 0;
         if (Pre is null) return 1;      // 1.0.0 is newer than 1.0.0-beta
         if (o.Pre is null) return -1;
-        return string.CompareOrdinal(Pre, o.Pre);
+        return ComparePre(Pre, o.Pre);
+    }
+
+    /// <summary>
+    /// Semantic version order of pre-release text: dot-separated identifiers from left to right; numbers compare as
+    /// numbers (beta.10 is after beta.2), numbers are before words, words compare as plain text, and the shorter list
+    /// is older when all shared identifiers are equal (beta is before beta.1).
+    /// </summary>
+    private static int ComparePre(string a, string b)
+    {
+        var x = a.Split('.'); var y = b.Split('.');
+        for (var i = 0; i < Math.Min(x.Length, y.Length); i++)
+        {
+            var xn = IsNumber(x[i]); var yn = IsNumber(y[i]);
+            int c;
+            if (xn && yn)
+            {
+                var p = x[i].TrimStart('0'); var q = y[i].TrimStart('0');
+                c = p.Length != q.Length ? p.Length.CompareTo(q.Length) : string.CompareOrdinal(p, q);
+            }
+            else if (xn) c = -1;
+            else if (yn) c = 1;
+            else c = string.CompareOrdinal(x[i], y[i]);
+            if (c != 0) return Math.Sign(c);
+        }
+        return x.Length.CompareTo(y.Length);
+
+        static bool IsNumber(string t) => t.Length > 0 && t.All(char.IsAsciiDigit);
     }
 
     /// <summary>True when <paramref name="candidate"/> should replace <paramref name="current"/>. Dev builds are older than any release.</summary>

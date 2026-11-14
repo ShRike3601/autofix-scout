@@ -35,6 +35,9 @@ public class SymptomRouterTests
     [InlineData("my scanner is not working", "scanner")]
     [InlineData("the program will not install, error 1603", "install")]
     [InlineData("I am not getting notifications from Teams", "notifications")]
+    [InlineData("the internet is slow", "netquality")]
+    [InlineData("my games lag online", "netquality")]
+    [InlineData("my internet is not working at all", "network")]
     [InlineData("something is wrong", "health")]
     [InlineData("", "health")]
     public void RoutesToTheRightCheck(string text, string area) => Assert.Equal(area, SymptomRouter.Best(text).Area);

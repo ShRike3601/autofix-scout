@@ -21,6 +21,7 @@ public static partial class SymptomRouter
         ["microphone"] = "The microphone, its privacy settings, the selected input and its level.",
         ["camera"] = "The camera, its privacy settings, apps using it and its driver.",
         ["network"] = "Wi-Fi and network cable, the connection to the router, DNS, proxy and network settings.",
+        ["netquality"] = "Delay, jitter and lost packets to the router and to the internet, to tell whether a slow or laggy connection is caused by the Wi-Fi or by the internet provider.",
         ["program"] = "Programs that closed unexpectedly and the likely cause recorded by Windows.",
         ["storage"] = "Free space, temporary files, startup apps and programs that slow the computer down.",
         ["update"] = "Windows Update services, failed updates, a waiting restart and free space.",
