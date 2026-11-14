@@ -1,7 +1,12 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 
+#if AFS_EXECUTOR
+// Linked into the elevated helper: a separate namespace, so the app and the helper never clash (the tests reference both).
+namespace AutoFixScout.Executor.Shared;
+#else
 namespace AutoFixScout.Probes;
+#endif
 
 /// <summary>The kind of cause a stop code usually points at. Drives the advice shown after a blue screen.</summary>
 public enum CauseGroup { Driver, Memory, Graphics, Disk, Files, Hardware, Unknown }
@@ -19,7 +24,7 @@ public sealed record ModuleCount(string Module, int Count);
 public sealed record WerBlueScreen(string EventType, uint? Code, string? Module, DateTime? WhenUtc);
 
 /// <summary>Mappers and parsers for blue screens. Pure logic: no file or event log access.</summary>
-public static class BlueScreenReports
+public static partial class BlueScreenReports
 {
     // ---- stop code -> cause group ----
 
@@ -158,17 +163,4 @@ public static class BlueScreenReports
             .GroupBy(m => m!, StringComparer.OrdinalIgnoreCase)
             .Select(g => new ModuleCount(g.Key, g.Count())).OrderByDescending(c => c.Count).ThenBy(c => c.Module, StringComparer.OrdinalIgnoreCase).ToList();
 
-    /// <summary>
-    /// How often the blue screens recur. Days = different calendar days; KeepsHappening = three or more in all, or two
-    /// on two different days; SameCodeEachTime = one stop code, seen at least twice.
-    /// </summary>
-    public sealed record Recurrence(int Total, int Days, bool SameCodeEachTime, bool KeepsHappening);
-
-    public static Recurrence Recur(int total, IEnumerable<DateTime> times, IReadOnlyList<StopCodeCount> codes)
-    {
-        var days = times.Select(t => t.Date).Distinct().Count();
-        var same = codes.Count == 1 && codes[0].Count >= 2;
-        var keeps = total >= 3 || (total >= 2 && days >= 2);
-        return new Recurrence(total, days, same, keeps);
-    }
 }

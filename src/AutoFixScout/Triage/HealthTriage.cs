@@ -388,6 +388,8 @@ public static class HealthTriage
             systemRepair = true;
         var causes = codes.Contains(FindingCode.HealthBlueScreens) ? BlueScreenCauseGroups(s) : new List<CauseGroup>();
         var named = codes.Contains(FindingCode.HealthBlueScreens) && s.BlueScreenModules.Count > 0 ? BlueScreenReports.NameModule(s.BlueScreenModules[0].Module) : null;
+        // Optional and never automatic: the reports that name the driver are readable by administrators only.
+        if (codes.Contains(FindingCode.HealthBlueScreens) && s.BlueScreenModules.Count == 0 && !s.CrashReportsRead) r.Add(ReadRungs.CrashReports());
         if (codes.Contains(FindingCode.HealthDiskErrors) || causes.Contains(CauseGroup.Disk))
             r.Add(Admin("scan_disk", "disk.scan", "AutoFix Scout can ask Windows to scan the drive for file system errors while you keep working.", "C"));
         if (causes.Contains(CauseGroup.Memory))

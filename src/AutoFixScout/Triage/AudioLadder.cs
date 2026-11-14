@@ -219,6 +219,8 @@ public static class LadderRunner
                 continue;
             }
             step.Result = StepResult.Success;
+            // A read-only read cannot fix anything, so there is nothing to test. The next check uses the new data.
+            if (Probes.DiagResults.IsDiagAction(rung.ActionId)) continue;
             step.UserConfirmedFixed = await host.TestAsync();
 
             if (rung.Tier >= 2)

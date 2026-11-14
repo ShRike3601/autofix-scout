@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <DefineConstants>$(DefineConstants);AFS_EXECUTOR</DefineConstants>
     <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -23,6 +24,10 @@
     <Compile Include="../AutoFixScout/Repair/WifiTuning.cs" Link="Repair/WifiTuning.cs" />
     <Compile Include="../AutoFixScout/Repair/OfficeClickToRun.cs" Link="Repair/OfficeClickToRun.cs" />
     <Compile Include="../AutoFixScout/Repair/BrowserPolicies.cs" Link="Repair/BrowserPolicies.cs" />
+    <!-- Parsers and the result file format of the read-only diag actions: the same code the app uses to validate the result. -->
+    <Compile Include="../AutoFixScout/Probes/StartupTimings.Parse.cs" Link="Probes/StartupTimings.Parse.cs" />
+    <Compile Include="../AutoFixScout/Probes/BlueScreenReports.cs" Link="Probes/BlueScreenReports.cs" />
+    <Compile Include="../AutoFixScout/Probes/DiagResults.cs" Link="Probes/DiagResults.cs" />
   </ItemGroup>
 
 </Project>

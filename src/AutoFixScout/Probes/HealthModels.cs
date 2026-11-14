@@ -27,6 +27,8 @@ public sealed class HealthState
     public IReadOnlyList<StopCodeCount> StopCodes { get; set; } = new List<StopCodeCount>();
     /// <summary>Modules (driver files) that Windows named in blue screen reports in the last 14 days, most frequent first. Often empty: the reports can need administrator rights.</summary>
     public IReadOnlyList<ModuleCount> BlueScreenModules { get; set; } = new List<ModuleCount>();
+    /// <summary>The blue screen reports were read through the elevated helper (even when they named no module). Stops the same offer from coming back.</summary>
+    public bool CrashReportsRead { get; set; }
     /// <summary>When the blue screens happened (local time), from the System log.</summary>
     public IReadOnlyList<DateTime> BlueScreenTimes { get; set; } = new List<DateTime>();
     /// <summary>Kernel-Power 41 events that carry a stop code (the code is not 0), in the last 14 days.</summary>
