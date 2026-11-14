@@ -40,6 +40,9 @@ public sealed class AppSettings
     /// <summary>Shows the list of steps unfolded during a check (for people who want to follow every step).</summary>
     public bool ActivityOpen { get; set; }
 
+    /// <summary>The first-run tour was shown (or skipped).</summary>
+    public bool TourDone { get; set; }
+
     public static readonly string[] Themes = { "dark", "light", "system" };
     public static readonly string[] Accents = { "blue", "teal", "violet", "orange" };
     public static readonly double[] TextScales = { 1.0, 1.1, 1.2 };

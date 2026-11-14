@@ -23,10 +23,12 @@ public partial class MainWindow : Window, IFixHost
         InitializeComponent();
         PreviewKeyDown += OnWindowPreviewKeyDown;
         RestorePlacement();
+        DecideTour();
         Loaded += async (_, _) =>
         {
             CloseUnfinishedSessions();
             _ = BuildSidebarAsync();
+            ShowTourIfNeeded();
             // For screenshots and testing: AUTOFIXSCOUT_OPEN=settings opens the settings panel at start.
             // "graphics" starts the read-only graphics check; "graphics-log" also unfolds the activity list.
             switch (Environment.GetEnvironmentVariable("AUTOFIXSCOUT_OPEN"))
