@@ -20,6 +20,9 @@ public sealed class AppSettings
     /// <summary>Default off. Only for people who test builds: lets a development build be offered a release.</summary>
     public bool OfferUpdatesToDevBuilds { get; set; }
 
+    /// <summary>Default off. Opt in to test versions (GitHub pre-releases, for example 0.4.0-beta.1).</summary>
+    public bool BetaUpdates { get; set; }
+
     // ---- Appearance and behaviour (Settings panel) ----
 
     /// <summary>"dark" (default), "light" or "system" (follows the Windows app mode).</summary>
