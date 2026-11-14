@@ -31,7 +31,7 @@
         <GradientStop Color="#99FFFFFF" Offset="0"/>
         <GradientStop Color="#66FFFFFF" Offset="1"/>
     </LinearGradientBrush>
-    <SolidColorBrush x:Key="FlyoutBrush" Color="#F7FFFFFF"/>
+    <SolidColorBrush x:Key="FlyoutBrush" Color="#FFFFFFFF"/>
     <SolidColorBrush x:Key="DividerBrush" Color="#26000000"/>
     <SolidColorBrush x:Key="InputBrush" Color="#B3FFFFFF"/>
     <SolidColorBrush x:Key="InputBorderBrush" Color="#40000000"/>

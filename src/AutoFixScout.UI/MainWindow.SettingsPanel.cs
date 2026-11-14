@@ -40,7 +40,7 @@ public partial class MainWindow
         var glass = Check("Frosted glass", s.Glass);
         glass.Click += (_, _) => Change(x => x.Glass = glass.IsChecked == true);
         card.Children.Add(glass);
-        card.Children.Add(Helper("Windows 11 with the dark theme. Turn it off for a solid look or on slower computers."));
+        card.Children.Add(Helper("On Windows 11, in the dark and the light theme. Turn it off for a solid look or on slower computers."));
         var motion = Check("Reduce motion", s.ReduceMotion);
         motion.Margin = new Thickness(0, 12, 0, 0);
         motion.Click += (_, _) => Change(x => x.ReduceMotion = motion.IsChecked == true);
