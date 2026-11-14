@@ -54,6 +54,7 @@ public static class FixActions
                         "camera" => "ms-settings:privacy-webcam",
                         "airplane" => "ms-settings:network-airplanemode",
                         "wifi" => "ms-settings:network-wifi",
+                        "network_status" => "ms-settings:network-status",
                         "camera_app" => "microsoft.windows.camera:",
                         "storagesense" => "ms-settings:storagesense",
                         "startupapps" => "ms-settings:startupapps",

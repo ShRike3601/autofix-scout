@@ -62,5 +62,7 @@ public sealed class QualityState
     /// <summary>Link speed reported by Windows for the adapter, in megabits per second.</summary>
     public int? LinkSpeedMbps { get; set; }
     public double DurationSeconds { get; set; }
+    /// <summary>Name lookup (DNS) speed; null when not measured.</summary>
+    public DnsMeasurement? Dns { get; set; }
     public IReadOnlyList<string> ProbeErrors { get; set; } = new List<string>();
 }

@@ -402,4 +402,6 @@ public enum FindingCode
     HealthDriveWearing,
     HealthDriveErrors,
     HealthDriveHot,
+    NetQualityDnsSlow,
+    NetQualityDnsSlowEverywhere,
 }
