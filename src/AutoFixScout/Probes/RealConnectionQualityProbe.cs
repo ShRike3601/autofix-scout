@@ -33,7 +33,12 @@ public sealed class RealConnectionQualityProbe
     public const int TimeoutMs = 1000;
 
     private readonly IPingSender _sender;
-    public RealConnectionQualityProbe(IPingSender? sender = null) => _sender = sender ?? new RealPingSender();
+    private readonly DnsSpeedProbe _dns;
+    public RealConnectionQualityProbe(IPingSender? sender = null, IDnsQuerySender? dnsSender = null)
+    {
+        _sender = sender ?? new RealPingSender();
+        _dns = new DnsSpeedProbe(dnsSender);
+    }
 
     public async Task<QualityState> ReadAsync(TimeSpan? duration = null, TimeSpan? interval = null, CancellationToken ct = default)
     {
@@ -72,7 +77,9 @@ public sealed class RealConnectionQualityProbe
         Activity.Report(ActivityKind.Network,
             $"Measuring ping delay, jitter and packet loss to the router and to two public servers for {Activity.Seconds(length)} ({Activity.Count((int)Math.Round(1000 / step.TotalMilliseconds), "ping")} per second each)");
         var sw = System.Diagnostics.Stopwatch.StartNew();
+        var dnsTask = MeasureDnsAsync(errors, ct); // at the same time as the pings
         var results = await MeasureAsync(new IPAddress?[] { gateway, PublicA, PublicB }, length, step, ct);
+        state.Dns = await dnsTask;
         state.DurationSeconds = Math.Round(sw.Elapsed.TotalSeconds, 1);
         state.Gateway = gateway == null ? null : results[0];
         state.InternetA = results[1];
@@ -80,6 +87,22 @@ public sealed class RealConnectionQualityProbe
         state.ProbeErrors = errors;
         Activity.Report(ActivityKind.Analyze, "Calculated the median delay, jitter and packet loss of each target");
         return state;
+    }
+
+    private async Task<DnsMeasurement?> MeasureDnsAsync(List<string> errors, CancellationToken ct)
+    {
+        try
+        {
+            var configured = await Task.Run(DnsSpeedProbe.ConfiguredServers, ct);
+            return await _dns.MeasureAsync(configured, ct);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            AppLog.Warn("ConnectionQuality DNS probe", ex);
+            lock (errors) errors.Add("dns: " + ex.Message);
+            return null;
+        }
     }
 
     /// <summary>Pings every non-null target once per <paramref name="step"/> for <paramref name="length"/>. Index i of the result belongs to targets[i].</summary>

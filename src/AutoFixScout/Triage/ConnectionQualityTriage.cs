@@ -52,7 +52,8 @@ public static class ConnectionQualityTriage
     private static string Detail(QualityState s) =>
         $"{Describe("router", s.Gateway)}; {Describe("internet server 1", s.InternetA)}; {Describe("internet server 2", s.InternetB)}; " +
         $"connection {(s.OnWifi ? "Wi-Fi" : "wired or unknown")}; Wi-Fi signal {(s.WifiSignalPercent is { } w ? w + " %" : "n/a")}; " +
-        $"link speed {(s.LinkSpeedMbps is { } l ? l + " Mbps" : "n/a")}; test length {N(s.DurationSeconds)} s";
+        $"link speed {(s.LinkSpeedMbps is { } l ? l + " Mbps" : "n/a")}; test length {N(s.DurationSeconds)} s" +
+        (s.Dns == null ? "" : "; " + DnsQualityTriage.Detail(s.Dns));
 
     /// <summary>One finding. Never empty.</summary>
     public static IReadOnlyList<Finding> Evaluate(QualityState s)
@@ -78,6 +79,9 @@ public static class ConnectionQualityTriage
             var best = Best(internet);
             return new[] { F(gateway == null ? FindingCode.NetQualityInternetUnclear : FindingCode.NetQualityInternet, InternetMessage(best, gateway == null), detail) };
         }
+
+        // The ping test is fine: slow name lookups are the only thing left to report.
+        if (DnsQualityTriage.Evaluate(s.Dns) is { } dns) return new[] { dns };
 
         var bestOk = Best(internet);
         var routerPart = gateway == null
@@ -141,6 +145,14 @@ public static class ConnectionQualityTriage
                 else rungs.Add(CheckCable);
                 rungs.Add(NetworkTriage.RestartRouter);
                 break;
+            case FindingCode.NetQualityDnsSlow:
+                rungs.Add(DnsQualityTriage.ChangeServer);
+                rungs.Add(NetworkTriage.RestartRouter);
+                break;
+            case FindingCode.NetQualityDnsSlowEverywhere:
+                rungs.Add(PauseTraffic);
+                rungs.Add(NetworkTriage.RestartRouter);
+                break;
             case FindingCode.NetQualityInternet or FindingCode.NetQualityInternetUnclear:
                 if (findings[0].Code == FindingCode.NetQualityInternetUnclear && s.OnWifi) rungs.Add(NetworkTriage.MoveCloser);
                 rungs.Add(PauseTraffic);
@@ -159,6 +171,7 @@ public static class ConnectionQualityTriage
     {
         FindingCode.NetQualityLocalNetwork => "The measurements point to your home or office network, not to the internet provider. " +
             "Moving closer to the router, or using a network cable, usually makes the connection steadier.",
+        FindingCode.NetQualityDnsSlow => "Looking up website names is slow with your current DNS server. The DNS server can be changed in the network settings; AutoFix Scout does not change it by itself.",
         FindingCode.NetQualityInternet => "The measurements point to the internet connection. Your internet provider can check the line; please give them the numbers from this check.",
         _ => null,
     };

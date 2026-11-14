@@ -323,7 +323,7 @@ public class DriveHealthReadTests
     public void NewCodes_AreAtTheEndOfTheEnum()
     {
         var all = Enum.GetValues<FindingCode>().ToList();
-        Assert.Equal(new[] { FindingCode.HealthDriveWornOut, FindingCode.HealthDriveWearing, FindingCode.HealthDriveErrors, FindingCode.HealthDriveHot }, all.TakeLast(4));
+        Assert.Equal(new[] { FindingCode.HealthDriveWornOut, FindingCode.HealthDriveWearing, FindingCode.HealthDriveErrors, FindingCode.HealthDriveHot }, all.SkipLast(2).TakeLast(4)); // the DNS codes were appended after these
     }
 
     // ---- the rung ----
