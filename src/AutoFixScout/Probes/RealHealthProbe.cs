@@ -69,7 +69,7 @@ public sealed class RealHealthProbe : IHealthProbe
             catch (Exception ex) { errors[i] = $"{p.Name}: {ex.Message}"; }
         })).ToArray());
 
-        ElevatedDiagnostics.ApplyTo(s); // crash report data the elevated helper read earlier in this session
+        ElevatedDiagnostics.ApplyTo(s); // crash report and drive data the elevated helper read earlier in this session
         s.ProbeErrors = errors.Where(e => e != null).Select(e => e!).ToList();
         Activity.Report(ActivityKind.Analyze, s.ProbeErrors.Count == 0 ? "All parts of the check-up were read" : $"{Activity.Count(s.ProbeErrors.Count, "part")} of the check-up could not be read");
         return s;
@@ -469,15 +469,29 @@ public sealed class RealHealthProbe : IHealthProbe
 
         var list = new List<PhysicalDriveInfo>();
         using var s = Wmi.Searcher(@"root\Microsoft\Windows\Storage",
-            "SELECT FriendlyName, MediaType, HealthStatus, OperationalStatus FROM MSFT_PhysicalDisk");
+            "SELECT DeviceId, FriendlyName, MediaType, HealthStatus, OperationalStatus FROM MSFT_PhysicalDisk");
         foreach (System.Management.ManagementObject d in s.Get())
             using (d)
             {
                 var name = (d["FriendlyName"] as string ?? "drive").Trim();
                 list.Add(new PhysicalDriveInfo(name, MediaName(d["MediaType"]), HealthName(d["HealthStatus"]),
-                    (d["OperationalStatus"] as ushort[] ?? Array.Empty<ushort>()).Select(x => (int)x).ToList(), predict.Contains(name)));
+                    (d["OperationalStatus"] as ushort[] ?? Array.Empty<ushort>()).Select(x => (int)x).ToList(), predict.Contains(name))
+                    { DeviceId = int.TryParse(d["DeviceId"] as string, out var id) ? id : null });
             }
         return list;
+    }
+
+    /// <summary>How many physical drives Windows Storage lists (readable without administrator rights); 0 when it cannot be read.</summary>
+    public static int CountPhysicalDrives()
+    {
+        try
+        {
+            using var s = Wmi.Searcher(@"root\Microsoft\Windows\Storage", "SELECT DeviceId FROM MSFT_PhysicalDisk");
+            var n = 0;
+            foreach (System.Management.ManagementObject d in s.Get()) using (d) n++;
+            return n;
+        }
+        catch (Exception) { return 0; }
     }
 
     public static string HealthName(object? v) => Convert.ToInt32(v ?? 5) switch { 0 => "Healthy", 1 => "Warning", 2 => "Unhealthy", _ => "Unknown" };

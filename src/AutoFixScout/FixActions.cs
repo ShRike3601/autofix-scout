@@ -18,7 +18,7 @@ public static class FixActions
         "system.repair_path", "network.reset_winsock", "update.reset_components", "search.rebuild_index", "runtime.install_vcredist", "disk.scan",
         "storage.cleanup_components", "office.quick_repair", "network.wifi_stability", "security.firewall_on", "security.uac_on", "security.remove_browser_policies", "system.pagefile_auto",
         // Read-only: no argument; the result comes back as a file the app validates and deletes (see ElevatedDiagnostics).
-        Probes.DiagResults.BootAction, Probes.DiagResults.CrashAction,
+        Probes.DiagResults.BootAction, Probes.DiagResults.CrashAction, Probes.DiagResults.DriveAction,
     };
 
     public static async Task<(bool Ok, string Detail)> RunAsync(Rung rung)
@@ -105,7 +105,7 @@ public static class FixActions
                     return await Task.Run(() => { var r = RunFixed("DisplaySwitch.exe", "/extend"); Thread.Sleep(3000); return r; });
                 case "display.set_brightness":
                     return await Task.Run(SetBrightness);
-                case Probes.DiagResults.BootAction or Probes.DiagResults.CrashAction:
+                case Probes.DiagResults.BootAction or Probes.DiagResults.CrashAction or Probes.DiagResults.DriveAction:
                     return await RunDiagAsync(rung.ActionId);
                 case var elevated when ElevatedActions.Contains(elevated):
                     var code = await Task.Run(() => RunElevated(rung.ActionId, rung.Arg!));

@@ -44,6 +44,40 @@ public static class HealthTriage
 
     private static string ServiceName(string name) => ServiceDefaults.Find(name)?.DisplayName ?? name;
 
+    // ---- drive wear, errors and temperature (reliability counters, read through diag.read_drive_health) ----
+
+    public const int WearWornOutPercent = 90, WearWearingPercent = 70, HotDriveC = 70;
+
+    public static bool HasUncorrectedErrors(PhysicalDriveInfo d) => d.ReadErrorsUncorrected > 0 || d.WriteErrorsUncorrected > 0;
+
+    /// <summary>Wear of an SSD only (a hard drive reports no wear). Null = Unknown, which gives no finding.</summary>
+    private static int? SsdWear(PhysicalDriveInfo d) => d.MediaType == "SSD" ? d.WearPercent : null;
+
+    public static IEnumerable<Finding> DriveHealthFindings(HealthState s)
+    {
+        var worn = s.Drives.Where(d => SsdWear(d) >= WearWornOutPercent).OrderByDescending(d => d.WearPercent).FirstOrDefault();
+        var wearing = s.Drives.Where(d => SsdWear(d) is >= WearWearingPercent and < WearWornOutPercent).OrderByDescending(d => d.WearPercent).FirstOrDefault();
+        if (worn is not null)
+            yield return F(FindingCode.HealthDriveWornOut,
+                $"The SSD \"{worn.Name}\" has used about {worn.WearPercent} percent of its expected life. Please copy important files to another drive or to cloud storage now, and plan to replace the SSD.",
+                $"{worn.Name} wear={worn.WearPercent}% hours={worn.PowerOnHours?.ToString() ?? "unknown"}");
+        else if (wearing is not null)
+            yield return F(FindingCode.HealthDriveWearing,
+                $"The SSD \"{wearing.Name}\" has used about {wearing.WearPercent} percent of its expected life. It still works, but please keep a recent backup of your important files and plan to replace the SSD in the future.",
+                $"{wearing.Name} wear={wearing.WearPercent}% hours={wearing.PowerOnHours?.ToString() ?? "unknown"}");
+        if (s.Drives.FirstOrDefault(HasUncorrectedErrors) is { } bad)
+            yield return F(FindingCode.HealthDriveErrors,
+                $"The drive \"{bad.Name}\" has reported errors that it could not correct while reading or writing. Please copy important files to another drive or to cloud storage now.",
+                $"{bad.Name} uncorrected read errors={bad.ReadErrorsUncorrected?.ToString() ?? "unknown"} write errors={bad.WriteErrorsUncorrected?.ToString() ?? "unknown"}");
+        if (s.Drives.Where(d => d.TemperatureMaxC >= HotDriveC).OrderByDescending(d => d.TemperatureMaxC).FirstOrDefault() is { } hot)
+            yield return F(FindingCode.HealthDriveHot,
+                $"The drive \"{hot.Name}\" has reached {hot.TemperatureMaxC} degrees Celsius. Please make sure the air vents are free of dust, that nothing blocks the air flow, and that the computer is in a cool place.",
+                $"{hot.Name} temperature={hot.TemperatureC?.ToString() ?? "unknown"} C max={hot.TemperatureMaxC} C");
+    }
+
+    /// <summary>True when drives exist, none has reliability counters yet and the helper has not read them: the optional read is worth offering.</summary>
+    public static bool OfferDriveRead(HealthState s) => !s.DriveHealthRead && s.Drives.Count > 0 && s.Drives.All(d => d.CountersUnknown);
+
     /// <summary>Findings, most important first; always at least one.</summary>
     public static IReadOnlyList<Finding> Evaluate(HealthState s)
     {
@@ -56,6 +90,7 @@ public static class HealthTriage
         else if (s.Drives.FirstOrDefault(d => d.Warning) is { } warn)
             f.Add(F(FindingCode.HealthDriveWarning, $"Windows reports a warning for the drive \"{warn.Name}\". It is a good idea to back up your important files.",
                 $"{warn.Name} ({warn.MediaType}) health={warn.Health} status={string.Join(",", warn.OperationalStatus)}"));
+        foreach (var d in DriveHealthFindings(s)) f.Add(d);
         if (s.TempProfile)
             f.Add(F(FindingCode.HealthTempProfile, "Windows signed you in with a temporary profile, so your desktop and files may look missing. Your files are most likely still safe in your normal profile; nothing is deleted.",
                 s.TempProfileDetail ?? "temporary profile"));
@@ -305,10 +340,16 @@ public static class HealthTriage
         }
         if (codes.Contains(FindingCode.HealthDeviceProblem))
             AddDeviceRungs(s, r);
-        if (codes.Contains(FindingCode.HealthDriveFailing) || codes.Contains(FindingCode.HealthDriveWarning))
+        if (codes.Contains(FindingCode.HealthDriveFailing) || codes.Contains(FindingCode.HealthDriveWarning) || codes.Contains(FindingCode.HealthDriveWornOut) || codes.Contains(FindingCode.HealthDriveWearing) || codes.Contains(FindingCode.HealthDriveErrors))
             r.Add(new("back_up_files", "ui.open_settings_page", 0,
                 "Please copy your important files (documents, photos) to a USB drive or to OneDrive before anything else. " +
                 "AutoFix Scout will open the \"Windows Backup\" settings, which can do this for you.", "backup"));
+        if (codes.Contains(FindingCode.HealthDriveHot))
+            r.Add(new("drive_cooling", "ui.human_step", 0,
+                "Please make sure the air vents and fans are free of dust and that nothing blocks them. A laptop should stand on a hard, flat surface, not on a bed or a blanket. " +
+                "If the drive is in a desktop computer, a helper can check that the case fans work."));
+        // Optional and never automatic: the wear and error counters of a drive can be read by administrators only.
+        if (OfferDriveRead(s)) r.Add(ReadRungs.DriveHealth());
         if (codes.Contains(FindingCode.HealthClockWrong) && s.AutoTimeOff)
             r.Add(new("auto_time_on", "ui.open_settings_page", 0,
                 "AutoFix Scout will open the \"Date and time\" settings. Please switch on \"Set time automatically\", and check that the time zone is correct.", "dateandtime"));

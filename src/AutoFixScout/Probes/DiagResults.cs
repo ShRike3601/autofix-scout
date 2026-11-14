@@ -30,26 +30,44 @@ public sealed class DiagCrashResult
 }
 
 /// <summary>
-/// The result files of the two read-only elevated actions (diag.read_boot_times, diag.read_crash_reports): names,
+/// One physical drive from diag.read_drive_health. No serial number and no path: DeviceId is Windows' small drive number,
+/// Name is the friendly model name. Every reading is null when the drive does not report it (or the value was out of range).
+/// </summary>
+public sealed record DriveHealthRecord(int? DeviceId, string Name, string MediaType, string BusType, string Health, long? SizeBytes,
+    int? WearPercent, int? TemperatureC, int? TemperatureMaxC, long? ReadErrorsTotal, long? ReadErrorsUncorrected,
+    long? WriteErrorsTotal, long? WriteErrorsUncorrected, long? PowerOnHours, long? StartStopCycles);
+
+/// <summary>What diag.read_drive_health writes.</summary>
+public sealed class DiagDriveResult
+{
+    public int Version { get; set; }
+    public string Action { get; set; } = "";
+    public DateTime CreatedUtc { get; set; }
+    public List<DriveHealthRecord> Drives { get; set; } = new();
+}
+
+/// <summary>
+/// The result files of the two read-only elevated actions (diag.read_boot_times, diag.read_crash_reports, diag.read_drive_health): names,
 /// JSON shape, size limits, validation and the privacy filter. Pure; the file is untrusted input for the app, and the
 /// elevated helper uses the same filter before it writes. Shared (linked) with AutoFixScout.Executor.
 /// </summary>
 public static class DiagResults
 {
     public const int Version = 1;
-    public const string BootAction = "diag.read_boot_times", CrashAction = "diag.read_crash_reports";
-    public const string BootFile = "diag-boot-times.json", CrashFile = "diag-crash-reports.json";
+    public const string BootAction = "diag.read_boot_times", CrashAction = "diag.read_crash_reports", DriveAction = "diag.read_drive_health";
+    public const string BootFile = "diag-boot-times.json", CrashFile = "diag-crash-reports.json", DriveFile = "diag-drive-health.json";
     public const int MaxChars = 256 * 1024, MaxBoots = 10, MaxSlowItems = 100, MaxReports = 200, MaxNameLength = 128;
     public const long MaxDurationMs = 24L * 3600 * 1000;
     public const int Days = 30;
+    public const int MaxDrives = 32, MaxTemperatureC = 120, MaxCount = 1_000_000_000, MaxHours = 1_000_000;
 
-    public static bool IsDiagAction(string? actionId) => actionId is BootAction or CrashAction;
+    public static bool IsDiagAction(string? actionId) => actionId is BootAction or CrashAction or DriveAction;
 
     /// <summary>C:\ProgramData\AutoFixScout\logs, where the helper writes and the app reads and deletes.</summary>
     public static string Folder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "AutoFixScout", "logs");
 
     public static string FileFor(string actionId) =>
-        Path.Combine(Folder, actionId == BootAction ? BootFile : actionId == CrashAction ? CrashFile : throw new ArgumentException("not a diag action", nameof(actionId)));
+        Path.Combine(Folder, actionId == BootAction ? BootFile : actionId == CrashAction ? CrashFile : actionId == DriveAction ? DriveFile : throw new ArgumentException("not a diag action", nameof(actionId)));
 
     private static readonly JsonSerializerOptions Options = new() { PropertyNameCaseInsensitive = true };
 
@@ -98,6 +116,46 @@ public static class DiagResults
                 c.Code is <= 0x0FFFFFFF ? c.Code : null, CleanName(c.Module), c.WhenUtc))
             .Take(MaxReports).ToList();
         return r;
+    }
+
+    private static int? Pct(int? v) => v is >= 0 and <= 100 ? v : null;
+    private static int? Temp(int? v) => v is >= 0 and <= MaxTemperatureC ? v : null;
+    private static long? Count(long? v) => v is >= 0 and <= MaxCount ? v : null;
+    private static long? Hours(long? v) => v is >= 0 and <= MaxHours ? v : null;
+
+    /// <summary>
+    /// Drops drives without a usable name. A reading out of range becomes null (Unknown): wear 0 to 100, temperatures 0 to 120 C.
+    /// Names are cut to the friendly model name; a name that holds a user folder is dropped with its drive.
+    /// </summary>
+    public static DiagDriveResult CleanDrives(IEnumerable<DriveHealthRecord>? drives, DateTime nowUtc)
+    {
+        var r = new DiagDriveResult { Version = Version, Action = DriveAction, CreatedUtc = nowUtc };
+        r.Drives = (drives ?? Enumerable.Empty<DriveHealthRecord>())
+            .Where(d => d is not null && CleanName(d.Name) is not null)
+            .Select(d => new DriveHealthRecord(
+                d.DeviceId is >= 0 and <= 4096 ? d.DeviceId : null, CleanName(d.Name)!, CleanWord(d.MediaType), CleanWord(d.BusType), CleanWord(d.Health),
+                d.SizeBytes is > 0 and <= 1L << 60 ? d.SizeBytes : null,
+                Pct(d.WearPercent), Temp(d.TemperatureC), Temp(d.TemperatureMaxC), Count(d.ReadErrorsTotal), Count(d.ReadErrorsUncorrected),
+                Count(d.WriteErrorsTotal), Count(d.WriteErrorsUncorrected), Hours(d.PowerOnHours), Count(d.StartStopCycles)))
+            .Take(MaxDrives).ToList();
+        return r;
+    }
+
+    private static string CleanWord(string? w) => w is not null && w.Length <= 24 && w.All(c => char.IsLetterOrDigit(c) || c == ' ') ? w : "Unknown";
+
+    public static string Serialize(DiagDriveResult r) => JsonSerializer.Serialize(r, Options);
+
+    /// <summary>Validates the text of a drive health result file; same rules as <see cref="ParseBoots"/>.</summary>
+    public static DiagDriveResult? ParseDrives(string? json, DateTime? nowUtc = null)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json.Length > MaxChars) return null;
+        try
+        {
+            var r = JsonSerializer.Deserialize<DiagDriveResult>(json, Options);
+            if (r is null || r.Version != Version || r.Action != DriveAction) return null;
+            return CleanDrives(r.Drives, nowUtc ?? DateTime.UtcNow);
+        }
+        catch (Exception) { return null; }
     }
 
     public static string Serialize(DiagBootResult r) => JsonSerializer.Serialize(r, Options);

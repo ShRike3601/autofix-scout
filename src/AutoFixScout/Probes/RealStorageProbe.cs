@@ -68,6 +68,7 @@ public sealed class RealStorageProbe : IStorageProbe
         };
         Task.WaitAll(tasks.ToArray());
         ElevatedDiagnostics.ApplyTo(s); // start-up data the elevated helper read earlier in this session
+        s.PhysicalDriveCount = RealHealthProbe.CountPhysicalDrives();
         Activity.Report(ActivityKind.Analyze, $"Read the storage and start-up details{(errors.Count > 0 ? $"; {Activity.Count(errors.Count, "part")} could not be read" : "")}");
         s.Uptime = TimeSpan.FromMilliseconds(Environment.TickCount64);
         s.MemoryLoadPercent = MemoryLoad();

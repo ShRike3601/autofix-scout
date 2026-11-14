@@ -397,4 +397,9 @@ public enum FindingCode
     GameSetPowerEfficiencyPluggedIn,
     GameSetWindowedOptimisationsOff,
     GameSetBackgroundRecording,
+    // Drive wear, temperature and uncorrected errors (read through diag.read_drive_health)
+    HealthDriveWornOut,
+    HealthDriveWearing,
+    HealthDriveErrors,
+    HealthDriveHot,
 }

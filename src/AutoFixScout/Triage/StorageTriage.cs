@@ -285,6 +285,7 @@ public static class StorageTriage
                 "After the restart, please open AutoFix Scout again."));
         // Optional and never automatic: only when Windows could not tell the boot times without administrator rights.
         if (s.BootTimes is null) rungs.Add(ReadRungs.StartupTimes());
+        if (ReadRungs.OfferDriveRead(s.PhysicalDriveCount, s.DriveHealthRead)) rungs.Add(ReadRungs.DriveHealth());
         return rungs;
     }
 

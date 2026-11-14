@@ -42,6 +42,8 @@ public sealed class RealPerfProbe : IPerfProbe
             var (blue, shut, whea) = RealHealthProbe.ReadInstabilitySignals();
             s.BlueScreens = blue; s.UnexpectedShutdowns = shut; s.HardwareErrors = whea; s.InstabilityRead = true;
         });
+        s.PhysicalDriveCount = RealHealthProbe.CountPhysicalDrives();
+        s.DriveHealthRead = ElevatedDiagnostics.DriveHealthWasRead;
         s.ProbeErrors = errors;
         Activity.Report(ActivityKind.Analyze, errors.Count == 0 ? "Read all parts of the performance check" : $"{Activity.Count(errors.Count, "part")} of the performance check could not be read");
         return s;

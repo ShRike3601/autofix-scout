@@ -7,7 +7,7 @@ using AutoFixScout.Executor.Shared;
 namespace AutoFixScout.Executor;
 
 /// <summary>
-/// diag.read_boot_times and diag.read_crash_reports: two READ-ONLY actions that need administrator rights only to read
+/// diag.read_boot_times, diag.read_crash_reports and diag.read_drive_health: three READ-ONLY actions that need administrator rights only to read
 /// protected logs and report folders. They take no argument, change nothing on the computer, and write one JSON file
 /// with a fixed name (see DiagResults) that the app validates and deletes. Exit codes: 0 written, 1 failed, 3 nothing to report.
 /// The values go through the same parsers the app uses, and a privacy filter drops any text that names a user folder.
@@ -82,6 +82,60 @@ internal static class DiagReads
     internal static bool IsKernelReportFolder(string name) =>
         name.StartsWith("Kernel", StringComparison.OrdinalIgnoreCase) || name.StartsWith("LiveKernel", StringComparison.OrdinalIgnoreCase)
         || name.StartsWith("BlueScreen", StringComparison.OrdinalIgnoreCase) || name.StartsWith("Critical", StringComparison.OrdinalIgnoreCase);
+
+    // ---- drive health ----
+
+    /// <summary>
+    /// diag.read_drive_health: MSFT_PhysicalDisk and its MSFT_StorageReliabilityCounter (root\Microsoft\Windows\Storage). Without
+    /// administrator rights the disks list but the counters are denied or empty. The serial number is never selected or written.
+    /// Exit 0 when at least one drive reported a counter, 3 when none did.
+    /// </summary>
+    internal static int DriveHealth()
+    {
+        var now = DateTime.UtcNow;
+        var found = new List<DriveHealthRecord>();
+        using var disks = new System.Management.ManagementObjectSearcher(@"root\Microsoft\Windows\Storage",
+            "SELECT * FROM MSFT_PhysicalDisk"); // the whole object is needed to follow the association; only the six listed properties are ever read
+        foreach (System.Management.ManagementObject disk in disks.Get())
+            using (disk)
+            {
+                if (found.Count >= DiagResults.MaxDrives) break;
+                System.Management.ManagementObject? counter = null;
+                try
+                {
+                    foreach (System.Management.ManagementObject c in disk.GetRelated("MSFT_StorageReliabilityCounter")) { counter = c; break; }
+                }
+                catch (System.Management.ManagementException) { /* denied or unsupported for this drive: its counters stay Unknown */ }
+                using (counter)
+                {
+                    if (counter is null) continue;
+                    found.Add(new DriveHealthRecord(
+                        Int(disk["DeviceId"]) is { } id ? (int)id : null,
+                        (disk["FriendlyName"] as string ?? "").Trim(), MediaName(disk["MediaType"]), BusName(disk["BusType"]), HealthName(disk["HealthStatus"]),
+                        Int(disk["Size"]),
+                        Int(counter["Wear"]) is { } w ? (int)w : null, Int(counter["Temperature"]) is { } t ? (int)t : null, Int(counter["TemperatureMax"]) is { } tm ? (int)tm : null,
+                        Int(counter["ReadErrorsTotal"]), Int(counter["ReadErrorsUncorrected"]), Int(counter["WriteErrorsTotal"]), Int(counter["WriteErrorsUncorrected"]),
+                        Int(counter["PowerOnHours"]), Int(counter["StartStopCycleCount"])));
+                }
+            }
+        var result = DiagResults.CleanDrives(found, now);
+        // A drive that reported nothing at all (every counter null) is not worth a file.
+        result.Drives.RemoveAll(d => d.WearPercent is null && d.TemperatureC is null && d.TemperatureMaxC is null && d.ReadErrorsUncorrected is null
+            && d.WriteErrorsUncorrected is null && d.PowerOnHours is null && d.ReadErrorsTotal is null && d.WriteErrorsTotal is null && d.StartStopCycles is null);
+        if (result.Drives.Count == 0) { RemoveStale(DiagResults.DriveAction); return 3; }
+        WriteResult(DiagResults.FileFor(DiagResults.DriveAction), DiagResults.Serialize(result));
+        return 0;
+    }
+
+    private static long? Int(object? v)
+    {
+        try { return v is null ? null : Convert.ToInt64(v, System.Globalization.CultureInfo.InvariantCulture); }
+        catch (Exception) { return null; }
+    }
+
+    private static string MediaName(object? v) => Int(v) switch { 3 => "HDD", 4 => "SSD", 5 => "SCM", _ => "Unspecified" };
+    private static string HealthName(object? v) => Int(v) switch { 0 => "Healthy", 1 => "Warning", 2 => "Unhealthy", _ => "Unknown" };
+    private static string BusName(object? v) => Int(v) switch { 3 => "ATA", 7 => "USB", 8 => "RAID", 10 => "SAS", 11 => "SATA", 12 => "SD", 17 => "NVMe", _ => "Other" };
 
     // ---- the result file ----
 
