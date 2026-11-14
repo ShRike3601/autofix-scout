@@ -75,7 +75,8 @@ public partial class MainWindow
     {
         _activitySteps = 0;
         _activityLog?.Children.Clear();
-        if (_activityOpen) SetActivityOpen(false);
+        EnsureActivityPanel();
+        SetActivityOpen(ThemeManager.Settings.ActivityOpen);
     }
 
     /// <summary>Called by PresentStep: shown on busy and result screens of a check, hidden elsewhere.</summary>

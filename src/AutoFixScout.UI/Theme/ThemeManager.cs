@@ -1,6 +1,8 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media;
+using AutoFixScout;
 
 namespace AutoFixScout.UI;
 
@@ -21,8 +23,48 @@ public static class ThemeManager
     public static Mode Detect()
     {
         if (SystemParameters.HighContrast) return Mode.HighContrast;
-        // For screenshots and testing: AUTOFIXSCOUT_THEME=light|dark.
-        return Environment.GetEnvironmentVariable("AUTOFIXSCOUT_THEME")?.ToLowerInvariant() == "light" ? Mode.Light : Mode.Dark;
+        // For screenshots and testing: AUTOFIXSCOUT_THEME=light|dark overrides the setting.
+        var choice = Environment.GetEnvironmentVariable("AUTOFIXSCOUT_THEME")?.ToLowerInvariant() ?? Settings.Theme;
+        if (choice == "system") return WindowsAppsUseLight() ? Mode.Light : Mode.Dark;
+        return choice == "light" ? Mode.Light : Mode.Dark;
+    }
+
+    /// <summary>The person's appearance settings (Settings panel); reloaded by <see cref="Refresh"/>.</summary>
+    public static Updates.AppSettings Settings { get; private set; } = Updates.AppSettings.Load();
+
+    private static bool WindowsAppsUseLight()
+    {
+        using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+        return k?.GetValue("AppsUseLightTheme") is int v && v == 1;
+    }
+
+    /// <summary>Re-reads the settings and re-applies theme, glass, accent, motion and text size to the window.</summary>
+    public static void Refresh(Window window)
+    {
+        Settings = Updates.AppSettings.Load();
+        ApplyAll(window, new WindowInteropHelper(window).Handle);
+    }
+
+    /// <summary>Accent sets: line/icon colour, filled control, hover, pressed, soft tint (solid and glass).</summary>
+    private static readonly Dictionary<string, (string Line, string Fill, string Hover, string Pressed, string Soft, string GlassSoft)> AccentSets = new()
+    {
+        ["blue"] = ("#5AA2FF", "#2670E8", "#3A80F0", "#1F5FCC", "#152440", "#332670E8"),
+        ["teal"] = ("#3DD9C4", "#0E8F7E", "#11A491", "#0B7A6B", "#0F2E2A", "#330E8F7E"),
+        ["violet"] = ("#B39DFF", "#7148E0", "#8159EE", "#5F3BC4", "#221A3D", "#337148E0"),
+        ["orange"] = ("#FFB077", "#C4520C", "#D9620F", "#A6450A", "#33200F", "#33C4520C"),
+    };
+
+    private static ResourceDictionary AccentPalette(string accent, bool light, bool glass)
+    {
+        var a = AccentSets.TryGetValue(accent, out var set) ? set : AccentSets["blue"];
+        SolidColorBrush B(string hex) { var b = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex)); b.Freeze(); return b; }
+        return new ResourceDictionary
+        {
+            // On a light page the line colour is the darker fill, for contrast.
+            ["AccentBrush"] = B(light ? a.Fill : a.Line), ["InfoBrush"] = B(light ? a.Fill : a.Line),
+            ["AccentFillBrush"] = B(a.Fill), ["AccentHoverBrush"] = B(a.Hover), ["AccentPressedBrush"] = B(a.Pressed),
+            ["AccentSoftBrush"] = B(light ? "#1A" + a.Fill[1..] : glass ? a.GlassSoft : a.Soft),
+        };
     }
 
     private static readonly Uri DarkGlassUri = new("pack://application:,,,/AutoFixScout.UI;component/Theme/DarkGlass.xaml");
@@ -42,6 +84,9 @@ public static class ThemeManager
             _ when glass => new ResourceDictionary { MergedDictionaries = { new ResourceDictionary { Source = DarkUri }, new ResourceDictionary { Source = DarkGlassUri } } },
             _ => new ResourceDictionary { Source = DarkUri },
         };
+        // The chosen accent is layered last (not in high contrast, which uses the system highlight).
+        if (Current != Mode.HighContrast)
+            palette = new ResourceDictionary { MergedDictionaries = { palette, AccentPalette(Settings.Accent, Current == Mode.Light, glass) } };
         var merged = Application.Current.Resources.MergedDictionaries;
         if (merged.Count > 0) merged[0] = palette; else merged.Add(palette);
     }
@@ -62,7 +107,10 @@ public static class ThemeManager
 
     private static void ApplyAll(Window window, IntPtr hwnd)
     {
-        Glass = Detect() == Mode.Dark && SetBackdrop(window, hwnd, on: true);
+        Motion.Reduced = Settings.ReduceMotion;
+        if (window.FindName("Root") is FrameworkElement root)
+            root.LayoutTransform = Settings.TextScale > 1.01 ? new ScaleTransform(Settings.TextScale, Settings.TextScale) : Transform.Identity;
+        Glass = Detect() == Mode.Dark && Settings.Glass && SetBackdrop(window, hwnd, on: true);
         if (!Glass) SetBackdrop(window, hwnd, on: false);
         // With the frame extended over the window, DWM draws the native Windows 11 caption buttons; use those and hide ours.
         if (System.Windows.Shell.WindowChrome.GetWindowChrome(window) is { } chrome) chrome.UseAeroCaptionButtons = Glass;

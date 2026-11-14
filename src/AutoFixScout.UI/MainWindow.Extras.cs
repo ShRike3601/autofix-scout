@@ -257,7 +257,8 @@ public partial class MainWindow
             AutomationProperties.SetLiveSetting(note, AutomationLiveSetting.Polite);
             SettingsBody.Children.Add(note);
         }
-        SettingsBody.Children.Add(Section("General", first: true));
+        AddAppearanceSettings();
+        SettingsBody.Children.Add(Section("Updates and Wi-Fi"));
         var settings = new StackPanel();
         var appSettings = AppSettings.Load();
         var updates = Check("Check for updates when AutoFix Scout starts", appSettings.CheckForUpdates);
@@ -300,6 +301,7 @@ public partial class MainWindow
             settings.Children.Add(Row("The Wi-Fi watcher is off.",
                 "It can be switched on from the internet check when Wi-Fi keeps dropping.", new Border(), divider: false));
         SettingsBody.Children.Add(Card(settings));
+        AddDataSettings();
 
         var version = Text($"AutoFix Scout version {AppVersion}", "CaptionText");
         version.Margin = new Thickness(2, 14, 0, 0);

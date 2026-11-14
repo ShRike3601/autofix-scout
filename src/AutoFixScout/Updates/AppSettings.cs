@@ -20,6 +20,39 @@ public sealed class AppSettings
     /// <summary>Default off. Only for people who test builds: lets a development build be offered a release.</summary>
     public bool OfferUpdatesToDevBuilds { get; set; }
 
+    // ---- Appearance and behaviour (Settings panel) ----
+
+    /// <summary>"dark" (default), "light" or "system" (follows the Windows app mode).</summary>
+    public string Theme { get; set; } = "dark";
+
+    /// <summary>Frosted glass on Windows 11 in the dark theme. Default on.</summary>
+    public bool Glass { get; set; } = true;
+
+    /// <summary>"blue" (default), "teal", "violet" or "orange".</summary>
+    public string Accent { get; set; } = "blue";
+
+    /// <summary>Text and layout size: 1.0 (default), 1.1 or 1.2.</summary>
+    public double TextScale { get; set; } = 1.0;
+
+    /// <summary>Turns off movement in the app even when Windows animations are on.</summary>
+    public bool ReduceMotion { get; set; }
+
+    /// <summary>Shows the list of steps unfolded during a check (for people who want to follow every step).</summary>
+    public bool ActivityOpen { get; set; }
+
+    public static readonly string[] Themes = { "dark", "light", "system" };
+    public static readonly string[] Accents = { "blue", "teal", "violet", "orange" };
+    public static readonly double[] TextScales = { 1.0, 1.1, 1.2 };
+
+    /// <summary>Puts values from an old or hand-edited file back into range.</summary>
+    public AppSettings Normalized()
+    {
+        if (!Themes.Contains(Theme)) Theme = "dark";
+        if (!Accents.Contains(Accent)) Accent = "blue";
+        if (!TextScales.Contains(TextScale)) TextScale = 1.0;
+        return this;
+    }
+
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 
     public static string FileIn(string dir) => Path.Combine(dir, "settings.json");
@@ -29,7 +62,7 @@ public sealed class AppSettings
         try
         {
             var file = FileIn(dir ?? AppPaths.DataDir);
-            return File.Exists(file) ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(file)) ?? new() : new();
+            return (File.Exists(file) ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(file)) ?? new() : new()).Normalized();
         }
         catch (Exception) { return new(); }
     }

@@ -14,7 +14,10 @@ namespace AutoFixScout.UI;
 /// </summary>
 public static class Motion
 {
-    public static bool Enabled => SystemParameters.ClientAreaAnimation;
+    public static bool Enabled => SystemParameters.ClientAreaAnimation && !Reduced;
+
+    /// <summary>Set from the "Reduce motion" setting: no movement even when Windows animations are on.</summary>
+    public static bool Reduced { get; set; }
 
     public static readonly IEasingFunction EaseOut = Frozen(new CubicEase { EasingMode = EasingMode.EaseOut });
     public static readonly IEasingFunction EaseOutStrong = Frozen(new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 6 });
