@@ -313,7 +313,20 @@ public partial class MainWindow
     /// <summary>Esc closes the settings panel first (otherwise it would press the step screen's cancel button underneath).</summary>
     private void OnWindowPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
-        if (_settingsOpen && e.Key == System.Windows.Input.Key.Escape) { SetSettingsOpen(false); e.Handled = true; }
+        if (_settingsOpen && e.Key == System.Windows.Input.Key.Escape) { SetSettingsOpen(false); e.Handled = true; return; }
+        // Shortcuts: Ctrl+, settings, Ctrl+K the "describe the problem" box (home page), Ctrl+H history (not during a check).
+        if (System.Windows.Input.Keyboard.Modifiers != System.Windows.Input.ModifierKeys.Control) return;
+        switch (e.Key)
+        {
+            case System.Windows.Input.Key.OemComma:
+                SetSettingsOpen(!_settingsOpen); e.Handled = true; break;
+            case System.Windows.Input.Key.K when HomePanel.Visibility == Visibility.Visible:
+                if (_settingsOpen) SetSettingsOpen(false);
+                SymptomBox.Focus(); SymptomBox.SelectAll(); e.Handled = true; break;
+            case System.Windows.Input.Key.H when NavHistory.IsEnabled:
+                if (_settingsOpen) SetSettingsOpen(false);
+                NavHistory.IsChecked = true; e.Handled = true; break;
+        }
     }
 
     private void OnSettingsButtonClicked(object sender, RoutedEventArgs e) => SetSettingsOpen(!_settingsOpen);

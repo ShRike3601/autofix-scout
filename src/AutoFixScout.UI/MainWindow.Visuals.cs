@@ -93,6 +93,27 @@ public partial class MainWindow
     {
         base.OnSourceInitialized(e);
         ThemeManager.Attach(this);
+        if (_restoreMaximized) WindowState = WindowState.Maximized;
+    }
+
+    private bool _restoreMaximized;
+
+    /// <summary>Opens where the window was last closed (if that is still on a screen); called from the constructor.</summary>
+    private void RestorePlacement()
+    {
+        var fit = Updates.WindowPlacement.Load()?.FitTo(SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight, MinWidth, MinHeight);
+        if (fit is null) return;
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        (Left, Top, Width, Height) = (fit.Left, fit.Top, fit.Width, fit.Height);
+        _restoreMaximized = fit.Maximized;
+    }
+
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        var r = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
+        if (!r.IsEmpty) new Updates.WindowPlacement(r.Left, r.Top, r.Width, r.Height, WindowState == WindowState.Maximized).Save();
     }
 
     protected override void OnContentRendered(EventArgs e)

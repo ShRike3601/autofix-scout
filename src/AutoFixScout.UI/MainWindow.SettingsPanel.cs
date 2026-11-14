@@ -84,6 +84,20 @@ public partial class MainWindow
         note.Margin = new Thickness(0, 10, 0, 0);
         card.Children.Add(note);
         SettingsBody.Children.Add(Card(card));
+
+        SettingsBody.Children.Add(Section("Keyboard shortcuts"));
+        var keys = new StackPanel();
+        foreach (var (combo, what) in new[] { ("Ctrl + K", "Describe a problem"), ("Ctrl + ,", "Open or close the settings"), ("Ctrl + H", "History"), ("Esc", "Close this panel") })
+        {
+            var row = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
+            var key = Text(combo, "CaptionText");
+            key.Width = 90;
+            DockPanel.SetDock(key, Dock.Left);
+            row.Children.Add(key);
+            row.Children.Add(new TextBlock { Text = what });
+            keys.Children.Add(row);
+        }
+        SettingsBody.Children.Add(Card(keys));
     }
 
     /// <summary>Saves one change, re-applies the look at once, and redraws the panel so the choice shows as selected.</summary>

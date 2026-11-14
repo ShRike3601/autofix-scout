@@ -22,6 +22,7 @@ public partial class MainWindow : Window, IFixHost
     {
         InitializeComponent();
         PreviewKeyDown += OnWindowPreviewKeyDown;
+        RestorePlacement();
         Loaded += async (_, _) =>
         {
             CloseUnfinishedSessions();
