@@ -254,8 +254,8 @@ public class DnsSpeedTests
     {
         var values = Enum.GetValues<FindingCode>().ToList();
         var last = values.Count - 1;
-        Assert.Equal(FindingCode.NetQualityDnsSlow, values[last - 1]);
-        Assert.Equal(FindingCode.NetQualityDnsSlowEverywhere, values[last]);
+        Assert.Equal(FindingCode.NetQualityDnsSlow, values[last - 5]); // four browser codes follow
+        Assert.Equal(FindingCode.NetQualityDnsSlowEverywhere, values[last - 4]);
     }
 
     [Fact]

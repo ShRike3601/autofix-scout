@@ -404,4 +404,8 @@ public enum FindingCode
     HealthDriveHot,
     NetQualityDnsSlow,
     NetQualityDnsSlowEverywhere,
+    BrowserSearchHijacked,
+    BrowserStartPageHijacked,
+    BrowserForcedExtensions,
+    BrowserExternalExtensions,
 }
