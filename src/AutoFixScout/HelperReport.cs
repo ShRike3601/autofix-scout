@@ -196,13 +196,15 @@ footer{color:var(--muted);font-size:13px;margin-top:18px}
 ";
 
     /// <summary>The HTML report for the check that just finished, with live data from this computer. Never throws on missing data.</summary>
-    public static string BuildHtmlNow(string topic, IReadOnlyList<Triage.Finding> findings, IEnumerable<string> tried, Outcome outcome, string version)
+    /// <param name="since">When the check started: steps from then on are included even when their area name differs from the topic (the screen's topic and a check's area name are not always the same word).</param>
+    public static string BuildHtmlNow(string topic, IReadOnlyList<Triage.Finding> findings, IEnumerable<string> tried, Outcome outcome, string version, DateTime? since = null)
     {
         IReadOnlyList<SummaryLine> computer; IReadOnlyList<ChangeEntry> changes; IReadOnlyList<SessionLog.SessionSummary> recent;
         try { computer = SystemSummary.Read(); } catch (Exception) { computer = Array.Empty<SummaryLine>(); }
         try { changes = new ChangeHistory().List(20); } catch (Exception) { changes = Array.Empty<ChangeEntry>(); }
         try { using var db = new SessionLog(SessionLog.DefaultPath); recent = db.Recent(10); } catch (Exception) { recent = Array.Empty<SessionLog.SessionSummary>(); }
-        var steps = Activity.Recent().Where(a => a.Area.Equals(topic, StringComparison.OrdinalIgnoreCase)).ToList();
+        var steps = Activity.Recent().Where(a => a.Area.Equals(topic, StringComparison.OrdinalIgnoreCase)
+                                                 || (since is { } start && a.Time >= start)).ToList();
         return BuildHtml(topic, findings, tried, outcome, DateTime.Now, computer, changes, steps, recent, version);
     }
 

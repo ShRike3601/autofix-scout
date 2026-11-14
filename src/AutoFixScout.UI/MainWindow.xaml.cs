@@ -138,7 +138,7 @@ public partial class MainWindow : Window, IFixHost
             var logError = FinishSession(sessionId, log, outcome);
             if (logError != null) report += $"\nSession log unavailable: {logError}\n";
             HelperReport.Save(topic, report); // the plain text copy stays for anyone who prefers it
-            try { _lastReportPath = HelperReport.SaveHtml(HelperReport.BuildHtmlNow(topic, before.Findings, log.Select(l => l.ToString()), outcome, AppVersion)); }
+            try { _lastReportPath = HelperReport.SaveHtml(HelperReport.BuildHtmlNow(topic, before.Findings, log.Select(l => l.ToString()), outcome, AppVersion, _checkStarted)); }
             catch (Exception) { _lastReportPath = HelperReport.Save(topic, report); }
             var end = outcome == Outcome.NotFixed && after.NotFixedHint is { } hint ? hint : EndMessage(outcome, what);
             Journey(Stage.Done, warn: outcome is not (Outcome.Fixed or Outcome.NoFaultFound));

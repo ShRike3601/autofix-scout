@@ -21,6 +21,7 @@ public partial class MainWindow
     private ScrollViewer? _activityScroll;
     private bool _activityOpen, _activityBusy;
     private int _activitySteps;
+    private DateTime? _checkStarted;
 
     private void EnsureActivityPanel()
     {
@@ -74,6 +75,7 @@ public partial class MainWindow
     private void ResetActivity()
     {
         _activitySteps = 0;
+        _checkStarted = DateTime.Now;
         _activityLog?.Children.Clear();
         EnsureActivityPanel();
         SetActivityOpen(ThemeManager.Settings.ActivityOpen);
