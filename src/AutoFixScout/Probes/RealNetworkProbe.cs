@@ -22,6 +22,7 @@ public sealed class RealNetworkProbe : INetworkProbe
         try { state.Adapters = ReadAdapters(); }
         catch (Exception ex) { errors.Add($"WMI: {ex.Message}"); return state; }
 
+        Activity.Report(ActivityKind.Network, "Checking the network adapters, Airplane mode and the connection tests");
         state.AirplaneMode = ReadAirplaneMode();
         if (!state.Adapters.Any(a => a.Connected)) return state; // nothing to test through
 
@@ -36,6 +37,7 @@ public sealed class RealNetworkProbe : INetworkProbe
         ReadExtras(state);
 
         state.GatewayReachable = await PingGatewayAsync();
+        Activity.Report(ActivityKind.Network, $"Testing DNS: resolving {TestHost}");
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
@@ -43,12 +45,15 @@ public sealed class RealNetworkProbe : INetworkProbe
         }
         catch (Exception) { state.DnsResolving = Tri.No; }
 
+        Activity.Report(ActivityKind.Network, state.DnsResolving == Tri.Yes ? "DNS lookup succeeded" : "DNS lookup failed");
         if (state.DnsResolving == Tri.Yes)
         {
+            Activity.Report(ActivityKind.Network, $"HTTP GET http://{TestHost}/connecttest.txt");
             try { state.InternetReachable = (await Http.GetStringAsync($"http://{TestHost}/connecttest.txt")).StartsWith("Microsoft Connect Test") ? Tri.Yes : Tri.No; }
             catch (Exception) { state.InternetReachable = Tri.No; }
         }
         else state.InternetReachable = Tri.No;
+        Activity.Report(ActivityKind.Analyze, state.InternetReachable == Tri.Yes ? "The connectivity test answered" : "The connectivity test did not answer");
         return state;
     }
 
@@ -106,7 +111,7 @@ public sealed class RealNetworkProbe : INetworkProbe
 
     private static string? ReadAdapterGuid(string instanceId)
     {
-        using var q = new ManagementObjectSearcher(
+        using var q = Wmi.Searcher(
             $"SELECT GUID FROM Win32_NetworkAdapter WHERE PNPDeviceID = '{instanceId.Replace(@"\", @"\\").Replace("'", "")}'");
         return q.Get().Cast<ManagementBaseObject>().Select(a => a["GUID"] as string).FirstOrDefault(g => g != null);
     }
@@ -114,7 +119,7 @@ public sealed class RealNetworkProbe : INetworkProbe
     private static List<NetAdapterInfo> ReadAdapters()
     {
         var list = new List<NetAdapterInfo>();
-        using var q = new ManagementObjectSearcher(
+        using var q = Wmi.Searcher(
             "SELECT Name, NetConnectionID, PNPDeviceID, NetConnectionStatus, ConfigManagerErrorCode FROM Win32_NetworkAdapter WHERE PhysicalAdapter = TRUE");
         foreach (var a in q.Get())
         {
@@ -138,6 +143,7 @@ public sealed class RealNetworkProbe : INetworkProbe
     {
         try
         {
+            Activity.ReadingRegistry("HKLM", @"SYSTEM\CurrentControlSet\Control\RadioManagement\SystemRadioState");
             using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\RadioManagement\SystemRadioState");
             return key?.GetValue("") switch { 1 => Tri.Yes, 0 => Tri.No, _ => Tri.Unknown };
         }
@@ -153,6 +159,7 @@ public sealed class RealNetworkProbe : INetworkProbe
             .Where(ip => !ip.Equals(IPAddress.Any) && !ip.Equals(IPAddress.IPv6Any))
             .Distinct().ToList();
         if (gateways.Count == 0) return Tri.No;
+        Activity.Report(ActivityKind.Network, $"Pinging the default gateway ({Activity.Count(gateways.Count, "address")}, up to 2 tries each)");
         using var ping = new Ping();
         foreach (var gw in gateways)
             for (var attempt = 0; attempt < 2; attempt++)
@@ -166,7 +173,7 @@ public sealed class RealNetworkProbe : INetworkProbe
     /// <summary>MSFT_NetNeighbor State: 5 Reachable, 6 Permanent. Stale/Probe/Incomplete don't prove the router is there now.</summary>
     private static bool NeighbourReachable(IPAddress gateway)
     {
-        using var q = new ManagementObjectSearcher(@"root\StandardCimv2",
+        using var q = Wmi.Searcher(@"root\StandardCimv2",
             $"SELECT State FROM MSFT_NetNeighbor WHERE IPAddress = '{gateway}'");
         return q.Get().Cast<ManagementBaseObject>().Any(n => Convert.ToInt32(n["State"]) is 5 or 6);
     }
@@ -174,11 +181,13 @@ public sealed class RealNetworkProbe : INetworkProbe
     /// <summary>Hand-typed DNS servers live in the interface's NameServer value; DHCP ones in DhcpNameServer.</summary>
     private static List<string> ReadStaticDns(string instanceId)
     {
-        using var q = new ManagementObjectSearcher(
+        using var q = Wmi.Searcher(
             $"SELECT GUID FROM Win32_NetworkAdapter WHERE PNPDeviceID = '{instanceId.Replace(@"\", @"\\").Replace("'", "")}'");
         var guid = q.Get().Cast<ManagementBaseObject>().Select(a => a["GUID"] as string).FirstOrDefault(g => g != null);
         if (guid is null) return new List<string>();
+        Activity.ReadingRegistry("HKLM", @"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces", "DNS server settings of the adapter");
         using var key = Registry.LocalMachine.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{guid}");
+
         return ((key?.GetValue("NameServer") as string) ?? "")
             .Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries).ToList();
     }

@@ -18,6 +18,7 @@ public sealed class RealMicrophoneProbe : IMicrophoneProbe
     {
         var errors = new List<string>();
         var state = new MicrophoneState { ProbeErrors = errors };
+        Activity.Report(ActivityKind.Command, $"Reading the state of {Activity.Count(AudioServices.Length, "audio service")} through the Service Control Manager");
 
         state.Services = AudioServices.Select(name =>
         {
@@ -37,6 +38,7 @@ public sealed class RealMicrophoneProbe : IMicrophoneProbe
 
         try
         {
+            Activity.ReadingRegistry("HKLM and HKCU", ConsentKey, "(app access to the microphone)");
             using var hklm = Registry.LocalMachine.OpenSubKey(ConsentKey);
             using var hkcu = Registry.CurrentUser.OpenSubKey(ConsentKey);
             using var desktop = hkcu?.OpenSubKey("NonPackaged");
@@ -51,6 +53,8 @@ public sealed class RealMicrophoneProbe : IMicrophoneProbe
 
     private static void ReadEndpoints(MicrophoneState state)
     {
+        Activity.Report(ActivityKind.Command, "Listing the sound inputs through Core Audio (names, level and mute state)");
+
         using var enumerator = new MMDeviceEnumerator();
         string? defaultId = null;
         if (enumerator.HasDefaultAudioEndpoint(DataFlow.Capture, Role.Multimedia))

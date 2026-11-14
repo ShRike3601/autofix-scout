@@ -531,3 +531,22 @@ Core only; the UI session wires it (see the UI requests in the g9 report). Files
   105 s, Completed, GPU max 82 C, CPU limit 100 %, LooksNormal; ChangeHistory read the real log. Not exercised on the
   bench: Undo on a real change, watcher Switch off from the UI, update bar end-to-end (needs a newer release than the
   installed one), silent downgrade refusal.
+
+## Part 9: UI redesign (2026-11-14, owner moved UI work to the overnight session; UI session told to stay out)
+Done on `perf` (pushed): frosted glass (Windows 11 acrylic, Theme/DarkGlass.xaml layered over Dark.xaml, solid
+fallback on Windows 10 / high contrast / transparency off), no bold type anywhere (Display = Light 24, Title = Normal 19),
+native caption buttons when glass is on, smoother hover/page motion, sidebar "This computer" (SystemSummary, compact
+icon + short value) and "Recent activity" (MainWindow.Sidebar.cs), Settings in its own panel sliding over any page
+(gear button in the sidebar, Esc closes; MainWindow.Extras.cs BuildSettings/SetSettingsOpen), History page without
+settings, activity line during checks that unfolds into all steps (MainWindow.Activity.cs + core Activity feed from
+g12-activity). Test switch: AUTOFIXSCOUT_OPEN=settings | graphics | graphics-log. Screenshots: scratchpad shot.ps1
+(PrintWindow when the app is not in front; NEVER SendKeys: the owner types in other windows).
+Next (owner's requests, in order):
+1. Buttons with presence: hover scale + soft glow (accent glow on AccentButton), press: ripple from the click point
+   (Theme/Ripple.cs, RippleAdorner.Play) + spring back (ElasticEase). Wire in Motion.OnPressChanged.
+2. iOS-style glass: soft drifting colour field (3 blurred gradient blobs) behind everything; cards with brighter
+   frosted fill, top specular edge, soft shadow.
+3. More settings (AppSettings in core): theme dark/light/system, glass on/off, accent colour, text size, reduce
+   motion, activity list unfolded by default, clear history, open data folder.
+4. Build, test, screenshots; then ask the owner 0.3.1 vs 0.4.0 (UI + activity feed + Afterburner fix => 0.4.0
+   recommended); check the UI session has nothing to push; release; then propose next-release ideas.

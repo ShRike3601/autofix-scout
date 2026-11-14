@@ -20,18 +20,21 @@ public sealed class RealGraphicsProbe : IGraphicsProbe
             try { read(); }
             catch (Exception ex) { errors.Add($"{name}: {ex.Message}"); }
         }
+        Activity.Report(ActivityKind.Analyze, "Reading the graphics card, driver, overclocking tools and driver resets");
         Part("video controllers", () => s.Gpus = ReadGpus());
         Part("chassis", () => s.IsDesktop = ReadIsDesktop());
         Part("nvidia-smi", () => ReadNvidia(s));
         Part("overclocking tools", () => s.Tools = ReadTools());
         Part("graphics resets", () => s.GraphicsResets = RealHealthProbe.CountGraphicsResets());
         s.ProbeErrors = errors;
+        Activity.Report(ActivityKind.Analyze, $"Read {Activity.Count(s.Gpus.Count, "graphics adapter")} and {s.GraphicsResets} graphics driver {(s.GraphicsResets == 1 ? "reset" : "resets")}"
+            + (errors.Count > 0 ? $"; {Activity.Count(errors.Count, "part")} could not be read" : ""));
         return s;
     }
 
     private static List<GpuInfo> ReadGpus()
     {
-        using var q = new ManagementObjectSearcher(
+        using var q = Wmi.Searcher(
             "SELECT Name, DriverVersion, DriverDate, AdapterRAM, CurrentHorizontalResolution, PNPDeviceID FROM Win32_VideoController");
         var list = new List<GpuInfo>();
         foreach (ManagementBaseObject o in q.Get())
@@ -51,14 +54,14 @@ public sealed class RealGraphicsProbe : IGraphicsProbe
     private static Tri ReadIsDesktop()
     {
         var chassis = new List<int>();
-        using (var q = new ManagementObjectSearcher("SELECT ChassisTypes FROM Win32_SystemEnclosure"))
+        using (var q = Wmi.Searcher("SELECT ChassisTypes FROM Win32_SystemEnclosure"))
             foreach (ManagementBaseObject o in q.Get())
                 using (o)
                     if (o["ChassisTypes"] is ushort[] t) chassis.AddRange(t.Select(x => (int)x));
         bool? battery = null;
         try
         {
-            using var b = new ManagementObjectSearcher("SELECT Name FROM Win32_Battery");
+            using var b = Wmi.Searcher("SELECT Name FROM Win32_Battery");
             battery = b.Get().Count > 0;
         }
         catch (Exception) { }
@@ -99,6 +102,8 @@ public sealed class RealGraphicsProbe : IGraphicsProbe
     /// </summary>
     internal static (IReadOnlyList<NvidiaReading> Rows, string? Prefix) QueryNvidia(string exe, string? knownPrefix = null)
     {
+        // The stress test repeats this call every second with a known prefix; only the first call is reported.
+        if (knownPrefix == null) Commands.Running(exe, "--query-gpu", "temperature, clocks, throttle reasons");
         foreach (var prefix in knownPrefix != null ? new[] { knownPrefix } : new[] { "clocks_throttle_reasons", "clocks_event_reasons" })
         {
             var (exit, text) = Run(exe, $"--query-gpu={GraphicsParsers.NvidiaQuery(prefix)}", "--format=csv,noheader,nounits");
@@ -116,7 +121,9 @@ public sealed class RealGraphicsProbe : IGraphicsProbe
         s.NvidiaToolPresent = exe != null;
         if (exe == null) return;
         s.Nvidia = QueryNvidia(exe).Rows;
+        Commands.Running(exe, "-q -d MEMORY", "BAR1 size, for Resizable BAR");
         var (e2, mem) = Run(exe, "-q", "-d", "MEMORY");
+
         if (e2 == 0)
         {
             s.Bar1TotalMiB = GraphicsParsers.ParseBar1TotalMiB(mem);
@@ -150,6 +157,7 @@ public sealed class RealGraphicsProbe : IGraphicsProbe
     private static OverclockToolState ReadTools()
     {
         var t = new OverclockToolState();
+        Activity.ReadingRegistry("HKLM", @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall", "(installed overclocking tools)");
         var programs = InstalledPrograms().ToList();
         var abDir = programs.FirstOrDefault(p => p.Name.Contains("Afterburner", StringComparison.OrdinalIgnoreCase)).Location;
         var defaultDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "MSI Afterburner");
@@ -163,10 +171,14 @@ public sealed class RealGraphicsProbe : IGraphicsProbe
         t.OtherTools = other.Distinct().ToList();
         if (!installed) return t;
 
+        Activity.Report(ActivityKind.Files, "Reading the MSI Afterburner profile settings (saved clock and voltage offsets only)");
         t.AfterburnerRunning = Process.GetProcessesByName("MSIAfterburner").Length > 0 ? Tri.Yes : Tri.No;
-        t.AfterburnerStartsWithWindows = StartsWithWindows() ? Tri.Yes : Tri.No;
-        var profiles = new List<AfterburnerProfile>();
+
         var profileDir = Path.Combine(dir, "Profiles");
+        string? settings = null;
+        try { settings = File.ReadAllText(Path.Combine(profileDir, "MSIAfterburner.cfg")); } catch (Exception) { /* unknown */ }
+        t.AfterburnerStartsWithWindows = StartsWithWindows() || GraphicsParsers.AfterburnerStartsWithWindows(settings) ? Tri.Yes : Tri.No;
+        var profiles = new List<AfterburnerProfile>();
         if (Directory.Exists(profileDir))
             foreach (var f in Directory.EnumerateFiles(profileDir, "*.cfg"))
                 try { profiles.Add(GraphicsParsers.ParseAfterburnerProfile(Path.GetFileName(f), File.ReadAllText(f))); }

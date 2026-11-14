@@ -263,7 +263,7 @@ public class UpdateServiceTests : IDisposable
         v = "0.3.1";
         var next = wn.TakeOnce();                                   // new version, no notes fetched: built-in text
         Assert.NotNull(next);
-        Assert.Contains("One-click updates", next!.Text);
+        Assert.Contains("This computer", next!.Text);
         Assert.Null(wn.TakeOnce());
     }
 
@@ -449,5 +449,27 @@ public class QolWritingTests
             Assert.DoesNotMatch(Bad, "The change has been undone. The change was not undone. The Windows permission prompt may have been declined, or the previous driver could not be restored.");
         }
         finally { SqliteConnection.ClearAllPools(); try { Directory.Delete(dir, true); } catch (IOException) { } }
+    }
+}
+
+public class AppearanceSettingsTests
+{
+    [Fact]
+    public void Defaults_AndRoundTrip_AndOutOfRangeValuesAreReset()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "afs-settings-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var s = AutoFixScout.Updates.AppSettings.Load(dir);
+            Assert.Equal(("dark", true, "blue", 1.0, false, false), (s.Theme, s.Glass, s.Accent, s.TextScale, s.ReduceMotion, s.ActivityOpen));
+            s.Theme = "system"; s.Accent = "teal"; s.TextScale = 1.2; s.ReduceMotion = true; s.Glass = false; s.ActivityOpen = true;
+            Assert.True(s.Save(dir));
+            var back = AutoFixScout.Updates.AppSettings.Load(dir);
+            Assert.Equal(("system", false, "teal", 1.2, true, true), (back.Theme, back.Glass, back.Accent, back.TextScale, back.ReduceMotion, back.ActivityOpen));
+            File.WriteAllText(AutoFixScout.Updates.AppSettings.FileIn(dir), "{\"Theme\":\"neon\",\"Accent\":\"pink\",\"TextScale\":3}");
+            var fixedUp = AutoFixScout.Updates.AppSettings.Load(dir);
+            Assert.Equal(("dark", "blue", 1.0), (fixedUp.Theme, fixedUp.Accent, fixedUp.TextScale));
+        }
+        finally { try { Directory.Delete(dir, true); } catch (IOException) { } }
     }
 }

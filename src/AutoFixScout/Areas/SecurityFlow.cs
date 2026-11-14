@@ -16,9 +16,10 @@ public static class SecurityFlow
 
     public static Task<Diagnosis> DiagnoseAsync() => Task.Run(() =>
     {
+        using var _ = Activity.Scope(Topic);
         var s = Read();
-        var f = SecurityTriage.Evaluate(s);
-        return new Diagnosis(s, f, SecurityTriage.Ladder(s, f), false, SecurityTriage.NotFixedHint(f));
+        var f = Analysis.Judge(() => SecurityTriage.Evaluate(s));
+        return new Diagnosis(s, f, Analysis.Plan(SecurityTriage.Ladder(s, f)), false, SecurityTriage.NotFixedHint(f));
     });
 
     private const string FirewallPolicy = @"SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters\FirewallPolicy";
@@ -35,6 +36,7 @@ public static class SecurityFlow
             catch (Exception ex) { errors.Add($"{name}: {ex.Message}"); }
         }
 
+        Activity.Report(ActivityKind.Analyze, "Reading the security products, firewall, User Account Control and unwanted-software signs");
         Part("antivirus", () => s.Antivirus = ReadProducts("AntiVirusProduct"));
         Part("firewall products", () => s.Firewalls = ReadProducts("FirewallProduct"));
         if (SecurityTriage.DefenderInCharge(s))
@@ -44,6 +46,7 @@ public static class SecurityFlow
         Part("firewall", () =>
         {
             var profiles = new Dictionary<string, Tri>();
+            Activity.ReadingRegistry("HKLM", FirewallPolicy, "(firewall on or off per profile)");
             using var k = Registry.LocalMachine.OpenSubKey(FirewallPolicy);
             foreach (var (key, name) in Profiles)
             {
@@ -63,6 +66,7 @@ public static class SecurityFlow
         });
         Part("user account control", () =>
         {
+            Activity.ReadingRegistry("HKLM", @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System", "(User Account Control)");
             using var k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System");
             // EnableLUA missing means Windows' default: on.
             s.UacEnabled = k?.GetValue("EnableLUA") is int lua ? (lua != 0 ? Tri.Yes : Tri.No) : Tri.Yes;
@@ -70,6 +74,7 @@ public static class SecurityFlow
         });
         Part("SmartScreen", () =>
         {
+            Activity.ReadingRegistry("HKLM", @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer", "(SmartScreen setting and policy)");
             using (var k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer"))
                 s.SmartScreenSetting = k?.GetValue("SmartScreenEnabled") as string;
             using (var p = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Policies\Microsoft\Windows\System"))
@@ -83,6 +88,7 @@ public static class SecurityFlow
         Part("startup programs", () => s.SuspiciousStartups = ReadSuspiciousStartups());
         Part("browser policies", () =>
         {
+            Activity.ReadingRegistry("HKCU and HKLM", @"SOFTWARE\Policies", "(browser policies for Edge, Chrome and Firefox)");
             var flags = new List<BrowserPolicies.Flag>();
             flags.AddRange(BrowserPolicies.Scan(Registry.CurrentUser, BrowserPolicies.HiveUser));
             using (var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
@@ -96,7 +102,7 @@ public static class SecurityFlow
 
     private static IReadOnlyList<SecurityProduct> ReadProducts(string cls)
     {
-        using var q = new ManagementObjectSearcher(@"root\SecurityCenter2", $"SELECT * FROM {cls}");
+        using var q = Wmi.Searcher(@"root\SecurityCenter2", $"SELECT * FROM {cls}");
         return q.Get().Cast<ManagementBaseObject>()
             .Select(m => new SecurityProduct(m["displayName"] as string ?? "", Convert.ToInt32(m["productState"] ?? 0), m["pathToSignedProductExe"] as string))
             .Where(p => p.Name.Length > 0).ToList();
@@ -106,7 +112,7 @@ public static class SecurityFlow
     {
         try
         {
-            using var q = new ManagementObjectSearcher(@"root\Microsoft\Windows\Defender",
+            using var q = Wmi.Searcher(@"root\Microsoft\Windows\Defender",
                 "SELECT RealTimeProtectionEnabled, AntivirusSignatureLastUpdated, QuickScanAge FROM MSFT_MpComputerStatus");
             foreach (var m in q.Get().Cast<ManagementBaseObject>())
             {
@@ -134,7 +140,7 @@ public static class SecurityFlow
         try
         {
             var det = new List<DetectionRow>();
-            using (var q = new ManagementObjectSearcher(DefenderNs, "SELECT ThreatID, InitialDetectionTime, ActionSuccess, CurrentThreatExecutionStatusID, Resources FROM MSFT_MpThreatDetection"))
+            using (var q = Wmi.Searcher(DefenderNs, "SELECT ThreatID, InitialDetectionTime, ActionSuccess, CurrentThreatExecutionStatusID, Resources FROM MSFT_MpThreatDetection"))
                 foreach (var m in q.Get().Cast<ManagementBaseObject>())
                     using (m)
                     {
@@ -145,7 +151,7 @@ public static class SecurityFlow
                             m["Resources"] is Array res ? res.Length : 0));
                     }
             var thr = new List<ThreatRow>();
-            using (var q = new ManagementObjectSearcher(DefenderNs, "SELECT ThreatID, ThreatName, SeverityID, IsActive FROM MSFT_MpThreat"))
+            using (var q = Wmi.Searcher(DefenderNs, "SELECT ThreatID, ThreatName, SeverityID, IsActive FROM MSFT_MpThreat"))
                 foreach (var m in q.Get().Cast<ManagementBaseObject>())
                     using (m)
                         if (m["ThreatID"] is not null)
@@ -158,9 +164,8 @@ public static class SecurityFlow
         try
         {
             var rows = new List<DefenderEventRow>();
-            var query = new System.Diagnostics.Eventing.Reader.EventLogQuery(DefenderLog, System.Diagnostics.Eventing.Reader.PathType.LogName,
-                $"*[System[(EventID=1116 or EventID=1117 or EventID=1118 or EventID=1119) and TimeCreated[timediff(@SystemTime) <= {ThreatHistory.Days * 86_400_000L}]]]");
-            using var reader = new System.Diagnostics.Eventing.Reader.EventLogReader(query);
+            using var reader = EventLogs.Open(DefenderLog,
+                $"*[System[(EventID=1116 or EventID=1117 or EventID=1118 or EventID=1119) and TimeCreated[timediff(@SystemTime) <= {ThreatHistory.Days * 86_400_000L}]]]", TimeSpan.FromDays(ThreatHistory.Days));
             for (var e = reader.ReadEvent(); e is not null; e = reader.ReadEvent())
                 using (e)
                 {
@@ -178,8 +183,10 @@ public static class SecurityFlow
 
     private static IReadOnlyList<SuspiciousStartup> ReadSuspiciousStartups()
     {
+        Activity.ReadingRegistry("HKCU and HKLM", @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", "(programs that start from temporary or shared folders)");
         var temp = Path.GetFullPath(Path.GetTempPath());
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var appData
+ = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         var pub = Environment.GetEnvironmentVariable("PUBLIC") ?? "";
         var found = new List<SuspiciousStartup>();
         void Scan(RegistryKey hive, string location, string path)

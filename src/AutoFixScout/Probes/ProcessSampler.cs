@@ -61,6 +61,7 @@ public static class ProcessSampler
 
     public static IReadOnlyList<ProcessUsage> Sample(TimeSpan interval, long? totalMemory)
     {
+        Activity.Report(ActivityKind.Load, $"Sampling processor use of running programs for {Activity.Seconds(interval)} (program names stay on this computer)");
         var first = new Dictionary<int, TimeSpan>();
         foreach (var p in Process.GetProcesses())
             using (p)
@@ -81,7 +82,9 @@ public static class ProcessSampler
             }
         }
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        Activity.Report(ActivityKind.Analyze, $"Grouping {Activity.Count(samples.Count, "process")} by program and leaving out Windows itself");
         // The name a person recognises is read here, so the triage stays pure.
+
         return Summarise(samples, sw.Elapsed, Environment.ProcessorCount, totalMemory, windows)
             .Select(u => u with { Name = FriendlyName(u) }).ToList();
     }

@@ -1,0 +1,56 @@
+<!--
+  Frosted glass (Windows 11 acrylic backdrop). Layered over Dark.xaml only when ThemeManager has switched the window to
+  the acrylic backdrop; Windows 10, high contrast and "Transparency effects: Off" keep the solid Dark.xaml surfaces.
+  Surfaces are translucent white over the blurred backdrop; borders are hairlines that are lighter at the top edge.
+  Text contrast is kept by the dark window tint underneath (about 60 % opaque).
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#9E0E0E12"/>
+    <SolidColorBrush x:Key="SidebarBrush" Color="#40000000"/>
+
+    <!-- Frosted card: brighter at the top like light falling on glass. -->
+    <LinearGradientBrush x:Key="CardBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#21FFFFFF" Offset="0"/>
+        <GradientStop Color="#0EFFFFFF" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="CardHoverBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#33FFFFFF" Offset="0"/>
+        <GradientStop Color="#17FFFFFF" Offset="1"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="CardPressedBrush" Color="#0AFFFFFF"/>
+    <LinearGradientBrush x:Key="CardBorderBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#66FFFFFF" Offset="0"/>
+        <GradientStop Color="#1AFFFFFF" Offset="0.3"/>
+        <GradientStop Color="#0DFFFFFF" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="CardHoverBorderBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#995AA2FF" Offset="0"/>
+        <GradientStop Color="#405AA2FF" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="SurfaceBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#17FFFFFF" Offset="0"/>
+        <GradientStop Color="#0AFFFFFF" Offset="1"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="FlyoutBrush" Color="#FF1A1A1F"/>
+    <SolidColorBrush x:Key="DividerBrush" Color="#17FFFFFF"/>
+    <SolidColorBrush x:Key="InputBrush" Color="#33000000"/>
+    <SolidColorBrush x:Key="InputBorderBrush" Color="#26FFFFFF"/>
+
+    <SolidColorBrush x:Key="ButtonBrush" Color="#17FFFFFF"/>
+    <SolidColorBrush x:Key="ButtonHoverBrush" Color="#24FFFFFF"/>
+    <SolidColorBrush x:Key="ButtonPressedBrush" Color="#0DFFFFFF"/>
+    <SolidColorBrush x:Key="ButtonBorderBrush" Color="#21FFFFFF"/>
+    <SolidColorBrush x:Key="NavSelectedBrush" Color="#1AFFFFFF"/>
+
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#332670E8"/>
+    <SolidColorBrush x:Key="StepTrackBrush" Color="#2EFFFFFF"/>
+    <SolidColorBrush x:Key="StepPendingFillBrush" Color="#1AFFFFFF"/>
+    <SolidColorBrush x:Key="RingTrackBrush" Color="#26FFFFFF"/>
+
+    <SolidColorBrush x:Key="SuccessTileBrush" Color="#334CC38A"/>
+    <SolidColorBrush x:Key="InfoTileBrush" Color="#335AA2FF"/>
+    <SolidColorBrush x:Key="CautionTileBrush" Color="#33F0B429"/>
+    <SolidColorBrush x:Key="ProblemTileBrush" Color="#33F2707A"/>
+    <SolidColorBrush x:Key="NeutralTileBrush" Color="#1AFFFFFF"/>
+</ResourceDictionary>

@@ -14,6 +14,7 @@ public static class StorageCleanup
     /// </summary>
     public static (long Freed, int Deleted, int Skipped) ClearTemp(string tempRoot, DateTime cutoffUtc)
     {
+        Activity.Report(ActivityKind.Change, "Deleting temporary files older than 24 hours from the temporary folder (links are never followed, files in use are skipped)");
         var root = Path.GetFullPath(tempRoot);
         if (!root.EndsWith(Path.DirectorySeparatorChar)) root += Path.DirectorySeparatorChar;
         long freed = 0;
@@ -53,7 +54,9 @@ public static class StorageCleanup
     /// <summary>Empties the Recycle Bin on all drives. The person has already confirmed that this cannot be undone.</summary>
     public static (bool Ok, string Detail) EmptyRecycleBin()
     {
+        Activity.Report(ActivityKind.Change, "Emptying the Recycle Bin on all drives (SHEmptyRecycleBin)");
         var before = Probes.RealStorageProbe.RecycleBinSize();
+
         var hr = SHEmptyRecycleBin(IntPtr.Zero, null, NoConfirmation | NoProgressUi | NoSound);
         var after = Probes.RealStorageProbe.RecycleBinSize();
         var freed = before is { } b && after is { } a ? Math.Max(0, b - a) : (long?)null;

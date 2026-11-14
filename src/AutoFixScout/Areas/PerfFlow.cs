@@ -11,8 +11,9 @@ public static class PerfFlow
 
     public static Task<Diagnosis> DiagnoseAsync() => Task.Run(() =>
     {
+        using var _ = Activity.Scope(Topic);
         var s = new RealPerfProbe().Read();
-        var f = PerfTriage.Evaluate(s);
-        return new Diagnosis(s, f, PerfTriage.Ladder(s, f), PerfTriage.ProbablyHardware(s), PerfTriage.NotFixedHint(f));
+        var f = Analysis.Judge(() => PerfTriage.Evaluate(s));
+        return new Diagnosis(s, f, Analysis.Plan(PerfTriage.Ladder(s, f)), PerfTriage.ProbablyHardware(s), PerfTriage.NotFixedHint(f));
     });
 }

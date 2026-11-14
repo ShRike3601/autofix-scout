@@ -24,15 +24,17 @@ public static class AppsFlow
 
     public static Task<Diagnosis> DiagnoseAsync(AppsFocus focus = AppsFocus.All) => Task.Run(() =>
     {
+        using var _ = Activity.Scope(Topic);
         var s = Read(focus);
-        var f = AppsTriage.Evaluate(s);
-        return new Diagnosis(s, f, AppsTriage.Ladder(s, f), false, AppsTriage.NotFixedHint(f, focus));
+        var f = Analysis.Judge(() => AppsTriage.Evaluate(s));
+        return new Diagnosis(s, f, Analysis.Plan(AppsTriage.Ladder(s, f)), false, AppsTriage.NotFixedHint(f, focus));
     });
 
     /// <summary>Read-only: Store packages, the services they need, the clock, Click-to-Run Office and OneDrive.</summary>
     public static AppsState Read(AppsFocus focus = AppsFocus.All)
     {
         var s = new AppsState { Focus = focus };
+        Activity.Report(ActivityKind.Analyze, "Reading Store packages, services, the clock, Office and OneDrive side by side");
         // The parts read separate fields, so they run side by side (the Store package list and the clock check over the
         // network are the slow ones). Errors keep this order.
         var parts = new List<(string? Name, Action Read)>
@@ -86,8 +88,7 @@ public static class AppsFlow
         const string Filter = "*[System[Provider[@Name='MsiInstaller'] and (EventID=11708 or EventID=1033 or EventID=1034) and TimeCreated[timediff(@SystemTime) <= 604800000]]]";
         try
         {
-            using var reader = new System.Diagnostics.Eventing.Reader.EventLogReader(
-                new System.Diagnostics.Eventing.Reader.EventLogQuery("Application", System.Diagnostics.Eventing.Reader.PathType.LogName, Filter));
+            using var reader = EventLogs.Open("Application", Filter, TimeSpan.FromDays(7));
             for (var n = 0; n < 500 && reader.ReadEvent() is { } e; n++)
                 using (e)
                 {
@@ -107,6 +108,7 @@ public static class AppsFlow
     /// <summary>Pending restart: update flags, or PendingFileRenameOperations (readable without administrator rights).</summary>
     private static bool RestartPending()
     {
+        Activity.ReadingRegistry("HKLM", @"SOFTWARE\Microsoft\Windows\CurrentVersion", "(restart-pending flags) and Session Manager (pending file renames)");
         foreach (var path in new[] { @"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired",
                                      @"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending" })
         {
@@ -120,6 +122,7 @@ public static class AppsFlow
     private static IReadOnlyList<ShellPackage> ReadPackages()
     {
         var names = string.Join(",", AppsTriage.StorePackageNames.Select(n => $"'{n}'"));
+
         var (code, output) = UserRepairs.RunPowerShell(
             $"[Console]::OutputEncoding=[Text.Encoding]::UTF8; $n = @({names}); @(Get-AppxPackage | Where-Object {{ $n -contains $_.Name }} | " +
             "Select-Object Name,PackageFullName,@{n='Status';e={[string]$_.Status}}) | ConvertTo-Json -Compress");
@@ -140,6 +143,7 @@ public static class AppsFlow
     /// <summary>Same check as the health probe: the Date header of Microsoft's plain-HTTP connectivity test.</summary>
     private static double? ReadClockOffset()
     {
+        Activity.Report(ActivityKind.Network, "HTTP HEAD http://www.msftconnecttest.com/connecttest.txt (comparing the clock with the Date header)");
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         var sent = DateTime.UtcNow;
         using var r = http.Send(new HttpRequestMessage(HttpMethod.Head, "http://www.msftconnecttest.com/connecttest.txt"));

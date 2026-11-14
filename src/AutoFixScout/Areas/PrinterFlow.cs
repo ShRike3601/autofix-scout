@@ -13,9 +13,10 @@ public static class PrinterFlow
     /// <param name="scanFocus">The person reported a scanning problem: scanner findings come first.</param>
     public static Task<Diagnosis> DiagnoseAsync(bool scanFocus = false) => Task.Run(() =>
     {
+        using var _ = Activity.Scope(Topic);
         var s = new RealPrinterProbe().Read();
         s.ScanFocus = scanFocus;
-        var f = PrinterTriage.Evaluate(s);
-        return new Diagnosis(s, f, PrinterTriage.Ladder(s, f), PrinterTriage.ProbablyHardware(s), PrinterTriage.NotFixedHint(f));
+        var f = Analysis.Judge(() => PrinterTriage.Evaluate(s));
+        return new Diagnosis(s, f, Analysis.Plan(PrinterTriage.Ladder(s, f)), PrinterTriage.ProbablyHardware(s), PrinterTriage.NotFixedHint(f));
     });
 }

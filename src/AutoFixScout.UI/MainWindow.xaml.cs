@@ -21,9 +21,19 @@ public partial class MainWindow : Window, IFixHost
     public MainWindow()
     {
         InitializeComponent();
+        PreviewKeyDown += OnWindowPreviewKeyDown;
         Loaded += async (_, _) =>
         {
             CloseUnfinishedSessions();
+            _ = BuildSidebarAsync();
+            // For screenshots and testing: AUTOFIXSCOUT_OPEN=settings opens the settings panel at start.
+            // "graphics" starts the read-only graphics check; "graphics-log" also unfolds the activity list.
+            switch (Environment.GetEnvironmentVariable("AUTOFIXSCOUT_OPEN"))
+            {
+                case "settings": SetSettingsOpen(true); break;
+                case "graphics": OnGraphicsClicked(this, new RoutedEventArgs()); break;
+                case "graphics-log": OnGraphicsClicked(this, new RoutedEventArgs()); EnsureActivityPanel(); SetActivityOpen(true); break;
+            }
             await RecoverOpenSavePointsAsync();
             await ShowStartupNoticesAsync();
         };
@@ -499,7 +509,7 @@ private async void OnScannerClicked(object sender, RoutedEventArgs e) =>        
             Process.Start(new ProcessStartInfo("notepad.exe", $"\"{_lastReportPath}\""));
     }
 
-    /// <summary>"History and settings" in the sidebar: changes with Undo, recent checks and settings (MainWindow.Extras.cs).</summary>
+    /// <summary>"History" in the sidebar: changes with Undo and recent checks (MainWindow.Extras.cs).</summary>
     private void OnSettingsClicked(object sender, RoutedEventArgs e)
     {
         if (!_historyOpen) ShowHistory();

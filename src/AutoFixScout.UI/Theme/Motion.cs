@@ -14,7 +14,10 @@ namespace AutoFixScout.UI;
 /// </summary>
 public static class Motion
 {
-    public static bool Enabled => SystemParameters.ClientAreaAnimation;
+    public static bool Enabled => SystemParameters.ClientAreaAnimation && !Reduced;
+
+    /// <summary>Set from the "Reduce motion" setting: no movement even when Windows animations are on.</summary>
+    public static bool Reduced { get; set; }
 
     public static readonly IEasingFunction EaseOut = Frozen(new CubicEase { EasingMode = EasingMode.EaseOut });
     public static readonly IEasingFunction EaseOutStrong = Frozen(new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 6 });
@@ -62,9 +65,9 @@ public static class Motion
             return;
         }
         var from = TimeSpan.FromMilliseconds(delayMs);
-        element.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(240))
+        element.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(300))
         { BeginTime = from, EasingFunction = EaseOut, FillBehavior = FillBehavior.HoldEnd });
-        shift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(distance, 0, TimeSpan.FromMilliseconds(340))
+        shift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(distance, 0, TimeSpan.FromMilliseconds(520))
         { BeginTime = from, EasingFunction = EaseOutStrong });
         if (delayMs > 0) element.Opacity = 0; // hidden until its turn (the animation's base value)
     }
@@ -137,23 +140,76 @@ public static class Motion
     private static readonly DependencyPropertyDescriptor IsPressedDescriptor =
         DependencyPropertyDescriptor.FromProperty(ButtonBase.IsPressedProperty, typeof(ButtonBase));
 
+    /// <summary>Soft glow on hover, in this colour (accent buttons glow in the accent). Transparent = no glow.</summary>
+    public static readonly DependencyProperty GlowProperty = DependencyProperty.RegisterAttached(
+        "Glow", typeof(Color), typeof(Motion), new PropertyMetadata(Colors.Transparent));
+    public static Color GetGlow(DependencyObject d) => (Color)d.GetValue(GlowProperty);
+    public static void SetGlow(DependencyObject d, Color value) => d.SetValue(GlowProperty, value);
+
+    /// <summary>Colour of the click ripple (alpha included). Transparent = no ripple.</summary>
+    public static readonly DependencyProperty RippleProperty = DependencyProperty.RegisterAttached(
+        "Ripple", typeof(Color), typeof(Motion), new PropertyMetadata(Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF)));
+    public static Color GetRipple(DependencyObject d) => (Color)d.GetValue(RippleProperty);
+    public static void SetRipple(DependencyObject d, Color value) => d.SetValue(RippleProperty, value);
+
+    /// <summary>Corner radius the ripple is clipped to.</summary>
+    public static readonly DependencyProperty RippleRadiusProperty = DependencyProperty.RegisterAttached(
+        "RippleRadius", typeof(double), typeof(Motion), new PropertyMetadata(7.0));
+    public static double GetRippleRadius(DependencyObject d) => (double)d.GetValue(RippleRadiusProperty);
+    public static void SetRippleRadius(DependencyObject d, double value) => d.SetValue(RippleRadiusProperty, value);
+
+    private static readonly IEasingFunction Spring = Frozen(new ElasticEase { EasingMode = EasingMode.EaseOut, Oscillations = 1, Springiness = 7 });
+
     private static void OnPressChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is not ButtonBase b || e.NewValue is not true) return;
         b.RenderTransform = new TransformGroup { Children = { new ScaleTransform(1, 1), new TranslateTransform() } };
         b.MouseEnter += (_, _) => Settle(b);
         b.MouseLeave += (_, _) => Settle(b);
-        IsPressedDescriptor.AddValueChanged(b, (_, _) => Settle(b));
+        b.GotKeyboardFocus += (_, _) => Settle(b);
+        b.LostKeyboardFocus += (_, _) => Settle(b);
+        // Impact: a ripple from the exact point that was pressed (keyboard presses ripple from the centre).
+        b.PreviewMouseLeftButtonDown += (_, args) =>
+        {
+            if (GetRipple(b).A > 0) RippleAdorner.Play(b, args.GetPosition(b), GetRipple(b), GetRippleRadius(b));
+        };
+        b.PreviewKeyDown += (_, args) =>
+        {
+            if (args.Key is System.Windows.Input.Key.Space or System.Windows.Input.Key.Enter && GetRipple(b).A > 0)
+                RippleAdorner.Play(b, new Point(b.ActualWidth / 2, b.ActualHeight / 2), GetRipple(b), GetRippleRadius(b));
+        };
+        IsPressedDescriptor.AddValueChanged(b, (_, _) => Settle(b, released: !b.IsPressed));
     }
 
-    private static void Settle(ButtonBase b)
+    private static void Settle(ButtonBase b, bool released = false)
     {
         if (b.RenderTransform is not TransformGroup { Children: [ScaleTransform s, TranslateTransform t] }) return;
-        var target = b.IsPressed ? 0.975 : b.IsMouseOver ? GetHoverScale(b) : 1.0;
-        var lift = b.IsPressed || !b.IsMouseOver ? 0 : -GetHoverLift(b);
-        var ms = b.IsPressed ? 100 : 220;
-        To(s, ScaleTransform.ScaleXProperty, target, ms);
-        To(s, ScaleTransform.ScaleYProperty, target, ms);
-        To(t, TranslateTransform.YProperty, lift, ms);
+        var hover = b.IsMouseOver || b.IsKeyboardFocused;
+        var target = b.IsPressed ? 0.955 : hover ? GetHoverScale(b) : 1.0;
+        var lift = b.IsPressed || !hover ? 0 : -GetHoverLift(b);
+        // Press goes in fast; release springs back with a small overshoot; hover eases.
+        var (ms, ease) = b.IsPressed ? (90, EaseOut) : released ? (520, Spring) : (280, EaseOutStrong);
+        To(s, ScaleTransform.ScaleXProperty, target, ms, ease);
+        To(s, ScaleTransform.ScaleYProperty, target, ms, ease);
+        To(t, TranslateTransform.YProperty, lift, ms, EaseOutStrong);
+        Glow(b, hover && !b.IsPressed);
+        // Cards: the hover glow layer fades rather than switching (template part "Hover").
+        if (b is System.Windows.Controls.Control c && c.Template?.FindName("Hover", c) is UIElement glow)
+            To(glow, UIElement.OpacityProperty, b.IsMouseOver || b.IsKeyboardFocused ? 1 : 0, b.IsMouseOver ? 180 : 320);
+    }
+
+    /// <summary>Soft coloured light around the button while it is hovered: fades in (blur and strength), fades out.</summary>
+    private static void Glow(ButtonBase b, bool on)
+    {
+        var color = GetGlow(b);
+        if (color.A == 0 || !Enabled || SystemParameters.HighContrast) { b.Effect = null; return; }
+        if (b.Effect is not System.Windows.Media.Effects.DropShadowEffect fx)
+        {
+            if (!on) return;
+            b.Effect = fx = new System.Windows.Media.Effects.DropShadowEffect
+            { Color = color, ShadowDepth = 0, BlurRadius = 0, Opacity = 0, RenderingBias = System.Windows.Media.Effects.RenderingBias.Performance };
+        }
+        To(fx, System.Windows.Media.Effects.DropShadowEffect.BlurRadiusProperty, on ? 22 : 0, on ? 260 : 360, EaseOutStrong);
+        To(fx, System.Windows.Media.Effects.DropShadowEffect.OpacityProperty, on ? color.A / 255.0 : 0, on ? 220 : 360);
     }
 }

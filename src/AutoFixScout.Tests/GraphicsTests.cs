@@ -132,10 +132,42 @@ GPU 00000000:01:00.0
         Assert.False(saved.InStartupSection);
         Assert.Equal(-100000, saved.CoreClockKhz);
         Assert.Equal(25, saved.VoltageMv);
-        var curve = GraphicsParsers.ParseAfterburnerProfile("hw.cfg", "[Startup]\nVFCurve=00010203AABB\n");
+        var curve = GraphicsParsers.ParseAfterburnerProfile("hw.cfg", "[Startup]\nVFCurve=" + Curve(0, 75, 0) + "\n");
         Assert.True(curve.CustomCurve);
         Assert.True(curve.InStartupSection);
     }
+
+    /// <summary>Afterburner's curve format as found on a real install: header (0x20000, count), then (offset, mV, MHz) per point, then a zero block.</summary>
+    private static string Curve(params float[] offsets)
+    {
+        var b = new List<byte>();
+        b.AddRange(BitConverter.GetBytes(0x20000u)); b.AddRange(BitConverter.GetBytes((uint)offsets.Length));
+        for (var i = 0; i < offsets.Length; i++)
+        {
+            b.AddRange(BitConverter.GetBytes(offsets[i])); b.AddRange(BitConverter.GetBytes(450f + i * 6.25f)); b.AddRange(BitConverter.GetBytes(405f));
+        }
+        b.AddRange(new byte[48]);
+        return Convert.ToHexString(b.ToArray());
+    }
+
+    [Fact]
+    public void Afterburner_StockCurveIsNotAnOverclock()
+    {
+        // Regression from the bench (2026-11-14): a fresh install stores the stock curve, which is not an overclock.
+        Assert.False(GraphicsParsers.VfCurveHasOffsets(Curve(0, 0, 0, 0)));
+        Assert.False(GraphicsParsers.ParseAfterburnerProfile("VEN_10DE.cfg", "[Startup]\nFormat=2\nCoreClkBoost=0\nVFCurve=" + Curve(0, 0) + "\nMemClkBoost=0\n").HasOffsets);
+        Assert.True(GraphicsParsers.VfCurveHasOffsets(Curve(0, -50, 0)));
+        Assert.False(GraphicsParsers.VfCurveHasOffsets("00"));
+        Assert.False(GraphicsParsers.VfCurveHasOffsets("zz00020080000000"));
+        Assert.False(GraphicsParsers.VfCurveHasOffsets("0000020080000000")); // says 128 points, has none
+    }
+
+    [Theory]
+    [InlineData("[Settings]\nStartWithWindows=1\n", true)]
+    [InlineData("[Settings]\r\nStartWithWindows=0\r\n", false)]
+    [InlineData(null, false)]
+    public void Afterburner_StartWithWindowsSetting(string? text, bool expected) =>
+        Assert.Equal(expected, GraphicsParsers.AfterburnerStartsWithWindows(text));
 
     [Theory]
     [InlineData("NVIDIA GeForce RTX 2060", GpuKind.Dedicated)]

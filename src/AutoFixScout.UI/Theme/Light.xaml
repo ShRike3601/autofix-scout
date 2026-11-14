@@ -5,6 +5,8 @@
     <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#F5F6F8"/>
     <SolidColorBrush x:Key="SidebarBrush" Color="#EBEDF1"/>
     <SolidColorBrush x:Key="CardBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="FlyoutBrush" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="ScrimBrush" Color="#33000000"/>
     <SolidColorBrush x:Key="CardHoverBrush" Color="#FAFBFD"/>
     <SolidColorBrush x:Key="CardPressedBrush" Color="#F1F3F6"/>
     <SolidColorBrush x:Key="CardBorderBrush" Color="#DEE1E7"/>

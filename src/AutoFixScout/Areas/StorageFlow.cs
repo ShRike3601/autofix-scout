@@ -17,10 +17,11 @@ public static class StorageFlow
 
     public static async Task<Diagnosis> DiagnoseAsync()
     {
+        using var _ = Activity.Scope(Topic);
         // Read-only (T0); off the UI thread because the temp folder and WMI can take seconds.
         var s = await Task.Run(Probe.Read);
-        var f = StorageTriage.Evaluate(s);
-        return new Diagnosis(s, f, StorageTriage.Ladder(s, f), StorageTriage.ProbablyHardware(s), StorageTriage.NotFixedHint(f));
+        var f = Analysis.Judge(() => StorageTriage.Evaluate(s));
+        return new Diagnosis(s, f, Analysis.Plan(StorageTriage.Ladder(s, f)), StorageTriage.ProbablyHardware(s), StorageTriage.NotFixedHint(f));
     }
 
     /// <summary>True when the system drive has more free space than the warning level (10% and 10 GB).</summary>
