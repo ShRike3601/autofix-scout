@@ -555,17 +555,17 @@ Next (owner's requests, in order):
 ## Ideas for the next release (proposed 2026-11-14; owner said keep working, stop before the 11:30 reset)
 Capabilities:
 - Battery health (laptops): design vs full-charge capacity and cycle count (powercfg /batteryreport /xml, read-only),
-  plain wear level and advice. [started: agent g13-battery]
+  plain wear level and advice. [DONE, merged into next]
 - Connection quality: latency, jitter and packet loss to the gateway and to the internet, separately for Wi-Fi, so
-  "internet is slow / games lag online" gets an answer (Wi-Fi vs provider). [started: agent g14-netquality]
-- Blue screen explainer: stop code + the driver named in the crash report, in plain words, with what to do.
+  "internet is slow / games lag online" gets an answer (Wi-Fi vs provider). [DONE, in the app under Internet and Bluetooth]
+- Blue screen explainer: stop code + the driver named in the crash report, in plain words, with what to do. [DONE; the driver name needs admin-only reports, next step: read them through the elevated helper]
 - Drive wear: SSD wear %, temperature and read errors from the storage reliability counters.
 - Slow start-up through the elevated helper (the boot-time log needs admin).
-- Game settings check: Game Mode, hardware-accelerated GPU scheduling, variable refresh rate, per-game GPU choice.
+- Game settings check: Game Mode, hardware-accelerated GPU scheduling, variable refresh rate, per-game GPU choice. [DONE, in the graphics check]
 Quality of life:
 - Keyboard shortcuts: Ctrl+K search, Ctrl+, settings, Esc back. Remember window size and position. [started here]
 - Optional weekly check-up from the tray, with a notification only when something is wrong.
-- Save a report as a file (HTML) to send to a helper.
+- Save a report as a file (HTML) to send to a helper. [started: agent g17-report]
 - First-run tour (three short cards) for new users.
 
 ## Blue screen explainer (g15-bsod, 2026-11-14)
