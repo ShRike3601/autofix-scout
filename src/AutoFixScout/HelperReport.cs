@@ -84,7 +84,8 @@ public static class HelperReport
     /// </summary>
     public static string BuildHtml(string topic, IReadOnlyList<Triage.Finding> findings, IEnumerable<string> tried, Outcome outcome,
         DateTime created, IReadOnlyList<SummaryLine> computer, IReadOnlyList<ChangeEntry> changes,
-        IReadOnlyList<ActivityItem> steps, IReadOnlyList<SessionLog.SessionSummary> recent, string version, IEnumerable<string>? hide = null)
+        IReadOnlyList<ActivityItem> steps, IReadOnlyList<SessionLog.SessionSummary> recent, string version, IEnumerable<string>? hide = null,
+        IReadOnlyList<string>? appProblems = null)
     {
         var hidden = hide?.ToList();
         string E(string? v) => WebUtility.HtmlEncode(Redact(v, hidden));
@@ -167,6 +168,16 @@ public static class HelperReport
         }
         sb.Append("</section>\n");
 
+        sb.Append("<section id=\"app-problems\">\n<h2>Problems in AutoFix Scout itself</h2>\n");
+        if (appProblems is not { Count: > 0 }) sb.Append("<p class=\"muted\">No problems in AutoFix Scout itself have been recorded.</p>\n");
+        else
+        {
+            sb.Append($"<p class=\"muted\">The last {(appProblems.Count == 1 ? "entry" : appProblems.Count + " entries")} of the log that AutoFix Scout keeps on this computer.</p>\n<ol class=\"log\">\n");
+            foreach (var l in appProblems) sb.Append($"<li>{E(l)}</li>\n");
+            sb.Append("</ol>\n");
+        }
+        sb.Append("</section>\n");
+
         sb.Append($"<section id=\"version\">\n<h2>App version</h2>\n<p>AutoFix Scout version {E(version)}.</p>\n</section>\n");
         sb.Append("<footer>This report was created on the computer it describes. Personal details such as the user name, the computer name and network names have been left out.</footer>\n");
         sb.Append("</main>\n</body>\n</html>\n");
@@ -205,7 +216,8 @@ footer{color:var(--muted);font-size:13px;margin-top:18px}
         try { using var db = new SessionLog(SessionLog.DefaultPath); recent = db.Recent(10); } catch (Exception) { recent = Array.Empty<SessionLog.SessionSummary>(); }
         var steps = Activity.Recent().Where(a => a.Area.Equals(topic, StringComparison.OrdinalIgnoreCase)
                                                  || (since is { } start && a.Time >= start)).ToList();
-        return BuildHtml(topic, findings, tried, outcome, DateTime.Now, computer, changes, steps, recent, version);
+        var problems = AppLog.Recent(20);
+        return BuildHtml(topic, findings, tried, outcome, DateTime.Now, computer, changes, steps, recent, version, null, problems);
     }
 
     /// <summary>Writes AutoFix-Scout-report-yyyy-MM-dd-HHmm.html under the reports folder and returns the path.</summary>

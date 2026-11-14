@@ -22,7 +22,7 @@ public sealed class RealStorageProbe : IStorageProbe
         {
             (s.SystemDrive, s.FreeBytes, s.TotalBytes) = ReadSystemDrive();
         }
-        catch (Exception ex) { errors.Add($"system drive: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Storage probe", ex); errors.Add($"system drive: {ex.Message}"); }
 
         // The readings are independent (each sets its own fields), so they run side by side: the 2 second process
         // sample, the folder walks and the WMI/event log reads used to add up one after another.

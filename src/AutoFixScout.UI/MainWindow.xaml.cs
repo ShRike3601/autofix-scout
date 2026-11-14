@@ -148,6 +148,7 @@ public partial class MainWindow : Window, IFixHost
         }
         catch (Exception ex)
         {
+            AppLog.Error("check", ex);
             FinishSession(sessionId, new List<StepLog>(), Outcome.Abandoned);
             Journey(Stage.Done, warn: true);
             await ShowStepAsync($"AutoFix Scout could not complete the check.\n\nTechnical detail: {ex.Message}", "Finish", look: Look.Problem);

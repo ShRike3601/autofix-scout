@@ -20,7 +20,7 @@ public sealed class RealNetworkProbe : INetworkProbe
         var state = new NetworkState { ProbeErrors = errors };
 
         try { state.Adapters = ReadAdapters(); }
-        catch (Exception ex) { errors.Add($"WMI: {ex.Message}"); return state; }
+        catch (Exception ex) { AppLog.Warn("Network probe", ex); errors.Add($"WMI: {ex.Message}"); return state; }
 
         Activity.Report(ActivityKind.Network, "Checking the network adapters, Airplane mode and the connection tests");
         state.AirplaneMode = ReadAirplaneMode();
@@ -32,7 +32,7 @@ public sealed class RealNetworkProbe : INetworkProbe
             state.StaticDnsServers = ReadStaticDns(connected.InstanceId);
             state.StaticDnsAdapterId = connected.InstanceId;
         }
-        catch (Exception ex) { errors.Add($"DNS settings: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Network probe", ex); errors.Add($"DNS settings: {ex.Message}"); }
 
         ReadExtras(state);
 
@@ -68,20 +68,20 @@ public sealed class RealNetworkProbe : INetworkProbe
             var guid = ReadAdapterGuid(connected.InstanceId);
             if (guid != null) state.AddressObtained = NetworkChecks.ReadAddressObtained(guid);
         }
-        catch (Exception ex) { errors.Add($"Address: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Network probe", ex); errors.Add($"Address: {ex.Message}"); }
         if (connected.IsWireless)
         {
             try
             {
                 if (NetworkChecks.ReadWifi() is { } wifi) { state.WifiSignalPercent = wifi.SignalPercent; state.Supports5GHz = wifi.Supports5GHz; }
             }
-            catch (Exception ex) { errors.Add($"Wi-Fi signal: {ex.Message}"); }
+            catch (Exception ex) { AppLog.Warn("Network probe", ex); errors.Add($"Wi-Fi signal: {ex.Message}"); }
         }
         var wifiAdapter = state.Adapters.Where(a => a.IsWireless).OrderByDescending(a => a.Connected).FirstOrDefault();
         if (wifiAdapter != null)
         {
             try { state.WifiDrops = NetworkChecks.ReadWifiDrops(); }
-            catch (Exception ex) { errors.Add($"Wi-Fi events: {ex.Message}"); }
+            catch (Exception ex) { AppLog.Warn("Network probe", ex); errors.Add($"Wi-Fi events: {ex.Message}"); }
             try
             {
                 var wguid = ReadAdapterGuid(wifiAdapter.InstanceId);
@@ -93,20 +93,20 @@ public sealed class RealNetworkProbe : INetworkProbe
                     state.WifiInstanceId = wifiAdapter.InstanceId;
                 }
             }
-            catch (Exception ex) { errors.Add($"Wi-Fi power setting: {ex.Message}"); }
+            catch (Exception ex) { AppLog.Warn("Network probe", ex); errors.Add($"Wi-Fi power setting: {ex.Message}"); }
             try { if (wifiAdapter.Connected) state.WifiEnterprise = NetworkChecks.ReadWifiEnterprise(); }
-            catch (Exception ex) { errors.Add($"Wi-Fi security type: {ex.Message}"); }
+            catch (Exception ex) { AppLog.Warn("Network probe", ex); errors.Add($"Wi-Fi security type: {ex.Message}"); }
         }
         try
         {
             state.WifiWatcher = Watching.WifiWatcherSetup.ReadState();
             state.WifiWatch = new Watching.WifiWatchStore().Summarize(DateTime.UtcNow);
         }
-        catch (Exception ex) { errors.Add($"Wi-Fi watcher: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Network probe", ex); errors.Add($"Wi-Fi watcher: {ex.Message}"); }
         try { state.IpConflictRecent = NetworkChecks.ReadRecentIpConflict(); }
-        catch (Exception ex) { errors.Add($"Event log: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Network probe", ex); errors.Add($"Event log: {ex.Message}"); }
         try { state.Metered = NetworkChecks.ReadMetered(connected.IsWireless); }
-        catch (Exception ex) { errors.Add($"Connection cost: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Network probe", ex); errors.Add($"Connection cost: {ex.Message}"); }
     }
 
     private static string? ReadAdapterGuid(string instanceId)

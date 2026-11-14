@@ -30,10 +30,10 @@ public sealed class RealAudioProbe : IAudioProbe
 
         // Devices first, so each output can be tied to the device it belongs to.
         try { state.Devices = ReadMediaDevices(); }
-        catch (Exception ex) { errors.Add($"WMI: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Audio probe", ex); errors.Add($"WMI: {ex.Message}"); }
 
         try { ReadEndpoints(state); }
-        catch (Exception ex) { errors.Add($"Core Audio: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Audio probe", ex); errors.Add($"Core Audio: {ex.Message}"); }
 
         return state;
     }

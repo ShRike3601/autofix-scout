@@ -21,14 +21,14 @@ public sealed class RealPrinterProbe : IPrinterProbe
 
             state.SpoolerRunning = sc.Status == ServiceControllerStatus.Running ? Tri.Yes : Tri.No;
         }
-        catch (Exception ex) { errors.Add($"Spooler service: {ex.Message}"); return state; }
+        catch (Exception ex) { AppLog.Warn("Printer probe", ex); errors.Add($"Spooler service: {ex.Message}"); return state; }
         // With the spooler stopped Windows cannot list printers, so there is nothing more to read.
         if (state.SpoolerRunning != Tri.Yes) return state;
 
         try { state.Printers = ReadPrinters(); }
-        catch (Exception ex) { errors.Add($"Win32_Printer: {ex.Message}"); return state; }
+        catch (Exception ex) { AppLog.Warn("Printer probe", ex); errors.Add($"Win32_Printer: {ex.Message}"); return state; }
         try { state.Jobs = ReadJobs(); }
-        catch (Exception ex) { errors.Add($"Win32_PrintJob: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Printer probe", ex); errors.Add($"Win32_PrintJob: {ex.Message}"); }
         return state;
     }
 
@@ -38,11 +38,11 @@ public sealed class RealPrinterProbe : IPrinterProbe
         var errors = new List<string>();
         state.ScannerErrors = errors;
         try { state.WiaService = ReadService("stisvc"); state.ShellHardwareService = ReadService("ShellHWDetection"); }
-        catch (Exception ex) { errors.Add($"services: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Printer probe", ex); errors.Add($"services: {ex.Message}"); }
         if (state.WiaService?.Status == "Unknown") errors.Add("stisvc: could not be read");
         if (state.ShellHardwareService?.Status == "Unknown") errors.Add("ShellHWDetection: could not be read");
         try { state.Scanners = ReadScannerDevices(); }
-        catch (Exception ex) { errors.Add($"Win32_PnPEntity: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Printer probe", ex); errors.Add($"Win32_PnPEntity: {ex.Message}"); }
     }
 
     private static UpdateServiceInfo ReadService(string name)

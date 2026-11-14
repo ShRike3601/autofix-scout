@@ -58,14 +58,14 @@ public sealed class RealConnectionQualityProbe
                 if (found.Nic.Speed is > 0 and var bps) state.LinkSpeedMbps = (int)Math.Min(int.MaxValue, bps / 1_000_000);
             }
         }
-        catch (Exception ex) { errors.Add("gateway: " + ex.Message); }
+        catch (Exception ex) { AppLog.Warn("ConnectionQuality probe", ex); errors.Add("gateway: " + ex.Message); }
 
         if (state.OnWifi)
             try
             {
                 if (NetworkChecks.ReadWifi() is { } wifi) { state.WifiSignalPercent = wifi.SignalPercent; state.Supports5GHz = wifi.Supports5GHz; }
             }
-            catch (Exception ex) { errors.Add("wifi: " + ex.Message); }
+            catch (Exception ex) { AppLog.Warn("ConnectionQuality probe", ex); errors.Add("wifi: " + ex.Message); }
 
         var length = duration ?? DefaultDuration;
         var step = interval ?? Interval;

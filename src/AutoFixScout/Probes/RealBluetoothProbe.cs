@@ -22,15 +22,15 @@ public sealed class RealBluetoothProbe : IBluetoothProbe
             state.ServiceStatus = sc.Status.ToString();
         }
         catch (InvalidOperationException) { state.ServiceStatus = "NotFound"; }
-        catch (Exception ex) { errors.Add($"Service: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Bluetooth probe", ex); errors.Add($"Service: {ex.Message}"); }
 
         try { ReadDevices(state); }
-        catch (Exception ex) { errors.Add($"WMI: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Bluetooth probe", ex); errors.Add($"WMI: {ex.Message}"); }
 
         Activity.Report(ActivityKind.Command, "Asking Windows whether the Bluetooth radio is on (Windows.Devices.Radios)");
         try { state.RadioOn = Radios.BluetoothOn(); }
 
-        catch (Exception ex) { errors.Add($"Radios: {ex.Message}"); }
+        catch (Exception ex) { AppLog.Warn("Bluetooth probe", ex); errors.Add($"Radios: {ex.Message}"); }
         return state;
     }
 
