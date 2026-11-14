@@ -49,7 +49,7 @@ public partial class MainWindow
         });
     }
 
-    private static bool Normal(Diagnosis d) => d.Findings.Count > 0 && d.Findings.All(f => f.Code == FindingCode.LooksNormal);
+    private static bool Normal(Diagnosis d) => d.Findings.Count > 0 && d.Findings.All(f => LadderRunner.IsAllClear(f.Code));
 
     /// <summary>Runs the load test once (about 2 minutes) behind a progress screen with a "Stop" button. Sets _stressLast.</summary>
     private async Task RunStressTestAsync()

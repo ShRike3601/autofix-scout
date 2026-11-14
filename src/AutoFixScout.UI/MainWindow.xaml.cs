@@ -33,6 +33,7 @@ public partial class MainWindow : Window, IFixHost
             {
                 case "settings": SetSettingsOpen(true); break;
                 case "graphics": OnGraphicsClicked(this, new RoutedEventArgs()); break;
+                case "netquality": OnConnectionQualityClicked(this, new RoutedEventArgs()); break;
                 case "graphics-log": OnGraphicsClicked(this, new RoutedEventArgs()); EnsureActivityPanel(); SetActivityOpen(true); break;
             }
             await RecoverOpenSavePointsAsync();
@@ -375,6 +376,9 @@ public partial class MainWindow : Window, IFixHost
             "printer" => OnPrinterClicked,
             "scanner" => OnScannerClicked,
             "display" => OnDisplayClicked,
+            "performance" => OnPerfClicked,
+            "graphics" => OnGraphicsClicked,
+            "netquality" => OnConnectionQualityClicked,
             _ => OnHealthClicked,
         };
         run(sender, e);
@@ -463,6 +467,10 @@ private async void OnInstallClicked(object sender, RoutedEventArgs e) => await R
     private async void OnPerfClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.PerfFlow.Topic, Areas.PerfFlow.What, Areas.PerfFlow.DiagnoseAsync,
             () => AskAsync(Areas.PerfFlow.TestQuestion));
+
+    private async void OnConnectionQualityClicked(object sender, RoutedEventArgs e) =>
+        await RunFlowAsync(Areas.ConnectionQualityFlow.Topic, Areas.ConnectionQualityFlow.What, () => Areas.ConnectionQualityFlow.DiagnoseAsync(),
+            () => AskAsync(Areas.ConnectionQualityFlow.TestQuestion));
 
     private async void OnGraphicsClicked(object sender, RoutedEventArgs e) =>
         await RunFlowAsync(Areas.GraphicsFlow.Topic, Areas.GraphicsFlow.What, Areas.GraphicsFlow.DiagnoseAsync,

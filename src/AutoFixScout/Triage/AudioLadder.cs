@@ -168,12 +168,19 @@ public static class LadderRunner
     /// <summary>Spec 6 hard invariant.</summary>
     public const int MaxT2PerSession = 3;
 
+    /// <summary>Results that mean "nothing wrong": the general one, and areas with their own all-clear wording.</summary>
+    public static bool IsAllClear(FindingCode code) => code is FindingCode.LooksNormal or FindingCode.NetQualitySteady;
+
+    /// <summary>Results that are information, not a problem (shown in blue, not red).</summary>
+    public static bool IsInformation(FindingCode code) => code is FindingCode.ProbeIncomplete or FindingCode.StressNotRun
+        or FindingCode.NetQualityNotMeasurable or FindingCode.NetQualityInternetUnclear or FindingCode.PowerBatteryAgeing;
+
     /// <summary>
     /// Act on symptoms (spec 2): when the check found nothing wrong, run the real test before offering any fix.
     /// Returns NoFaultFound if it works; null means go on to the ladder (something's wrong, or the test failed).
     /// </summary>
     public static async Task<Outcome?> NoFaultAsync(IReadOnlyList<Finding> findings, Func<Task<bool>> test) =>
-        findings.Count > 0 && findings.All(f => f.Code == FindingCode.LooksNormal) && await test()
+        findings.Count > 0 && findings.All(f => IsAllClear(f.Code)) && await test()
             ? Outcome.NoFaultFound
             : null;
 

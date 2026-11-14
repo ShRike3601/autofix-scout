@@ -347,3 +347,18 @@ public class LiveConnectionQualityTests
         Assert.Equal(60, s.InternetA!.Sent);
     }
 }
+
+public class ResultKindTests
+{
+    [Theory]
+    [InlineData(AutoFixScout.Triage.FindingCode.LooksNormal, true, false)]
+    [InlineData(AutoFixScout.Triage.FindingCode.NetQualitySteady, true, false)]
+    [InlineData(AutoFixScout.Triage.FindingCode.NetQualityNotMeasurable, false, true)]
+    [InlineData(AutoFixScout.Triage.FindingCode.PowerBatteryAgeing, false, true)]
+    [InlineData(AutoFixScout.Triage.FindingCode.NetQualityInternet, false, false)]
+    public void AllClear_And_Information(AutoFixScout.Triage.FindingCode code, bool clear, bool info)
+    {
+        Xunit.Assert.Equal(clear, AutoFixScout.Triage.LadderRunner.IsAllClear(code));
+        Xunit.Assert.Equal(info, AutoFixScout.Triage.LadderRunner.IsInformation(code));
+    }
+}

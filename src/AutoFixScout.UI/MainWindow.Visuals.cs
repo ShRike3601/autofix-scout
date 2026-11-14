@@ -140,8 +140,8 @@ public partial class MainWindow
     /// <summary>Severity of a check result, for the banner on the result screen.</summary>
     private static Look FindingLook(FindingCode code) => code switch
     {
-        FindingCode.LooksNormal => Look.FindingOk,
-        FindingCode.ProbeIncomplete or FindingCode.StressNotRun => Look.FindingInfo, // a stopped load test is not a problem
+        _ when LadderRunner.IsAllClear(code) => Look.FindingOk,
+        _ when LadderRunner.IsInformation(code) => Look.FindingInfo, // e.g. a stopped load test or an unmeasurable connection is not a problem
         FindingCode.Muted or FindingCode.VolumeVeryLow or FindingCode.DefaultIsHdmiOrBluetooth or FindingCode.AirplaneModeOn
             or FindingCode.NetAdapterDisabled or FindingCode.NotConnected or FindingCode.CameraDisabled
             or FindingCode.CameraPrivacyOff or FindingCode.CameraInUse => Look.FindingWarning,
@@ -173,6 +173,7 @@ public partial class MainWindow
             "display" => "Screen and display",
             "performance" => "Computer speed",
             "graphics" => "Graphics card",
+            "netquality" => "Internet is slow or unstable",
             "stress" => "Short load test",
             _ => null,
         };
@@ -416,6 +417,7 @@ public partial class MainWindow
         new(0xE774, "Internet and Bluetooth", "Wi-Fi, network cable, dropped connections, Bluetooth devices",
         [
             new(0xE774, "Cannot connect to the internet", "Wi-Fi or cable not connecting, connection dropping, or websites not opening.", OnNetworkClicked),
+            new(0xE9D9, "Internet is slow or lags online", "Measures delay and lost packets for about 15 seconds, and shows whether the Wi-Fi or the provider is the cause.", OnConnectionQualityClicked),
             new(0xE702, "Bluetooth is not working", "Headphones, mouse, keyboard or phone will not pair or keep disconnecting.", OnBluetoothClicked),
         ]),
         new(0xE7F4, "Display and camera", "Screen resolution, blurry or flickering picture, webcam",
@@ -629,6 +631,7 @@ public partial class MainWindow
         "display" => 0xE7F4,
         "performance" => 0xEC4A,
         "graphics" => 0xE7FC,
+        "netquality" => 0xE9D9,
         "stress" => 0xE945,
         _ => 0xE946, // Info
     };
