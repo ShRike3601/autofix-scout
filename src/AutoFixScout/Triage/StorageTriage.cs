@@ -39,7 +39,11 @@ public static class StorageTriage
 
     /// <summary>The person's own startup entries that may be offered (see <see cref="StartupApps.Offerable"/>).</summary>
     public static IReadOnlyList<StartupEntry> StartupOffers(StorageState s) =>
-        s.StartupEntries is { } e ? StartupApps.Offerable(e, s.WindowsDirectory) : Array.Empty<StartupEntry>();
+        s.StartupEntries is { } e ? StartupApps.Offerable(e, s.WindowsDirectory, s.SlowStartupItems) : Array.Empty<StartupEntry>();
+
+    /// <summary>Offered entries that Windows measured as slowing start-up, the largest delay first (up to <see cref="StartupApps.MaxOffered"/>).</summary>
+    public static IReadOnlyList<SlowStartupMatch> SlowMatches(StorageState s) =>
+        StartupSlowMatch.Match(s.SlowStartupItems, StartupOffers(s));
 
     private static string StartupDetail(StorageState s)
     {
@@ -173,9 +177,13 @@ public static class StorageTriage
                 StartupDetail(s)));
         if (SlowStartup(s))
         {
-            var names = s.SlowStartupItems is { Count: > 0 } items ? items.Take(3).Select(x => "\"" + x.Name + "\"").ToList() : new List<string>();
+            var matches = SlowMatches(s);
+            var matched = matches.Select(m => m.Item).ToHashSet();
+            var names = s.SlowStartupItems is { Count: > 0 } items
+                ? items.Where(x => !matched.Contains(x)).Take(3).Select(x => "\"" + x.Name + "\"").ToList() : new List<string>();
             f.Add(F(FindingCode.StorageSlowStartup,
                 "Windows takes a long time to start on this computer." +
+                (matches.Count > 0 ? " " + StartupSlowMatch.Sentence(matches) : "") +
                 (names.Count > 0 ? " Windows names " + string.Join(", ", names) + " as slowing the start-up down." : ""),
                 SlowStartupDetail(s)));
         }
@@ -251,9 +259,18 @@ public static class StorageTriage
         }
 
         var offers = StartupOffers(s);
+        var measured = SlowMatches(s).ToDictionary(m => m.Entry, m => m.Ms);
         for (var i = 0; i < offers.Count; i++)
         {
             var name = StartupApps.DisplayName(offers[i]);
+            if (measured.TryGetValue(offers[i], out var ms))
+            {
+                rungs.Add(new($"startup_off_{i + 1}", "startup.disable", 1,
+                    $"Windows measured that \"{name}\" delayed the start of Windows by {StartupSlowMatch.About(ms)}. " +
+                    "AutoFix Scout can stop it from starting automatically. " +
+                    "It can be switched on again from History or in Settings > Apps > Startup.", offers[i].Name));
+                continue;
+            }
             rungs.Add(new($"startup_off_{i + 1}", "startup.disable", 1,
                 $"\"{name}\" starts automatically every time you sign in to Windows. AutoFix Scout can stop it from starting automatically. " +
                 "The app is not removed, and you can turn it on again in \"Startup apps\" at any time. " +
