@@ -346,6 +346,12 @@ public partial class MainWindow : Window, IFixHost
         var matched = rank.Candidates.Any(c => c.Score > 0);
         var areas = rank.Candidates.Select(c => c.Route.Area).ToList();
         var options = rank.Candidates.Select(c => new Choice(AreaGlyph(c.Route.Area), c.Route.Title, c.Covers)).ToList();
+        var settingTitle = Areas.SettingsSearch.Match(text);
+        if (settingTitle is not null)
+        {
+            areas.Add("setting");
+            options.Add(new Choice(0xE713, "Open the setting: " + settingTitle, "Settings"));
+        }
         if (!areas.Contains("health"))
         {
             areas.Add("health");
@@ -362,6 +368,7 @@ public partial class MainWindow : Window, IFixHost
         if (pick < 0) { ShowHome(); return; }
         Action<object, RoutedEventArgs> run = areas[pick] switch
         {
+            "setting" => (_, _) => SetSettingsOpen(true),
             "sound" => OnSoundClicked,
             "camera" => OnCameraClicked,
             "network" => OnNetworkClicked,
